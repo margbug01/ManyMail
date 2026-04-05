@@ -123,9 +123,17 @@ yourdomain.com.       IN  MX   10  mail.yourdomain.com.
 ; A record — points to your server IP
 mail.yourdomain.com.  IN  A        <your-server-ip>
 
-; SPF record (recommended)
+; SPF record — declares which IPs may send for your domain
 yourdomain.com.       IN  TXT      "v=spf1 ip4:<your-server-ip> -all"
+
+; DKIM record — email signature verification (generate key pair first)
+default._domainkey.yourdomain.com.  IN  TXT  "v=DKIM1; k=rsa; p=<your-public-key>"
+
+; DMARC record — policy for failed SPF/DKIM checks
+_dmarc.yourdomain.com.  IN  TXT  "v=DMARC1; p=quarantine; rua=mailto:dmarc@yourdomain.com"
 ```
+
+> **STARTTLS**: ManyMail supports STARTTLS. Mount your TLS certificate and key via `docker-compose.yml` and set `SMTP_TLS_CERT` / `SMTP_TLS_KEY` in `.env`. See `.env.example` for details.
 
 <br>
 

@@ -123,9 +123,17 @@ yourdomain.com.       IN  MX   10  mail.yourdomain.com.
 ; A 记录 — 指向你的服务器 IP
 mail.yourdomain.com.  IN  A        <你的服务器IP>
 
-; SPF 记录（推荐，防止伪造发件人）
+; SPF 记录 — 声明哪些 IP 可以代表你的域名发信
 yourdomain.com.       IN  TXT      "v=spf1 ip4:<你的服务器IP> -all"
+
+; DKIM 记录 — 邮件签名验证（需先生成密钥对）
+default._domainkey.yourdomain.com.  IN  TXT  "v=DKIM1; k=rsa; p=<你的公钥>"
+
+; DMARC 记录 — SPF/DKIM 验证失败时的处理策略
+_dmarc.yourdomain.com.  IN  TXT  "v=DMARC1; p=quarantine; rua=mailto:dmarc@yourdomain.com"
 ```
+
+> **STARTTLS**：ManyMail 支持 STARTTLS 加密传输。在 `docker-compose.yml` 中挂载 TLS 证书，并在 `.env` 中设置 `SMTP_TLS_CERT` / `SMTP_TLS_KEY`。详见 `.env.example`。
 
 <br>
 

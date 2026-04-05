@@ -49,6 +49,12 @@ services:
       - SMTP_GREYLIST_ENABLED=0
       - SMTP_GREYLIST_DELAY_SECONDS=60
       - SMTP_GREYLIST_TTL_SECONDS=3600
+      - SMTP_TLS_CERT=${SMTP_TLS_CERT:-}
+      - SMTP_TLS_KEY=${SMTP_TLS_KEY:-}
+    # Uncomment to mount TLS certificates for STARTTLS:
+    # volumes:
+    #   - /etc/letsencrypt/live/mail.yourdomain.com/fullchain.pem:/certs/fullchain.pem:ro
+    #   - /etc/letsencrypt/live/mail.yourdomain.com/privkey.pem:/certs/privkey.pem:ro
     depends_on:
       mongodb:
         condition: service_healthy

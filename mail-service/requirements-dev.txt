@@ -1,0 +1,5 @@
+-r requirements.txt
+pytest>=7.0
+httpx>=0.24.0
+mongomock>=4.1.0
+ruff>=0.4.0

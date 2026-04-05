@@ -1,0 +1,13 @@
+target-version = "py311"
+line-length = 120
+
+[lint]
+select = ["E", "F", "W"]
+ignore = [
+    "E501",   # line too long (handled by formatter)
+    "E402",   # module level import not at top (needed for test env setup)
+    "F841",   # local variable assigned but never used
+]
+
+[lint.per-file-ignores]
+"tests/*" = ["E711", "F811"]

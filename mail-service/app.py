@@ -40,6 +40,8 @@ ENVIRONMENT = os.getenv("ENVIRONMENT", "development").strip().lower()
 _SEED_DOMAINS = [d.strip().lower() for d in os.getenv("DOMAINS", "").split(",") if d.strip()]
 API_PORT = int(os.getenv("API_PORT", "8080"))
 SMTP_PORT = int(os.getenv("SMTP_PORT", "25"))
+SMTP_TLS_CERT = os.getenv("SMTP_TLS_CERT", "")  # path to TLS certificate (PEM)
+SMTP_TLS_KEY = os.getenv("SMTP_TLS_KEY", "")    # path to TLS private key (PEM)
 MESSAGE_TTL_DAYS = int(os.getenv("MESSAGE_TTL_DAYS", "3"))
 
 
@@ -910,18 +912,37 @@ class MailHandler:
             return "451 Requested action aborted: error in processing"
 
 
+def _build_tls_context():
+    """Build SSLContext for STARTTLS if cert/key are configured."""
+    if not SMTP_TLS_CERT or not SMTP_TLS_KEY:
+        return None
+    import ssl
+    ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+    ctx.minimum_version = ssl.TLSVersion.TLSv1_2
+    ctx.load_cert_chain(SMTP_TLS_CERT, SMTP_TLS_KEY)
+    logger.info(f"TLS context loaded: cert={SMTP_TLS_CERT}")
+    return ctx
+
+
 def start_smtp_server():
-    """启动 SMTP 服务器 (后台守护线程)"""
+    """启动 SMTP 服务器 (后台守护线程)，支持 STARTTLS"""
     handler = MailHandler()
-    controller = Controller(
-        handler,
+    tls_ctx = _build_tls_context()
+
+    kwargs = dict(
         hostname="0.0.0.0",
         port=SMTP_PORT,
         server_hostname=SMTP_HOSTNAME,
         data_size_limit=10 * 1024 * 1024,  # 10MB
     )
+    if tls_ctx:
+        kwargs["tls_context"] = tls_ctx
+        kwargs["require_starttls"] = False  # offer but don't require
+
+    controller = Controller(handler, **kwargs)
     controller.start()
-    logger.info(f"SMTP server started on port {SMTP_PORT}")
+    tls_status = "STARTTLS enabled" if tls_ctx else "no TLS"
+    logger.info(f"SMTP server started on port {SMTP_PORT} ({tls_status})")
     logger.info(f"Accepting mail for domains: {get_active_domains()} (dynamic from DB)")
 
 
