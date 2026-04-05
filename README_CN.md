@@ -18,6 +18,10 @@ SMTP 收件 &bull; REST API &bull; Web 查看器 &bull; IMAP 桥接
 
 ---
 
+<img src="docs/screenshot.jpg" alt="ManyMail 截图" width="900">
+
+<sub>*截图中所有邮件均为测试邮件，无实际意义。*</sub>
+
 </div>
 
 ## 概述

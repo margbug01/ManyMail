@@ -18,6 +18,10 @@ SMTP Receiver &bull; REST API &bull; Web Viewer &bull; IMAP Bridge
 
 ---
 
+<img src="docs/screenshot.jpg" alt="ManyMail Screenshot" width="900">
+
+<sub>*All emails shown in the screenshot are for testing purposes only and have no real-world significance.*</sub>
+
 </div>
 
 ## Overview
