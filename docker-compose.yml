@@ -1,0 +1,121 @@
+services:
+  # ---- MongoDB ----
+  mongodb:
+    image: mongo:7
+    container_name: mail-mongodb
+    restart: unless-stopped
+    volumes:
+      - mongo_data:/data/db
+    command: >
+      mongod
+      --wiredTigerCacheSizeGB 0.25
+      --quiet
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.runCommand('ping').ok"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    networks:
+      - mail-net
+
+  # ---- Mail Service (SMTP + REST API) ----
+  mail-service:
+    build: ./mail-service
+    container_name: mail-service
+    restart: unless-stopped
+    ports:
+      - "25:25"
+      - "127.0.0.1:8080:8080"
+    expose:
+      - "8080"
+    env_file:
+      - .env
+    environment:
+      - ENVIRONMENT=production
+      - ENABLE_API_DOCS=0
+      - EXPOSE_HEALTH_DETAILS=0
+      - RATE_LIMIT_WINDOW=60
+      - RATE_LIMIT_MAX=60
+      - SMTP_RCPT_RATE_WINDOW=60
+      - SMTP_RCPT_RATE_MAX=100
+      - SMTP_DATA_RATE_WINDOW=60
+      - SMTP_DATA_RATE_MAX=20
+      - SMTP_MAX_RCPTS_PER_MESSAGE=20
+      - SMTP_MAX_MESSAGE_BYTES=1048576
+      - SMTP_MAX_ADDRESS_LENGTH=320
+      - SMTP_BLACKLIST_IPS=
+      - SMTP_BLACKLIST_SENDERS=
+      - SMTP_GREYLIST_ENABLED=0
+      - SMTP_GREYLIST_DELAY_SECONDS=60
+      - SMTP_GREYLIST_TTL_SECONDS=3600
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/health', timeout=5).read()"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    networks:
+      - mail-net
+
+  # ---- Mail Viewer (Web UI) ----
+  mail-viewer:
+    build: ./mail-viewer
+    container_name: mail-viewer
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:5000:5000"
+    environment:
+      - ENVIRONMENT=${ENVIRONMENT:-production}
+      - DUCKMAIL_BASE_URL=http://mail-service:8080
+      - DUCKMAIL_API_KEY=${DUCKMAIL_API_KEY}
+      - ACCESS_PASSWORD=${ACCESS_PASSWORD}
+      - SECRET_KEY=${SECRET_KEY}
+      - UNIFIED_PASSWORD=${UNIFIED_PASSWORD}
+      - MAX_IMAGE_PROXY_BYTES=${MAX_IMAGE_PROXY_BYTES:-5242880}
+      - IMAP_MAIL_BASE_URL=http://imap-mail:3939
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:5000/login', timeout=5).read()"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    depends_on:
+      mail-service:
+        condition: service_healthy
+      imap-mail:
+        condition: service_started
+    networks:
+      - mail-net
+
+  # ---- IMAP Mail Bridge (Node.js) ----
+  imap-mail:
+    build: ./mail-viewer/imap-mail-app
+    container_name: mail-imap-bridge
+    restart: unless-stopped
+    environment:
+      - PORT=3939
+      - ACCOUNTS_FILE=/data/accounts.json
+    volumes:
+      - imap_mail_data:/data
+    expose:
+      - "3939"
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3939/api/accounts').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    networks:
+      - mail-net
+
+volumes:
+  mongo_data:
+  imap_mail_data:
+
+networks:
+  mail-net:
+    driver: bridge

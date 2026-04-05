@@ -1,0 +1,1566 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>📬 Mail Viewer</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" rel="stylesheet">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;600&family=Satisfy&display=swap" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/quill@2.0.3/dist/quill.snow.css" rel="stylesheet">
+    <style>
+        :root {
+            --primary-color: #5b9a8b;
+            --primary-hover: #4a8a7b;
+            --bg-color: #f5f9f7;
+            --card-bg: #ffffff;
+            --text-color: #1a2421;
+            --muted-text: #4a5752;
+            --border-color: #d4e4de;
+            --navy: #4a7c9b;
+            --success-color: #5b9a8b;
+            --warning-color: #c4a35a;
+            --danger-color: #c76b6b;
+            --shadow: 0 2px 8px rgba(91,154,139,0.12);
+            --content-max-width: 1680px;
+            --radius: 10px;
+            --radius-sm: 6px;
+        }
+        
+        html {
+            height: 100%;
+        }
+        
+        body {
+            background: linear-gradient(135deg, #ffffff 0%, #fafcfb 30%, #f7fbf9 50%, #fafcfb 70%, #ffffff 100%);
+            background-attachment: fixed;
+            min-height: 100vh;
+            color: var(--text-color);
+            font-family: "Noto Sans SC", "Microsoft YaHei", system-ui, sans-serif;
+        }
+        
+        .navbar {
+            background: rgba(245,249,247,0.95) !important;
+            border-bottom: 1px solid var(--border-color);
+            box-shadow: 0 1px 0 rgba(43,42,39,0.06);
+            backdrop-filter: blur(6px);
+            position: relative;
+            padding: 15px 0 !important;
+        }
+        
+        .navbar::after {
+            content: "";
+            position: absolute;
+            left: 0; right: 0; bottom: -1px;
+            height: 6px;
+            background: repeating-linear-gradient(45deg, #5b9a8b 0 10px, #ffffff 10px 20px, #4a7c9b 20px 30px, #ffffff 30px 40px);
+            opacity: 0.65;
+        }
+        
+        .navbar-brand {
+            color: #2a5f8a !important;
+            font-weight: 400;
+            font-size: 1.8rem;
+            letter-spacing: 2px;
+            font-family: 'Satisfy', cursive;
+        }
+        
+        .card {
+            background: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: var(--radius);
+            box-shadow: var(--shadow);
+        }
+        
+        .card-header {
+            background: rgba(245,249,247,0.95);
+            border-bottom: 1px solid var(--border-color);
+            font-weight: 600;
+            padding: 12px 16px;
+        }
+        
+        .btn-primary {
+            background: var(--primary-color);
+            border-color: var(--primary-color);
+        }
+        .btn-primary:hover {
+            background: var(--primary-hover);
+            border-color: var(--primary-hover);
+        }
+        
+        .form-control:focus, .form-select:focus {
+            border-color: var(--primary-color);
+            box-shadow: 0 0 0 0.2rem rgba(91,154,139,0.15);
+        }
+        
+        .list-group-item {
+            border-color: var(--border-color);
+        }
+        .list-group-item.active {
+            background: var(--primary-color);
+            border-color: var(--primary-color);
+        }
+        
+        /* 骨架屏 */
+        .skeleton {
+            background: linear-gradient(90deg, #e8f0ed 25%, #f5f9f7 50%, #e8f0ed 75%);
+            background-size: 200% 100%;
+            animation: skeleton-loading 1.5s infinite;
+            border-radius: 4px;
+        }
+        @keyframes skeleton-loading {
+            0% { background-position: 200% 0; }
+            100% { background-position: -200% 0; }
+        }
+        .skeleton-text { height: 16px; margin-bottom: 8px; }
+        .skeleton-title { height: 24px; width: 60%; margin-bottom: 12px; }
+        
+        /* 空状态 */
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: var(--muted-text);
+        }
+        .empty-state i.d-block {
+            font-size: 3.5rem;
+            margin-bottom: 12px;
+            opacity: 0.35;
+        }
+        .empty-state p {
+            font-size: 0.95rem;
+            margin-bottom: 18px;
+        }
+        .empty-state .btn-refresh {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 7px 20px;
+            border-radius: 6px;
+            font-size: 0.85rem;
+            font-weight: 500;
+            color: #666;
+            border: 1px solid #d0d0d0;
+            background: #fafafa;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        .empty-state .btn-refresh:hover {
+            background: #f0f0f0;
+            border-color: #bbb;
+            color: #333;
+        }
+        .empty-state .btn-refresh:active {
+            background: #e8e8e8;
+        }
+        .empty-state .btn-refresh i {
+            font-size: 0.85rem;
+            margin-bottom: 0;
+            opacity: 0.7;
+            color: inherit;
+        }
+        
+        /* 错误状态 */
+        .error-state {
+            text-align: center;
+            padding: 30px 20px;
+            color: var(--danger-color);
+        }
+        .error-state i {
+            font-size: 2.5rem;
+            margin-bottom: 12px;
+        }
+        
+        /* 三栏邮件布局 */
+        .mail-shell {
+            width: min(100%, var(--content-max-width));
+            margin: 0 auto;
+        }
+        @media (min-width: 992px) {
+            html, body {
+                height: 100%;
+                overflow: hidden;
+            }
+            body {
+                height: 100vh;
+                display: flex;
+                flex-direction: column;
+            }
+            .mail-shell {
+                box-sizing: border-box;
+                flex: 1 1 auto;
+                min-height: 0;
+                display: flex;
+                flex-direction: column;
+                overflow: hidden;
+            }
+            .mail-layout {
+                flex: 1 1 auto;
+                min-height: 0;
+                overflow: hidden;
+                align-items: stretch;
+            }
+            .mail-col {
+                display: flex;
+                flex-direction: column;
+                min-height: 0;
+                height: 100%;
+            }
+            .mail-col > .card {
+                flex: 1 1 auto;
+                min-height: 0;
+                display: flex;
+                flex-direction: column;
+                overflow: hidden;
+            }
+            .mail-col > .card > .card-body {
+                flex: 1 1 auto;
+                min-height: 0;
+                display: flex;
+                flex-direction: column;
+                overflow: hidden;
+            }
+            .mail-left {
+                display: flex;
+                flex-direction: column;
+                gap: 1rem;
+            }
+            .mail-left .mail-query-card { flex: 0 0 auto; }
+            .mail-left .mail-domain-card {
+                flex: 1 1 auto;
+                min-height: 0;
+            }
+            .mail-domain-body,
+            .mail-list-body {
+                gap: 0.75rem;
+            }
+            .mail-domain-scroll,
+            .mail-list-scroll,
+            #mail-detail-content {
+                flex: 1 1 auto;
+                min-height: 0;
+                overflow-y: auto;
+                overflow-x: hidden;
+                overscroll-behavior: contain;
+                scrollbar-width: thin;
+                scrollbar-color: rgba(74,124,155,0.32) transparent;
+                scrollbar-gutter: stable both-edges;
+            }
+            .mail-domain-scroll::-webkit-scrollbar,
+            .mail-list-scroll::-webkit-scrollbar,
+            #mail-detail-content::-webkit-scrollbar {
+                width: 8px;
+            }
+            .mail-domain-scroll::-webkit-scrollbar-track,
+            .mail-list-scroll::-webkit-scrollbar-track,
+            #mail-detail-content::-webkit-scrollbar-track {
+                background: transparent;
+            }
+            .mail-domain-scroll::-webkit-scrollbar-thumb,
+            .mail-list-scroll::-webkit-scrollbar-thumb,
+            #mail-detail-content::-webkit-scrollbar-thumb {
+                background: rgba(74,124,155,0.28);
+                border-radius: 999px;
+                border: 2px solid transparent;
+                background-clip: padding-box;
+            }
+            .mail-domain-scroll::-webkit-scrollbar-thumb:hover,
+            .mail-list-scroll::-webkit-scrollbar-thumb:hover,
+            #mail-detail-content::-webkit-scrollbar-thumb:hover {
+                background: rgba(74,124,155,0.42);
+            }
+            .mail-list-scroll {
+                scrollbar-color: rgba(92,92,92,0.72) rgba(255,255,255,0.92);
+            }
+            .mail-list-scroll::-webkit-scrollbar-track {
+                background: rgba(255,255,255,0.92);
+            }
+            .mail-list-scroll::-webkit-scrollbar-thumb {
+                background: rgba(92,92,92,0.6);
+            }
+            .mail-list-scroll::-webkit-scrollbar-thumb:hover {
+                background: rgba(48,48,48,0.78);
+            }
+        }
+        
+        /* 邮件内容保护 */
+        .mail-body {
+            word-break: break-word;
+            overflow-wrap: anywhere;
+        }
+        .mail-body img {
+            max-width: 100%;
+            height: auto;
+        }
+        
+        /* 邮件列表选中态 */
+        .mail-item {
+            cursor: pointer;
+            transition: all 0.15s ease;
+            overflow: hidden;
+        }
+        .mail-item .mail-item-body {
+            min-width: 0;
+        }
+        .mail-item .mail-item-meta {
+            flex-shrink: 0;
+            white-space: nowrap;
+            opacity: 0.72;
+        }
+        .mail-intro {
+            opacity: 0.72;
+        }
+        /* 未读邮件样式 */
+        .mail-item.mail-unread {
+            border-left: 3px solid var(--navy);
+            background: rgba(74,124,155,0.06);
+        }
+        .mail-item.mail-unread .mail-sender {
+            font-weight: 700;
+            color: var(--text-color);
+        }
+        .mail-item.mail-unread .mail-subject {
+            font-weight: 600;
+            color: var(--text-color);
+        }
+        /* 已读邮件样式 */
+        .mail-item:not(.mail-unread) .mail-sender {
+            font-weight: 400;
+            color: var(--muted-text);
+        }
+        .mail-item:not(.mail-unread) .mail-subject {
+            font-weight: 400;
+            color: var(--muted-text);
+        }
+        .mail-item:hover {
+            background: rgba(91,154,139,0.08);
+        }
+        .mail-item.active {
+            background: rgba(91,154,139,0.15);
+            border-left: 3px solid var(--primary-color);
+        }
+        .mail-item.active .mail-copy {
+            background: transparent;
+            border-radius: 0;
+            box-decoration-break: slice;
+            -webkit-box-decoration-break: slice;
+            padding: 0;
+        }
+        .mail-item.active strong,
+        .mail-item.active .mail-sender,
+        .mail-item.active .mail-subject {
+            font-weight: 700;
+            color: var(--text-color);
+        }
+        .mail-item.active .mail-intro {
+            opacity: 0.9;
+            color: var(--muted-text);
+        }
+        .mail-item.active .mail-item-meta {
+            opacity: 0.88;
+        }
+        
+        /* Quill 编辑器样式 */
+        .ql-container {
+            min-height: 180px;
+            font-family: "Noto Sans SC", system-ui, sans-serif;
+            font-size: 14px;
+        }
+        .ql-editor {
+            min-height: 180px;
+        }
+        .ql-toolbar.ql-snow {
+            border-radius: var(--radius-sm) var(--radius-sm) 0 0;
+            border-color: var(--border-color);
+        }
+        .ql-container.ql-snow {
+            border-radius: 0 0 var(--radius-sm) var(--radius-sm);
+            border-color: var(--border-color);
+        }
+        #imap-panel {
+            display: none;
+        }
+        #imap-panel .card {
+            overflow: hidden;
+        }
+        #imap-panel .card-body {
+            padding: 0;
+        }
+        #imap-frame {
+            width: 100%;
+            min-height: calc(100vh - 180px);
+            border: 0;
+            background: #fff;
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar navbar-light sticky-top">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="#">
+                <i class="bi bi-envelope me-2"></i>Mail Viewer
+            </a>
+            <button class="btn btn-primary" onclick="openCompose()">
+                <i class="bi bi-pencil-square me-1"></i>写邮件
+            </button>
+        </div>
+    </nav>
+
+    <div class="container-fluid py-4 px-4 mail-shell">
+        <div class="row g-4 mail-layout">
+            <!-- 第1栏：查询 -->
+            <div class="col-12 col-lg-3 mail-col mail-left" id="mail-left-column">
+                <div class="card mail-query-card">
+                    <div class="card-header">
+                        <i class="bi bi-search me-2"></i>查询收件箱
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <label class="form-label">选择域名</label>
+                            <select class="form-select" id="inbox-domain">
+                                <option value="">加载中...</option>
+                            </select>
+                        </div>
+                        <div class="mb-3">
+                            <label class="form-label">邮箱前缀</label>
+                            <div class="input-group">
+                                <input type="text" class="form-control" id="inbox-prefix" placeholder="输入前缀" onkeydown="if(event.key==='Enter') queryInbox()">
+                                <span class="input-group-text" id="inbox-domain-display">@damnv.lol</span>
+                            </div>
+                            <small class="text-muted">例如：openai001</small>
+                        </div>
+                        <button class="btn btn-primary w-100" onclick="queryInbox()" id="btn-query-inbox">
+                            <i class="bi bi-search me-1"></i>查询
+                        </button>
+                        <div id="inbox-error" class="alert alert-danger mt-3" style="display:none;"></div>
+                    </div>
+                </div>
+                
+                <div class="card mail-domain-card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <span><i class="bi bi-globe me-2"></i>域名管理</span>
+                        <button class="btn btn-sm btn-outline-secondary" onclick="loadDomains()" title="刷新">
+                            <i class="bi bi-arrow-clockwise"></i>
+                        </button>
+                    </div>
+                    <div class="card-body mail-domain-body">
+                        <div id="domain-list" class="mail-domain-scroll">
+                            <div class="text-center text-muted py-2 small">加载中...</div>
+                        </div>
+                        <div class="mail-domain-footer">
+                            <div class="input-group input-group-sm">
+                                <input type="text" class="form-control" id="new-domain-input" placeholder="输入新域名，如 example.com">
+                                <button class="btn btn-primary" onclick="addDomain()" id="btn-add-domain">
+                                    <i class="bi bi-plus-lg"></i>
+                                </button>
+                            </div>
+                            <div id="domain-error" class="text-danger small mt-2" style="display:none;"></div>
+                            <div class="small text-muted mt-2">输入前缀即可查询邮件，邮箱不存在会自动创建。</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 第2栏：收件箱列表 -->
+            <div class="col-12 col-lg-4 mail-col" id="mail-list-column">
+                <div class="card h-100">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <div class="btn-group btn-group-sm" role="group">
+                            <button type="button" class="btn btn-primary" id="tab-inbox" onclick="switchTab('inbox')">
+                                <i class="bi bi-envelope-open me-1"></i>收件箱<span id="unread-badge" class="badge ms-1" style="display:none;background:var(--navy);font-size:0.7em;"></span>
+                            </button>
+                            <button type="button" class="btn btn-outline-secondary" id="tab-sent" onclick="switchTab('sent')">
+                                <i class="bi bi-send me-1"></i>已发送
+                            </button>
+                            <button type="button" class="btn btn-outline-secondary" id="tab-imap" onclick="switchTab('imap')">
+                                <i class="bi bi-diagram-3 me-1"></i>IMAP
+                            </button>
+                        </div>
+                        <div class="d-flex align-items-center gap-2">
+                            <div class="form-check form-switch mb-0" title="每 15 秒自动刷新">
+                                <input class="form-check-input" type="checkbox" id="auto-refresh-toggle" onchange="toggleAutoRefresh(this.checked)">
+                                <label class="form-check-label small" for="auto-refresh-toggle">自动</label>
+                            </div>
+                            <button class="btn btn-sm btn-outline-secondary" onclick="refreshCurrentTab()" id="btn-refresh-mail" disabled>
+                                <i class="bi bi-arrow-clockwise"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="card-body mail-list-body">
+                        <div class="mail-list-toolbar">
+                            <div class="input-group input-group-sm" id="search-bar" style="display:none;">
+                                <input type="text" class="form-control" id="search-input" placeholder="搜索发件人/主题/内容..." onkeydown="if(event.key==='Enter') searchMail()">
+                                <button class="btn btn-outline-secondary" onclick="searchMail()" id="btn-search">
+                                    <i class="bi bi-search"></i>
+                                </button>
+                                <button class="btn btn-outline-secondary" onclick="clearSearch()" title="清除搜索">
+                                    <i class="bi bi-x-lg"></i>
+                                </button>
+                            </div>
+                            <div id="batch-bar" class="d-flex align-items-center gap-2" style="display:none !important;">
+                                <div class="form-check mb-0">
+                                    <input class="form-check-input" type="checkbox" id="select-all-checkbox" onchange="toggleSelectAll(this.checked)">
+                                    <label class="form-check-label small" for="select-all-checkbox">全选</label>
+                                </div>
+                                <span class="small text-muted" id="selected-count"></span>
+                                <button class="btn btn-sm btn-outline-danger" onclick="batchDelete()" id="btn-batch-delete" disabled>
+                                    <i class="bi bi-trash me-1"></i>删除
+                                </button>
+                                <button class="btn btn-sm btn-outline-secondary" onclick="batchMarkRead()" id="btn-batch-read" disabled>
+                                    <i class="bi bi-check2-all me-1"></i>已读
+                                </button>
+                            </div>
+                        </div>
+                        <div id="mail-list" class="mail-list-scroll">
+                            <div class="text-center text-muted py-4">
+                                <i class="bi bi-arrow-left me-2"></i>请在左侧输入邮箱前缀查询
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 第3栏：邮件详情 -->
+            <div class="col-12 col-lg-5 mail-col" id="mail-detail-column">
+                <div class="card h-100" id="mail-detail-card">
+                    <div class="card-header">
+                        <i class="bi bi-file-text me-2"></i>邮件详情
+                    </div>
+                    <div class="card-body">
+                        <div id="mail-detail-content">
+                            <div class="text-center text-muted py-5">
+                                <i class="bi bi-envelope-paper" style="font-size:3rem;opacity:0.3;"></i>
+                                <p class="mt-3">请选择一封邮件查看详情</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-12" id="imap-panel">
+                <div class="card">
+                    <div class="card-body">
+                        <iframe id="imap-frame" title="IMAP Mail Client" loading="lazy" referrerpolicy="no-referrer"></iframe>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 撰写/回复邮件 Modal -->
+    <div class="modal fade" id="composeModal" tabindex="-1" aria-labelledby="composeModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header" style="background:rgba(245,249,247,0.95);border-bottom:1px solid var(--border-color);">
+                    <h5 class="modal-title" id="composeModalLabel"><i class="bi bi-pencil-square me-2"></i>撰写邮件</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div id="compose-alert" class="alert" style="display:none;" role="alert"></div>
+                    <div class="mb-3">
+                        <label class="form-label">发件人</label>
+                        <div class="input-group">
+                            <input type="text" class="form-control" id="compose-from-prefix" placeholder="前缀">
+                            <span class="input-group-text">@</span>
+                            <select class="form-select" id="compose-from-domain" style="max-width:200px;">
+                                <option value="">加载中...</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">收件人</label>
+                        <input type="text" class="form-control" id="compose-to" placeholder="收件人邮箱，多个用逗号分隔">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">主题</label>
+                        <input type="text" class="form-control" id="compose-subject" placeholder="邮件主题">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">正文</label>
+                        <div id="compose-editor" style="min-height:200px;"></div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">取消</button>
+                    <button type="button" class="btn btn-primary" id="btn-send-email" onclick="sendEmail()">
+                        <i class="bi bi-send me-1"></i>发送
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/quill@2.0.3/dist/quill.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        let currentEmail = '';
+        let currentMessages = [];
+        let currentSentMessages = [];
+        let activeDomains = [];
+        let currentOffset = 0;
+        let currentTotal = 0;
+        let imapLoaded = false;
+        const PAGE_SIZE = 30;
+
+        // HTML 转义工具函数（防 XSS）
+        function _escapeHtml(str) {
+            const div = document.createElement('div');
+            div.appendChild(document.createTextNode(str));
+            return div.innerHTML;
+        }
+
+        function _renderMailBodyIframe(iframe, mailContent) {
+            const iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
+            iframe.setAttribute('scrolling', 'no');
+            iframe.style.overflow = 'hidden';
+
+            const resizeScript = `
+                (function () {
+                    const resize = () => {
+                        const body = document.body;
+                        const doc = document.documentElement;
+                        const height = Math.max(
+                            body ? body.scrollHeight : 0,
+                            body ? body.offsetHeight : 0,
+                            doc ? doc.scrollHeight : 0,
+                            doc ? doc.offsetHeight : 0
+                        );
+                        if (window.frameElement) {
+                            window.frameElement.style.height = (height + 20) + 'px';
+                        }
+                    };
+
+                    window.addEventListener('load', resize);
+                    if (window.ResizeObserver && document.body) {
+                        new ResizeObserver(resize).observe(document.body);
+                    }
+                    Array.from(document.images || []).forEach((img) => {
+                        if (!img.complete) {
+                            img.addEventListener('load', resize);
+                            img.addEventListener('error', resize);
+                        }
+                    });
+                    requestAnimationFrame(resize);
+                    setTimeout(resize, 120);
+                    setTimeout(resize, 500);
+                })();
+            `;
+
+            iframeDoc.open();
+            iframeDoc.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><style>html,body{margin:0;padding:0;overflow:hidden;background:transparent;}body{font-family:"Noto Sans SC",system-ui,sans-serif;font-size:14px;color:#1a2421;padding:12px;word-break:break-word;overflow:hidden;}img{max-width:100%;height:auto;}a{color:#4a7c9b;}</style></head><body>${mailContent}<script>${resizeScript}<\/script></body></html>`);
+            iframeDoc.close();
+
+            try {
+                const body = iframeDoc.body;
+                const doc = iframeDoc.documentElement;
+                const height = Math.max(
+                    body ? body.scrollHeight : 0,
+                    body ? body.offsetHeight : 0,
+                    doc ? doc.scrollHeight : 0,
+                    doc ? doc.offsetHeight : 0
+                );
+                iframe.style.height = (height + 20) + 'px';
+            } catch (e) {}
+        }
+
+        // 更新未读邮件计数 badge
+        function _updateUnreadBadge() {
+            const badge = document.getElementById('unread-badge');
+            const unreadCount = currentMessages.filter(m => !m.seen).length;
+            if (unreadCount > 0) {
+                badge.textContent = unreadCount > 99 ? '99+' : unreadCount;
+                badge.style.display = 'inline';
+            } else {
+                badge.style.display = 'none';
+            }
+        }
+
+        // 域名选择联动
+        document.getElementById('inbox-domain').addEventListener('change', function() {
+            document.getElementById('inbox-domain-display').textContent = '@' + this.value;
+        });
+
+        // ---- 域名管理 ----
+        async function loadDomains() {
+            const domainList = document.getElementById('domain-list');
+            const domainSelect = document.getElementById('inbox-domain');
+            try {
+                const resp = await fetch('/api/domains');
+                const data = await resp.json();
+                if (!data.success) {
+                    domainList.innerHTML = `<div class="text-danger small">${_escapeHtml(data.message || '加载失败')}</div>`;
+                    return;
+                }
+                const domains = (data.domains || []).filter(d => d.is_active);
+                activeDomains = domains.map(d => d.domain);
+
+                // 更新域名下拉框
+                const prevSelected = domainSelect.value;
+                domainSelect.innerHTML = activeDomains.map(d =>
+                    `<option value="${_escapeHtml(d)}">${_escapeHtml(d)}</option>`
+                ).join('');
+                if (activeDomains.includes(prevSelected)) {
+                    domainSelect.value = prevSelected;
+                }
+                if (domainSelect.value) {
+                    document.getElementById('inbox-domain-display').textContent = '@' + domainSelect.value;
+                }
+
+                // 更新域名管理列表
+                if (activeDomains.length === 0) {
+                    domainList.innerHTML = '<div class="text-muted small text-center py-2">暂无域名</div>';
+                } else {
+                    domainList.innerHTML = activeDomains.map(d => `
+                        <div class="d-flex justify-content-between align-items-center py-1 px-2 mb-1" style="background:#f5f9f7;border-radius:6px;">
+                            <span class="small"><i class="bi bi-globe2 me-1 text-muted"></i>${_escapeHtml(d)}</span>
+                            <button class="btn btn-sm p-0 text-danger" onclick="deleteDomain(decodeURIComponent('${encodeURIComponent(d)}'))" title="停用此域名">
+                                <i class="bi bi-x-lg" style="font-size:0.75rem;"></i>
+                            </button>
+                        </div>
+                    `).join('');
+                }
+            } catch (e) {
+                domainList.innerHTML = `<div class="text-danger small">加载失败: ${_escapeHtml(e.message)}</div>`;
+            }
+        }
+
+        async function addDomain() {
+            const input = document.getElementById('new-domain-input');
+            const errorDiv = document.getElementById('domain-error');
+            const domain = input.value.trim().toLowerCase();
+            errorDiv.style.display = 'none';
+
+            if (!domain) {
+                errorDiv.textContent = '请输入域名';
+                errorDiv.style.display = 'block';
+                return;
+            }
+            if (!domain.includes('.') || domain.length < 3) {
+                errorDiv.textContent = '域名格式不正确';
+                errorDiv.style.display = 'block';
+                return;
+            }
+
+            const btn = document.getElementById('btn-add-domain');
+            btn.disabled = true;
+            try {
+                const resp = await fetch('/api/domains', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ domain })
+                });
+                const data = await resp.json();
+                if (data.success) {
+                    input.value = '';
+                    await loadDomains();
+                } else {
+                    errorDiv.textContent = data.message || '添加失败';
+                    errorDiv.style.display = 'block';
+                }
+            } catch (e) {
+                errorDiv.textContent = '网络错误: ' + e.message;
+                errorDiv.style.display = 'block';
+            } finally {
+                btn.disabled = false;
+            }
+        }
+
+        async function deleteDomain(domain) {
+            if (!confirm(`确定要停用域名 "${domain}" 吗？停用后该域名的邮件将不再接收。`)) return;
+            const errorDiv = document.getElementById('domain-error');
+            errorDiv.style.display = 'none';
+            try {
+                const resp = await fetch(`/api/domains/${domain}`, { method: 'DELETE' });
+                const data = await resp.json();
+                if (data.success) {
+                    await loadDomains();
+                } else {
+                    errorDiv.textContent = data.message || '删除失败';
+                    errorDiv.style.display = 'block';
+                }
+            } catch (e) {
+                errorDiv.textContent = '网络错误: ' + e.message;
+                errorDiv.style.display = 'block';
+            }
+        }
+
+        // 页面加载时自动获取域名列表
+        document.addEventListener('DOMContentLoaded', loadDomains);
+        window.addEventListener('message', (event) => {
+            if (event.origin !== window.location.origin) return;
+            if (event.data?.type === 'mail-viewer-switch-tab' && event.data.tab) {
+                switchTab(event.data.tab);
+            }
+        });
+
+        function ensureImapLoaded() {
+            const frame = document.getElementById('imap-frame');
+            if (!imapLoaded) {
+                frame.src = '/imap/?embedded=1';
+                imapLoaded = true;
+            }
+        }
+
+        function reloadImapFrame() {
+            const frame = document.getElementById('imap-frame');
+            if (!imapLoaded) {
+                ensureImapLoaded();
+                return;
+            }
+            frame.src = '/imap/?embedded=1';
+        }
+
+        // ---- 自动刷新 ----
+        let autoRefreshTimer = null;
+        const AUTO_REFRESH_INTERVAL = 15000; // 15秒
+
+        function toggleAutoRefresh(enabled) {
+            if (enabled && currentEmail) {
+                autoRefreshTimer = setInterval(() => { queryInbox(true); }, AUTO_REFRESH_INTERVAL);
+            } else {
+                if (autoRefreshTimer) clearInterval(autoRefreshTimer);
+                autoRefreshTimer = null;
+                document.getElementById('auto-refresh-toggle').checked = false;
+            }
+        }
+
+        // ---- 收件箱 / 已发送 切换 ----
+        let currentTab = 'inbox';
+
+        function switchTab(tab) {
+            currentTab = tab;
+            const tabInbox = document.getElementById('tab-inbox');
+            const tabSent = document.getElementById('tab-sent');
+            const tabImap = document.getElementById('tab-imap');
+            const searchBar = document.getElementById('search-bar');
+            const batchBar = document.getElementById('batch-bar');
+            const leftColumn = document.getElementById('mail-left-column');
+            const listColumn = document.getElementById('mail-list-column');
+            const detailColumn = document.getElementById('mail-detail-column');
+            const imapPanel = document.getElementById('imap-panel');
+
+            if (tab === 'inbox') {
+                tabInbox.className = 'btn btn-primary';
+                tabSent.className = 'btn btn-outline-secondary';
+                tabImap.className = 'btn btn-outline-secondary';
+                leftColumn.style.display = '';
+                listColumn.style.display = '';
+                detailColumn.style.display = '';
+                imapPanel.style.display = 'none';
+                batchBar.style.display = currentMessages.length > 0 ? 'flex' : 'none';
+                searchBar.style.display = currentEmail ? 'flex' : 'none';
+                if (currentMessages.length > 0) {
+                    renderMessages(currentMessages);
+                } else if (currentEmail) {
+                    queryInbox();
+                }
+                resetMailDetail();
+            } else {
+                tabInbox.className = 'btn btn-outline-secondary';
+                searchBar.style.display = 'none';
+                batchBar.style.display = 'none';
+                if (tab === 'sent') {
+                    tabSent.className = 'btn btn-primary';
+                    tabImap.className = 'btn btn-outline-secondary';
+                    leftColumn.style.display = '';
+                    listColumn.style.display = '';
+                    detailColumn.style.display = '';
+                    imapPanel.style.display = 'none';
+                    if (currentEmail) {
+                        querySent();
+                    } else {
+                        document.getElementById('mail-list').innerHTML = '<div class="text-center text-muted py-4"><i class="bi bi-arrow-left me-2"></i>请先查询一个邮箱</div>';
+                    }
+                    resetMailDetail();
+                } else {
+                    tabSent.className = 'btn btn-outline-secondary';
+                    tabImap.className = 'btn btn-primary';
+                    if (autoRefreshTimer) {
+                        clearInterval(autoRefreshTimer);
+                        autoRefreshTimer = null;
+                        document.getElementById('auto-refresh-toggle').checked = false;
+                    }
+                    leftColumn.style.display = 'none';
+                    listColumn.style.display = 'none';
+                    detailColumn.style.display = 'none';
+                    imapPanel.style.display = 'block';
+                    ensureImapLoaded();
+                }
+            }
+        }
+
+        function refreshCurrentTab() {
+            if (currentTab === 'inbox') queryInbox();
+            else if (currentTab === 'sent') querySent();
+            else reloadImapFrame();
+        }
+
+        async function querySent() {
+            if (!currentEmail) return;
+            const mailList = document.getElementById('mail-list');
+            mailList.innerHTML = '<div class="text-center py-3"><span class="spinner-border spinner-border-sm"></span> 加载中...</div>';
+
+            try {
+                const resp = await fetch('/api/sent/query', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email: currentEmail })
+                });
+                const data = await resp.json();
+                if (!data.success) {
+                    mailList.innerHTML = `<div class="error-state"><p>${_escapeHtml(data.message || '加载失败')}</p></div>`;
+                    return;
+                }
+                renderSentMessages(data.messages);
+            } catch (e) {
+                mailList.innerHTML = `<div class="error-state"><p>加载失败: ${_escapeHtml(e.message)}</p></div>`;
+            }
+        }
+
+        function renderSentMessages(messages) {
+            currentSentMessages = messages;
+            const mailList = document.getElementById('mail-list');
+            if (messages.length === 0) {
+                mailList.innerHTML = `<div class="empty-state"><i class="bi bi-send d-block"></i><p>暂无已发送邮件</p></div>`;
+                return;
+            }
+            mailList.innerHTML = messages.map(msg => {
+                const toStr = _escapeHtml((msg.to || []).join(', '));
+                const subject = _escapeHtml(msg.subject || '(无主题)');
+                return `
+                    <div class="card mb-2 mail-item" data-msg-id="${msg.id}" onclick="viewSentDetailById('${msg.id}', this)">
+                        <div class="card-body py-2">
+                            <div class="d-flex justify-content-between align-items-start">
+                                <strong><i class="bi bi-arrow-right me-1 text-muted"></i><span class="mail-copy">${toStr}</span></strong>
+                                <small class="text-muted">${new Date(msg.createdAt).toLocaleString('zh-CN')}</small>
+                            </div>
+                            <div class="text-truncate"><span class="mail-copy">${subject}</span></div>
+                        </div>
+                    </div>`;
+            }).join('');
+        }
+
+        function viewSentDetailById(messageId, element) {
+            const msg = currentSentMessages.find(item => item.id === messageId);
+            if (!msg) return;
+            viewSentDetail(element, msg);
+        }
+
+        function viewSentDetail(element, msg) {
+            document.querySelectorAll('.mail-item').forEach(el => el.classList.remove('active'));
+            if (element) element.classList.add('active');
+            const detailContent = document.getElementById('mail-detail-content');
+            const toStr = _escapeHtml((msg.to || []).join(', '));
+            detailContent.innerHTML = `
+                <div class="mb-3"><strong>收件人:</strong> ${toStr}</div>
+                <div class="mb-3"><strong>主题:</strong> ${_escapeHtml(msg.subject || '(无主题)')}</div>
+                <div class="mb-3"><strong>时间:</strong> ${new Date(msg.createdAt).toLocaleString('zh-CN')}</div>
+                <hr>
+                <div class="mail-body-container" style="background:#f8f9fa; padding:0; border-radius:8px; overflow:hidden;">
+                    <iframe id="sent-body-frame" sandbox="allow-same-origin" referrerpolicy="no-referrer" style="width:100%;border:none;min-height:200px;"></iframe>
+                </div>`;
+            // 安全渲染已发送邮件内容
+            const iframe = document.getElementById('sent-body-frame');
+            const mailContent = msg.html || _escapeHtml(msg.text || '').replace(/\n/g, '<br>') || '<i style="color:#6c757d;">邮件内容为空</i>';
+            _renderMailBodyIframe(iframe, mailContent);
+        }
+
+        function resetMailDetail() {
+            document.getElementById('mail-detail-content').innerHTML = `
+                <div class="text-center text-muted py-5">
+                    <i class="bi bi-envelope-paper" style="font-size:3rem;opacity:0.3;"></i>
+                    <p class="mt-3">请选择一封邮件查看详情</p>
+                </div>`;
+            document.querySelectorAll('.mail-item').forEach(el => el.classList.remove('active'));
+        }
+
+        async function queryInbox(silent = false, append = false) {
+            if (!silent && !append) resetMailDetail();
+            const prefix = document.getElementById('inbox-prefix').value.trim();
+            const domain = document.getElementById('inbox-domain').value;
+            const email = prefix ? `${prefix}@${domain}` : '';
+            const errorDiv = document.getElementById('inbox-error');
+            const btn = document.getElementById('btn-query-inbox');
+            const mailList = document.getElementById('mail-list');
+            
+            if (!prefix) {
+                if (!silent) {
+                    errorDiv.textContent = '请输入邮箱前缀';
+                    errorDiv.style.display = 'block';
+                }
+                return;
+            }
+            
+            // 计算分页偏移量
+            const reqOffset = append ? currentMessages.length : 0;
+            
+            errorDiv.style.display = 'none';
+            if (!silent && !append) {
+                btn.disabled = true;
+                btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>查询中...';
+                mailList.innerHTML = `
+                    <div class="card mb-2">
+                        <div class="card-body py-3">
+                            <div class="skeleton skeleton-title"></div>
+                            <div class="skeleton skeleton-text" style="width:80%"></div>
+                            <div class="skeleton skeleton-text" style="width:60%"></div>
+                        </div>
+                    </div>
+                    <div class="card mb-2">
+                        <div class="card-body py-3">
+                            <div class="skeleton skeleton-title"></div>
+                            <div class="skeleton skeleton-text" style="width:75%"></div>
+                        </div>
+                    </div>`;
+            }
+            if (append) {
+                const loadMoreBtn = document.getElementById('btn-load-more');
+                if (loadMoreBtn) {
+                    loadMoreBtn.disabled = true;
+                    loadMoreBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>加载中...';
+                }
+            }
+            
+            try {
+                const resp = await fetch('/api/inbox/query', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email, offset: reqOffset, limit: PAGE_SIZE })
+                });
+                const data = await resp.json();
+                
+                if (!data.success) {
+                    if (!silent) {
+                        errorDiv.textContent = data.message;
+                        errorDiv.style.display = 'block';
+                        mailList.innerHTML = `
+                            <div class="error-state">
+                                <i class="bi bi-exclamation-triangle d-block"></i>
+                                <p>${_escapeHtml(data.message || '查询失败')}</p>
+                            </div>`;
+                    }
+                    return;
+                }
+                
+                currentEmail = email;
+                currentTotal = data.total || 0;
+                
+                if (append) {
+                    // 追加模式：合并新消息到已有列表
+                    currentMessages = currentMessages.concat(data.messages);
+                } else {
+                    currentMessages = data.messages;
+                }
+                
+                document.getElementById('btn-refresh-mail').disabled = false;
+                if (currentTab === 'inbox') {
+                    document.getElementById('search-bar').style.display = 'flex';
+                }
+                
+                // 静默刷新时保存当前选中和 checkbox 状态
+                let activeId = null;
+                let checkedIds = [];
+                if (silent) {
+                    const activeEl = document.querySelector('.mail-item.active');
+                    if (activeEl) activeId = activeEl.dataset.msgId;
+                    checkedIds = getSelectedIds();
+                }
+                
+                renderMessages(currentMessages);
+                
+                // 恢复选中和 checkbox 状态
+                if (silent || append) {
+                    if (activeId) {
+                        const el = document.querySelector(`.mail-item[data-msg-id="${activeId}"]`);
+                        if (el) el.classList.add('active');
+                    }
+                    if (checkedIds.length > 0) {
+                        checkedIds.forEach(id => {
+                            const cb = document.querySelector(`.mail-checkbox[value="${id}"]`);
+                            if (cb) cb.checked = true;
+                        });
+                        updateBatchButtons();
+                    }
+                }
+                
+            } catch (e) {
+                if (!silent) {
+                    errorDiv.textContent = '网络错误: ' + e.message;
+                    errorDiv.style.display = 'block';
+                    mailList.innerHTML = `
+                        <div class="error-state">
+                            <i class="bi bi-exclamation-triangle d-block"></i>
+                            <p>网络错误: ${_escapeHtml(e.message)}</p>
+                        </div>`;
+                }
+            } finally {
+                if (!silent) {
+                    btn.disabled = false;
+                    btn.innerHTML = '<i class="bi bi-search me-1"></i>查询';
+                }
+            }
+        }
+
+        function renderMessages(messages) {
+            const mailList = document.getElementById('mail-list');
+            const batchBar = document.getElementById('batch-bar');
+
+            // 显示/隐藏批量操作栏
+            if (messages.length > 0 && currentTab === 'inbox') {
+                batchBar.style.display = 'flex';
+                batchBar.style.cssText = 'display:flex !important;';
+            } else {
+                batchBar.style.cssText = 'display:none !important;';
+            }
+            // 重置全选
+            document.getElementById('select-all-checkbox').checked = false;
+            updateBatchButtons();
+            
+            if (messages.length === 0) {
+                mailList.innerHTML = `
+                    <div class="empty-state">
+                        <i class="bi bi-inbox d-block"></i>
+                        <p>收件箱为空</p>
+                        <button class="btn-refresh" onclick="queryInbox()">
+                            <i class="bi bi-arrow-clockwise"></i>刷新
+                        </button>
+                    </div>`;
+                return;
+            }
+            
+            mailList.innerHTML = messages.map(msg => `
+                <div class="card mb-2 mail-item ${msg.seen ? '' : 'mail-unread'}" data-msg-id="${msg.id}">
+                    <div class="card-body py-2">
+                        <div class="d-flex align-items-start">
+                            <div class="form-check me-2 mt-1" onclick="event.stopPropagation()">
+                                <input class="form-check-input mail-checkbox" type="checkbox" value="${msg.id}" onchange="updateBatchButtons()">
+                            </div>
+                            <div class="flex-grow-1 mail-item-body" onclick="viewMailDetail('${msg.id}', this.closest('.mail-item'))">
+                                <div class="d-flex justify-content-between align-items-start">
+                                    <span class="mail-sender text-truncate me-2"><span class="mail-copy">${_escapeHtml(msg.from?.name || msg.from?.address || '未知发件人')}</span></span>
+                                    <div class="mail-item-meta text-end ms-2">
+                                        ${msg.extracted_code ? `<span class="badge bg-success me-1" title="验证码"><i class="bi bi-key me-1"></i>${msg.extracted_code}</span>` : ''}
+                                        <small class="text-muted">${new Date(msg.createdAt).toLocaleString('zh-CN')}</small>
+                                    </div>
+                                </div>
+                                <div class="mail-subject text-truncate"><span class="mail-copy">${_escapeHtml(msg.subject || '(无主题)')}</span></div>
+                                <small class="mail-intro text-muted text-truncate d-block"><span class="mail-copy">${_escapeHtml(msg.intro || '')}</span></small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+            
+            // 添加"加载更多"按钮（当还有更多数据时）
+            if (currentTotal > currentMessages.length && currentTab === 'inbox') {
+                mailList.insertAdjacentHTML('beforeend', `
+                    <div class="text-center py-3">
+                        <button class="btn btn-outline-primary btn-sm" id="btn-load-more" onclick="queryInbox(false, true)">
+                            <i class="bi bi-arrow-down-circle me-1"></i>加载更多 (${currentMessages.length}/${currentTotal})
+                        </button>
+                    </div>`);
+            }
+            _updateUnreadBadge();
+        }
+
+        async function searchMail() {
+            if (!currentEmail) return;
+            const query = document.getElementById('search-input').value.trim();
+            if (!query) { clearSearch(); return; }
+
+            const mailList = document.getElementById('mail-list');
+            mailList.innerHTML = '<div class="text-center py-3"><span class="spinner-border spinner-border-sm"></span> 搜索中...</div>';
+
+            try {
+                const resp = await fetch('/api/inbox/search', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email: currentEmail, query })
+                });
+                const data = await resp.json();
+                if (data.success) {
+                    renderMessages(data.messages);
+                    if (data.messages.length === 0) {
+                        mailList.innerHTML = `<div class="empty-state"><i class="bi bi-search d-block"></i><p>没有找到匹配的邮件</p></div>`;
+                    }
+                } else {
+                    mailList.innerHTML = `<div class="error-state"><p>${_escapeHtml(data.message || '搜索失败')}</p></div>`;
+                }
+            } catch (e) {
+                mailList.innerHTML = `<div class="error-state"><p>搜索失败: ${_escapeHtml(e.message)}</p></div>`;
+            }
+        }
+
+        function clearSearch() {
+            document.getElementById('search-input').value = '';
+            if (currentMessages.length > 0) {
+                renderMessages(currentMessages);
+            }
+        }
+
+        async function viewMailDetail(messageId, element) {
+            if (!currentEmail) return;
+            
+            document.querySelectorAll('.mail-item').forEach(el => el.classList.remove('active'));
+            if (element) element.classList.add('active');
+            
+            const detailContent = document.getElementById('mail-detail-content');
+            
+            detailContent.innerHTML = `
+                <div class="mb-3"><div class="skeleton skeleton-text" style="width:50%"></div></div>
+                <div class="mb-3"><div class="skeleton skeleton-text" style="width:70%"></div></div>
+                <div class="mb-3"><div class="skeleton skeleton-text" style="width:40%"></div></div>
+                <hr>
+                <div style="background:#f8f9fa; padding:15px; border-radius:8px;">
+                    <div class="skeleton skeleton-text mb-2" style="width:90%"></div>
+                    <div class="skeleton skeleton-text mb-2" style="width:85%"></div>
+                    <div class="skeleton skeleton-text" style="width:60%"></div>
+                </div>`;
+            
+            try {
+                const resp = await fetch('/api/inbox/detail', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        email: currentEmail, 
+                        message_id: messageId 
+                    })
+                });
+                const data = await resp.json();
+                
+                if (!data.success) {
+                    detailContent.innerHTML = `
+                        <div class="error-state">
+                            <i class="bi bi-exclamation-triangle d-block"></i>
+                            <p>${_escapeHtml(data.message || '加载失败')}</p>
+                        </div>`;
+                    return;
+                }
+                
+                const msg = data.detail;
+                // 保存当前查看的邮件详情供回复使用
+                window._currentDetailMsg = msg;
+                // 同步已读状态：更新 currentMessages 并移除未读样式
+                const idx = currentMessages.findIndex(m => m.id === messageId);
+                if (idx !== -1) currentMessages[idx].seen = true;
+                if (element) element.classList.remove('mail-unread');
+                _updateUnreadBadge();
+                const escapedSubject = _escapeHtml(msg.subject || '(无主题)');
+                const escapedFromName = _escapeHtml(msg.from?.name || '');
+                const escapedFromAddr = _escapeHtml(msg.from?.address || '');
+                detailContent.innerHTML = `
+                    <div class="d-flex justify-content-between align-items-start mb-3">
+                        <div>
+                            <strong>发件人:</strong> ${escapedFromName} &lt;${escapedFromAddr}&gt;
+                        </div>
+                        <div>
+                            <button class="btn btn-sm btn-outline-primary me-1" onclick="openReply()">
+                                <i class="bi bi-reply me-1"></i>回复
+                            </button>
+                            <button class="btn btn-sm btn-outline-danger" onclick="deleteEmail('${messageId}')">
+                                <i class="bi bi-trash me-1"></i>删除
+                            </button>
+                        </div>
+                    </div>
+                    <div class="mb-3">
+                        <strong>主题:</strong> ${escapedSubject}
+                    </div>
+                    <div class="mb-3">
+                        <strong>时间:</strong> ${new Date(msg.createdAt).toLocaleString('zh-CN')}
+                    </div>
+                    <hr>
+                    <div class="mail-body-container" style="background:#f8f9fa; padding:0; border-radius:8px; overflow:hidden;">
+                        <iframe id="mail-body-frame" sandbox="allow-same-origin" referrerpolicy="no-referrer" style="width:100%;border:none;min-height:200px;"></iframe>
+                    </div>
+                `;
+                // 安全渲染邮件内容到 iframe sandbox
+                const iframe = document.getElementById('mail-body-frame');
+                const mailContent = msg.html || _escapeHtml(msg.text || '').replace(/\n/g, '<br>') || '<i style="color:#6c757d;">邮件内容为空</i>';
+                _renderMailBodyIframe(iframe, mailContent);
+                
+            } catch (e) {
+                detailContent.innerHTML = `<div class="alert alert-danger">加载失败: ${e.message}</div>`;
+            }
+        }
+
+        // ---- 撰写 / 回复 / 发送邮件 ----
+
+        let composeModal = null;
+        let quillEditor = null;
+
+        function _getComposeModal() {
+            if (!composeModal) {
+                composeModal = new bootstrap.Modal(document.getElementById('composeModal'));
+            }
+            return composeModal;
+        }
+
+        function _getQuillEditor() {
+            if (!quillEditor) {
+                quillEditor = new Quill('#compose-editor', {
+                    theme: 'snow',
+                    placeholder: '输入邮件正文...',
+                    modules: {
+                        toolbar: [
+                            [{ 'header': [1, 2, 3, false] }],
+                            ['bold', 'italic', 'underline', 'strike'],
+                            [{ 'color': [] }, { 'background': [] }],
+                            [{ 'list': 'ordered' }, { 'list': 'bullet' }],
+                            ['blockquote', 'code-block'],
+                            ['link', 'image'],
+                            ['clean'],
+                        ],
+                    },
+                });
+            }
+            return quillEditor;
+        }
+
+        function _syncComposeDomains() {
+            const sel = document.getElementById('compose-from-domain');
+            const prev = sel.value;
+            sel.innerHTML = activeDomains.map(d => `<option value="${d}">${d}</option>`).join('');
+            if (activeDomains.includes(prev)) sel.value = prev;
+        }
+
+        function _resetComposeForm() {
+            document.getElementById('compose-from-prefix').value = '';
+            document.getElementById('compose-to').value = '';
+            document.getElementById('compose-subject').value = '';
+            _getQuillEditor().setContents([]);
+            const alert = document.getElementById('compose-alert');
+            alert.style.display = 'none';
+            alert.className = 'alert';
+            document.getElementById('btn-send-email').disabled = false;
+            document.getElementById('btn-send-email').innerHTML = '<i class="bi bi-send me-1"></i>发送';
+            document.getElementById('composeModalLabel').innerHTML = '<i class="bi bi-pencil-square me-2"></i>撰写邮件';
+        }
+
+        function openCompose() {
+            _resetComposeForm();
+            _syncComposeDomains();
+            // 如果当前已查询邮箱，自动填充发件人
+            if (currentEmail) {
+                const [prefix, domain] = currentEmail.split('@');
+                document.getElementById('compose-from-prefix').value = prefix || '';
+                const domainSel = document.getElementById('compose-from-domain');
+                if (activeDomains.includes(domain)) domainSel.value = domain;
+            }
+            _getComposeModal().show();
+        }
+
+        function openReply() {
+            const msg = window._currentDetailMsg;
+            if (!msg) return;
+
+            _resetComposeForm();
+            _syncComposeDomains();
+            document.getElementById('composeModalLabel').innerHTML = '<i class="bi bi-reply me-2"></i>回复邮件';
+
+            // 填充收件人 = 原发件人
+            document.getElementById('compose-to').value = msg.from?.address || '';
+
+            // 填充主题
+            const origSubject = msg.subject || '';
+            document.getElementById('compose-subject').value = origSubject.startsWith('Re: ') ? origSubject : `Re: ${origSubject}`;
+
+            // 填充发件人 = 当前查询的邮箱
+            if (currentEmail) {
+                const [prefix, domain] = currentEmail.split('@');
+                document.getElementById('compose-from-prefix').value = prefix || '';
+                const domainSel = document.getElementById('compose-from-domain');
+                if (activeDomains.includes(domain)) domainSel.value = domain;
+            }
+
+            // 引用原文
+            const origDate = msg.createdAt ? new Date(msg.createdAt).toLocaleString('zh-CN') : '';
+            const origFrom = msg.from?.address || '';
+            const origText = msg.text || '';
+            const editor = _getQuillEditor();
+            editor.setContents([]);
+            editor.insertText(0, '\n\n');
+            const quoteStart = editor.getLength();
+            const quoteText = `--- Original Message ---\nFrom: ${origFrom}\nDate: ${origDate}\nSubject: ${origSubject}\n\n${origText}`;
+            editor.insertText(quoteStart, quoteText);
+            editor.formatText(quoteStart, quoteText.length, 'color', '#6c757d');
+            editor.setSelection(0, 0);
+
+            _getComposeModal().show();
+        }
+
+        async function sendEmail() {
+            const alertDiv = document.getElementById('compose-alert');
+            const btn = document.getElementById('btn-send-email');
+            alertDiv.style.display = 'none';
+
+            const fromPrefix = document.getElementById('compose-from-prefix').value.trim();
+            const fromDomain = document.getElementById('compose-from-domain').value;
+            const to = document.getElementById('compose-to').value.trim();
+            const subject = document.getElementById('compose-subject').value.trim();
+            const editor = _getQuillEditor();
+            const body = editor.getText().trim();
+            const htmlBody = editor.root.innerHTML;
+
+            if (!fromPrefix || !fromDomain) {
+                alertDiv.className = 'alert alert-danger';
+                alertDiv.textContent = '请填写发件人';
+                alertDiv.style.display = 'block';
+                return;
+            }
+            if (!to) {
+                alertDiv.className = 'alert alert-danger';
+                alertDiv.textContent = '请填写收件人';
+                alertDiv.style.display = 'block';
+                return;
+            }
+            if (!subject) {
+                alertDiv.className = 'alert alert-danger';
+                alertDiv.textContent = '请填写主题';
+                alertDiv.style.display = 'block';
+                return;
+            }
+            if (!body) {
+                alertDiv.className = 'alert alert-danger';
+                alertDiv.textContent = '请填写正文';
+                alertDiv.style.display = 'block';
+                return;
+            }
+
+            const fromEmail = `${fromPrefix}@${fromDomain}`;
+
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>发送中...';
+
+            try {
+                const resp = await fetch('/api/send', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        from_email: fromEmail,
+                        from_name: fromPrefix,
+                        to: to,
+                        subject: subject,
+                        text: body,
+                        html: htmlBody,
+                        reply_to: fromEmail,
+                    })
+                });
+                const data = await resp.json();
+
+                if (data.success) {
+                    alertDiv.className = 'alert alert-success';
+                    alertDiv.textContent = '邮件发送成功！';
+                    alertDiv.style.display = 'block';
+                    btn.innerHTML = '<i class="bi bi-check-lg me-1"></i>已发送';
+                    // 2秒后自动关闭弹窗
+                    setTimeout(() => { _getComposeModal().hide(); }, 2000);
+                } else {
+                    alertDiv.className = 'alert alert-danger';
+                    alertDiv.textContent = data.message || '发送失败';
+                    alertDiv.style.display = 'block';
+                    btn.disabled = false;
+                    btn.innerHTML = '<i class="bi bi-send me-1"></i>发送';
+                }
+            } catch (e) {
+                alertDiv.className = 'alert alert-danger';
+                alertDiv.textContent = '网络错误: ' + e.message;
+                alertDiv.style.display = 'block';
+                btn.disabled = false;
+                btn.innerHTML = '<i class="bi bi-send me-1"></i>发送';
+            }
+        }
+
+        // ---- 批量操作 ----
+
+        function getSelectedIds() {
+            return Array.from(document.querySelectorAll('.mail-checkbox:checked')).map(cb => cb.value);
+        }
+
+        function updateBatchButtons() {
+            const ids = getSelectedIds();
+            const count = ids.length;
+            document.getElementById('btn-batch-delete').disabled = count === 0;
+            document.getElementById('btn-batch-read').disabled = count === 0;
+            document.getElementById('selected-count').textContent = count > 0 ? `已选 ${count} 封` : '';
+        }
+
+        function toggleSelectAll(checked) {
+            document.querySelectorAll('.mail-checkbox').forEach(cb => { cb.checked = checked; });
+            updateBatchButtons();
+        }
+
+        async function batchAction(action) {
+            const ids = getSelectedIds();
+            if (ids.length === 0) return;
+
+            const label = action === 'delete' ? '删除' : '标记已读';
+            if (action === 'delete' && !confirm(`确定要删除选中的 ${ids.length} 封邮件吗？`)) return;
+
+            try {
+                const resp = await fetch('/api/inbox/batch', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        email: currentEmail,
+                        action: action,
+                        message_ids: ids,
+                    })
+                });
+                const data = await resp.json();
+                if (data.success) {
+                    if (action === 'delete') {
+                        currentMessages = currentMessages.filter(m => !ids.includes(m.id));
+                        renderMessages(currentMessages);
+                        resetMailDetail();
+                    } else if (action === 'mark_read') {
+                        // 本地更新已读状态，避免不必要的网络请求
+                        ids.forEach(id => {
+                            const m = currentMessages.find(msg => msg.id === id);
+                            if (m) m.seen = true;
+                        });
+                        renderMessages(currentMessages);
+                        _updateUnreadBadge();
+                    }
+                } else {
+                    alert(data.message || `${label}失败`);
+                }
+            } catch (e) {
+                alert('网络错误: ' + e.message);
+            }
+        }
+
+        function batchDelete() { batchAction('delete'); }
+        function batchMarkRead() { batchAction('mark_read'); }
+
+        // ---- 删除邮件 ----
+
+        async function deleteEmail(messageId) {
+            if (!currentEmail) return;
+            if (!confirm('确定要删除这封邮件吗？')) return;
+
+            try {
+                const resp = await fetch('/api/inbox/delete', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        email: currentEmail,
+                        message_id: messageId,
+                    })
+                });
+                const data = await resp.json();
+
+                if (data.success) {
+                    // 从列表中移除并重置详情
+                    currentMessages = currentMessages.filter(m => m.id !== messageId);
+                    renderMessages(currentMessages);
+                    resetMailDetail();
+                } else {
+                    alert(data.message || '删除失败');
+                }
+            } catch (e) {
+                alert('网络错误: ' + e.message);
+            }
+        }
+    </script>
+</body>
+</html>
