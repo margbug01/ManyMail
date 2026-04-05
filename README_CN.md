@@ -1,6 +1,6 @@
 <div align="center">
 
-# ManyMail
+<img src="docs/banner.svg" alt="ManyMail" width="700">
 
 **轻量级自建邮箱服务 —— 一键部署，开箱即用**
 

@@ -1,6 +1,6 @@
 <div align="center">
 
-# ManyMail
+<img src="docs/banner.svg" alt="ManyMail" width="700">
 
 **Lightweight self-hosted mail service — one-click deploy, ready to use**
 
