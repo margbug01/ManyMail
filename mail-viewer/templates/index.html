@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>📬 Mail Viewer</title>
+    <title>ManyMail</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" rel="stylesheet">
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -399,11 +399,16 @@
     <nav class="navbar navbar-light sticky-top">
         <div class="container-fluid">
             <a class="navbar-brand" href="#">
-                <i class="bi bi-envelope me-2"></i>Mail Viewer
+                <i class="bi bi-envelope me-2"></i>ManyMail
             </a>
-            <button class="btn btn-primary" onclick="openCompose()">
-                <i class="bi bi-pencil-square me-1"></i>写邮件
-            </button>
+            <div class="d-flex align-items-center gap-2">
+                <button class="btn btn-sm btn-outline-secondary" onclick="toggleLang()" id="btn-lang" title="Switch Language">
+                    <i class="bi bi-translate me-1"></i><span id="lang-label">EN</span>
+                </button>
+                <button class="btn btn-primary" onclick="openCompose()">
+                    <i class="bi bi-pencil-square me-1"></i><span data-i18n="compose">写邮件</span>
+                </button>
+            </div>
         </div>
     </nav>
 
@@ -413,25 +418,25 @@
             <div class="col-12 col-lg-3 mail-col mail-left" id="mail-left-column">
                 <div class="card mail-query-card">
                     <div class="card-header">
-                        <i class="bi bi-search me-2"></i>查询收件箱
+                        <i class="bi bi-search me-2"></i><span data-i18n="queryInbox">查询收件箱</span>
                     </div>
                     <div class="card-body">
                         <div class="mb-3">
-                            <label class="form-label">选择域名</label>
+                            <label class="form-label" data-i18n="selectDomain">选择域名</label>
                             <select class="form-select" id="inbox-domain">
-                                <option value="">加载中...</option>
+                                <option value="" data-i18n="loading">加载中...</option>
                             </select>
                         </div>
                         <div class="mb-3">
-                            <label class="form-label">邮箱前缀</label>
+                            <label class="form-label" data-i18n="emailPrefix">邮箱前缀</label>
                             <div class="input-group">
-                                <input type="text" class="form-control" id="inbox-prefix" placeholder="输入前缀" onkeydown="if(event.key==='Enter') queryInbox()">
+                                <input type="text" class="form-control" id="inbox-prefix" data-i18n-ph="enterPrefix" placeholder="输入前缀" onkeydown="if(event.key==='Enter') queryInbox()">
                                 <span class="input-group-text" id="inbox-domain-display">@damnv.lol</span>
                             </div>
-                            <small class="text-muted">例如：openai001</small>
+                            <small class="text-muted" data-i18n="prefixExample">例如：openai001</small>
                         </div>
                         <button class="btn btn-primary w-100" onclick="queryInbox()" id="btn-query-inbox">
-                            <i class="bi bi-search me-1"></i>查询
+                            <i class="bi bi-search me-1"></i><span data-i18n="query">查询</span>
                         </button>
                         <div id="inbox-error" class="alert alert-danger mt-3" style="display:none;"></div>
                     </div>
@@ -439,24 +444,24 @@
                 
                 <div class="card mail-domain-card">
                     <div class="card-header d-flex justify-content-between align-items-center">
-                        <span><i class="bi bi-globe me-2"></i>域名管理</span>
-                        <button class="btn btn-sm btn-outline-secondary" onclick="loadDomains()" title="刷新">
+                        <span><i class="bi bi-globe me-2"></i><span data-i18n="domainMgmt">域名管理</span></span>
+                        <button class="btn btn-sm btn-outline-secondary" onclick="loadDomains()" data-i18n-title="refresh" title="刷新">
                             <i class="bi bi-arrow-clockwise"></i>
                         </button>
                     </div>
                     <div class="card-body mail-domain-body">
                         <div id="domain-list" class="mail-domain-scroll">
-                            <div class="text-center text-muted py-2 small">加载中...</div>
+                            <div class="text-center text-muted py-2 small" data-i18n="loading">加载中...</div>
                         </div>
                         <div class="mail-domain-footer">
                             <div class="input-group input-group-sm">
-                                <input type="text" class="form-control" id="new-domain-input" placeholder="输入新域名，如 example.com">
+                                <input type="text" class="form-control" id="new-domain-input" data-i18n-ph="enterDomain" placeholder="输入新域名，如 example.com">
                                 <button class="btn btn-primary" onclick="addDomain()" id="btn-add-domain">
                                     <i class="bi bi-plus-lg"></i>
                                 </button>
                             </div>
                             <div id="domain-error" class="text-danger small mt-2" style="display:none;"></div>
-                            <div class="small text-muted mt-2">输入前缀即可查询邮件，邮箱不存在会自动创建。</div>
+                            <div class="small text-muted mt-2" data-i18n="domainTip">输入前缀即可查询邮件，邮箱不存在会自动创建。</div>
                         </div>
                     </div>
                 </div>
@@ -468,19 +473,19 @@
                     <div class="card-header d-flex justify-content-between align-items-center">
                         <div class="btn-group btn-group-sm" role="group">
                             <button type="button" class="btn btn-primary" id="tab-inbox" onclick="switchTab('inbox')">
-                                <i class="bi bi-envelope-open me-1"></i>收件箱<span id="unread-badge" class="badge ms-1" style="display:none;background:var(--navy);font-size:0.7em;"></span>
+                                <i class="bi bi-envelope-open me-1"></i><span data-i18n="inbox">收件箱</span><span id="unread-badge" class="badge ms-1" style="display:none;background:var(--navy);font-size:0.7em;"></span>
                             </button>
                             <button type="button" class="btn btn-outline-secondary" id="tab-sent" onclick="switchTab('sent')">
-                                <i class="bi bi-send me-1"></i>已发送
+                                <i class="bi bi-send me-1"></i><span data-i18n="sent">已发送</span>
                             </button>
                             <button type="button" class="btn btn-outline-secondary" id="tab-imap" onclick="switchTab('imap')">
                                 <i class="bi bi-diagram-3 me-1"></i>IMAP
                             </button>
                         </div>
                         <div class="d-flex align-items-center gap-2">
-                            <div class="form-check form-switch mb-0" title="每 15 秒自动刷新">
+                            <div class="form-check form-switch mb-0" data-i18n-title="autoRefreshTitle" title="每 15 秒自动刷新">
                                 <input class="form-check-input" type="checkbox" id="auto-refresh-toggle" onchange="toggleAutoRefresh(this.checked)">
-                                <label class="form-check-label small" for="auto-refresh-toggle">自动</label>
+                                <label class="form-check-label small" for="auto-refresh-toggle" data-i18n="auto">自动</label>
                             </div>
                             <button class="btn btn-sm btn-outline-secondary" onclick="refreshCurrentTab()" id="btn-refresh-mail" disabled>
                                 <i class="bi bi-arrow-clockwise"></i>
@@ -490,7 +495,7 @@
                     <div class="card-body mail-list-body">
                         <div class="mail-list-toolbar">
                             <div class="input-group input-group-sm" id="search-bar" style="display:none;">
-                                <input type="text" class="form-control" id="search-input" placeholder="搜索发件人/主题/内容..." onkeydown="if(event.key==='Enter') searchMail()">
+                                <input type="text" class="form-control" id="search-input" data-i18n-ph="searchPlaceholder" placeholder="搜索发件人/主题/内容..." onkeydown="if(event.key==='Enter') searchMail()">
                                 <button class="btn btn-outline-secondary" onclick="searchMail()" id="btn-search">
                                     <i class="bi bi-search"></i>
                                 </button>
@@ -501,20 +506,20 @@
                             <div id="batch-bar" class="d-flex align-items-center gap-2" style="display:none !important;">
                                 <div class="form-check mb-0">
                                     <input class="form-check-input" type="checkbox" id="select-all-checkbox" onchange="toggleSelectAll(this.checked)">
-                                    <label class="form-check-label small" for="select-all-checkbox">全选</label>
+                                    <label class="form-check-label small" for="select-all-checkbox" data-i18n="selectAll">全选</label>
                                 </div>
                                 <span class="small text-muted" id="selected-count"></span>
                                 <button class="btn btn-sm btn-outline-danger" onclick="batchDelete()" id="btn-batch-delete" disabled>
-                                    <i class="bi bi-trash me-1"></i>删除
+                                    <i class="bi bi-trash me-1"></i><span data-i18n="delete">删除</span>
                                 </button>
                                 <button class="btn btn-sm btn-outline-secondary" onclick="batchMarkRead()" id="btn-batch-read" disabled>
-                                    <i class="bi bi-check2-all me-1"></i>已读
+                                    <i class="bi bi-check2-all me-1"></i><span data-i18n="markRead">已读</span>
                                 </button>
                             </div>
                         </div>
                         <div id="mail-list" class="mail-list-scroll">
                             <div class="text-center text-muted py-4">
-                                <i class="bi bi-arrow-left me-2"></i>请在左侧输入邮箱前缀查询
+                                <i class="bi bi-arrow-left me-2"></i><span data-i18n="queryHint">请在左侧输入邮箱前缀查询</span>
                             </div>
                         </div>
                     </div>
@@ -525,13 +530,13 @@
             <div class="col-12 col-lg-5 mail-col" id="mail-detail-column">
                 <div class="card h-100" id="mail-detail-card">
                     <div class="card-header">
-                        <i class="bi bi-file-text me-2"></i>邮件详情
+                        <i class="bi bi-file-text me-2"></i><span data-i18n="mailDetail">邮件详情</span>
                     </div>
                     <div class="card-body">
                         <div id="mail-detail-content">
                             <div class="text-center text-muted py-5">
                                 <i class="bi bi-envelope-paper" style="font-size:3rem;opacity:0.3;"></i>
-                                <p class="mt-3">请选择一封邮件查看详情</p>
+                                <p class="mt-3" data-i18n="selectMailHint">请选择一封邮件查看详情</p>
                             </div>
                         </div>
                     </div>
@@ -552,38 +557,38 @@
         <div class="modal-dialog modal-lg">
             <div class="modal-content">
                 <div class="modal-header" style="background:rgba(245,249,247,0.95);border-bottom:1px solid var(--border-color);">
-                    <h5 class="modal-title" id="composeModalLabel"><i class="bi bi-pencil-square me-2"></i>撰写邮件</h5>
+                    <h5 class="modal-title" id="composeModalLabel"><i class="bi bi-pencil-square me-2"></i><span data-i18n="composeEmail">撰写邮件</span></h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body">
                     <div id="compose-alert" class="alert" style="display:none;" role="alert"></div>
                     <div class="mb-3">
-                        <label class="form-label">发件人</label>
+                        <label class="form-label" data-i18n="from">发件人</label>
                         <div class="input-group">
-                            <input type="text" class="form-control" id="compose-from-prefix" placeholder="前缀">
+                            <input type="text" class="form-control" id="compose-from-prefix" data-i18n-ph="prefix" placeholder="前缀">
                             <span class="input-group-text">@</span>
                             <select class="form-select" id="compose-from-domain" style="max-width:200px;">
-                                <option value="">加载中...</option>
+                                <option value="" data-i18n="loading">加载中...</option>
                             </select>
                         </div>
                     </div>
                     <div class="mb-3">
-                        <label class="form-label">收件人</label>
-                        <input type="text" class="form-control" id="compose-to" placeholder="收件人邮箱，多个用逗号分隔">
+                        <label class="form-label" data-i18n="to">收件人</label>
+                        <input type="text" class="form-control" id="compose-to" data-i18n-ph="toPlaceholder" placeholder="收件人邮箱，多个用逗号分隔">
                     </div>
                     <div class="mb-3">
-                        <label class="form-label">主题</label>
-                        <input type="text" class="form-control" id="compose-subject" placeholder="邮件主题">
+                        <label class="form-label" data-i18n="subject">主题</label>
+                        <input type="text" class="form-control" id="compose-subject" data-i18n-ph="subjectPlaceholder" placeholder="邮件主题">
                     </div>
                     <div class="mb-3">
-                        <label class="form-label">正文</label>
+                        <label class="form-label" data-i18n="body">正文</label>
                         <div id="compose-editor" style="min-height:200px;"></div>
                     </div>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">取消</button>
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal" data-i18n="cancel">取消</button>
                     <button type="button" class="btn btn-primary" id="btn-send-email" onclick="sendEmail()">
-                        <i class="bi bi-send me-1"></i>发送
+                        <i class="bi bi-send me-1"></i><span data-i18n="send">发送</span>
                     </button>
                 </div>
             </div>
@@ -593,6 +598,186 @@
     <script src="https://cdn.jsdelivr.net/npm/quill@2.0.3/dist/quill.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script>
+        // ---- i18n ----
+        const LANGS = {
+            zh: {
+                compose: '写邮件',
+                queryInbox: '查询收件箱',
+                selectDomain: '选择域名',
+                loading: '加载中...',
+                emailPrefix: '邮箱前缀',
+                enterPrefix: '输入前缀',
+                prefixExample: '例如：openai001',
+                query: '查询',
+                domainMgmt: '域名管理',
+                enterDomain: '输入新域名，如 example.com',
+                domainTip: '输入前缀即可查询邮件，邮箱不存在会自动创建。',
+                inbox: '收件箱',
+                sent: '已发送',
+                auto: '自动',
+                searchPlaceholder: '搜索发件人/主题/内容...',
+                selectAll: '全选',
+                delete: '删除',
+                markRead: '已读',
+                queryHint: '请在左侧输入邮箱前缀查询',
+                mailDetail: '邮件详情',
+                selectMailHint: '请选择一封邮件查看详情',
+                composeEmail: '撰写邮件',
+                from: '发件人',
+                prefix: '前缀',
+                to: '收件人',
+                toPlaceholder: '收件人邮箱，多个用逗号分隔',
+                subject: '主题',
+                subjectPlaceholder: '邮件主题',
+                body: '正文',
+                cancel: '取消',
+                send: '发送',
+                refresh: '刷新',
+                reply: '回复',
+                replyEmail: '回复邮件',
+                noSubject: '(无主题)',
+                unknownSender: '未知发件人',
+                inboxEmpty: '收件箱为空',
+                noSentMail: '暂无已发送邮件',
+                noDomains: '暂无域名',
+                noMatch: '没有找到匹配的邮件',
+                loadMore: '加载更多',
+                querying: '查询中...',
+                searching: '搜索中...',
+                sending: '发送中...',
+                sentSuccess: '邮件发送成功！',
+                sendFailed: '发送失败',
+                loadFailed: '加载失败',
+                queryFailed: '查询失败',
+                searchFailed: '搜索失败',
+                deleteFailed: '删除失败',
+                networkError: '网络错误',
+                enterDomainErr: '请输入域名',
+                domainInvalid: '域名格式不正确',
+                enterPrefixErr: '请输入邮箱前缀',
+                fillFrom: '请填写发件人',
+                fillTo: '请填写收件人',
+                fillSubject: '请填写主题',
+                fillBody: '请填写正文',
+                selected: '已选 {n} 封',
+                confirmDeleteN: '确定要删除选中的 {n} 封邮件吗？',
+                confirmDelete1: '确定要删除这封邮件吗？',
+                confirmDisableDomain: '确定要停用域名 "{d}" 吗？停用后该域名的邮件将不再接收。',
+                emptyContent: '邮件内容为空',
+                queryFirst: '请先查询一个邮箱',
+                editorPlaceholder: '输入邮件正文...',
+                time: '时间',
+                autoRefreshTitle: '每 15 秒自动刷新',
+                disableDomain: '停用此域名',
+                verifyCode: '验证码',
+            },
+            en: {
+                compose: 'Compose',
+                queryInbox: 'Query Inbox',
+                selectDomain: 'Select Domain',
+                loading: 'Loading...',
+                emailPrefix: 'Email Prefix',
+                enterPrefix: 'Enter prefix',
+                prefixExample: 'e.g. openai001',
+                query: 'Query',
+                domainMgmt: 'Domains',
+                enterDomain: 'Enter domain, e.g. example.com',
+                domainTip: 'Enter prefix to query. Mailbox auto-created if not exists.',
+                inbox: 'Inbox',
+                sent: 'Sent',
+                auto: 'Auto',
+                searchPlaceholder: 'Search sender / subject / content...',
+                selectAll: 'All',
+                delete: 'Delete',
+                markRead: 'Read',
+                queryHint: 'Enter email prefix on the left to query',
+                mailDetail: 'Mail Detail',
+                selectMailHint: 'Select an email to view details',
+                composeEmail: 'Compose Email',
+                from: 'From',
+                prefix: 'Prefix',
+                to: 'To',
+                toPlaceholder: 'Recipient email, separate with commas',
+                subject: 'Subject',
+                subjectPlaceholder: 'Email subject',
+                body: 'Body',
+                cancel: 'Cancel',
+                send: 'Send',
+                refresh: 'Refresh',
+                reply: 'Reply',
+                replyEmail: 'Reply',
+                noSubject: '(No subject)',
+                unknownSender: 'Unknown sender',
+                inboxEmpty: 'Inbox is empty',
+                noSentMail: 'No sent emails',
+                noDomains: 'No domains',
+                noMatch: 'No matching emails found',
+                loadMore: 'Load more',
+                querying: 'Querying...',
+                searching: 'Searching...',
+                sending: 'Sending...',
+                sentSuccess: 'Email sent successfully!',
+                sendFailed: 'Send failed',
+                loadFailed: 'Load failed',
+                queryFailed: 'Query failed',
+                searchFailed: 'Search failed',
+                deleteFailed: 'Delete failed',
+                networkError: 'Network error',
+                enterDomainErr: 'Please enter a domain',
+                domainInvalid: 'Invalid domain format',
+                enterPrefixErr: 'Please enter email prefix',
+                fillFrom: 'Please fill in sender',
+                fillTo: 'Please fill in recipient',
+                fillSubject: 'Please fill in subject',
+                fillBody: 'Please fill in body',
+                selected: '{n} selected',
+                confirmDeleteN: 'Delete {n} selected emails?',
+                confirmDelete1: 'Delete this email?',
+                confirmDisableDomain: 'Disable domain "{d}"? Emails to this domain will no longer be received.',
+                emptyContent: 'Email content is empty',
+                queryFirst: 'Please query a mailbox first',
+                editorPlaceholder: 'Enter email body...',
+                time: 'Time',
+                autoRefreshTitle: 'Auto-refresh every 15s',
+                disableDomain: 'Disable this domain',
+                verifyCode: 'Code',
+            }
+        };
+
+        let currentLang = localStorage.getItem('manymail-lang') || 'zh';
+
+        function t(key, params) {
+            let s = (LANGS[currentLang] || LANGS.zh)[key] || key;
+            if (params) {
+                Object.keys(params).forEach(k => { s = s.replace(`{${k}}`, params[k]); });
+            }
+            return s;
+        }
+
+        function applyLang() {
+            document.querySelectorAll('[data-i18n]').forEach(el => {
+                el.textContent = t(el.dataset.i18n);
+            });
+            document.querySelectorAll('[data-i18n-ph]').forEach(el => {
+                el.placeholder = t(el.dataset.i18nPh);
+            });
+            document.querySelectorAll('[data-i18n-title]').forEach(el => {
+                el.title = t(el.dataset.i18nTitle);
+            });
+            document.getElementById('lang-label').textContent = currentLang === 'zh' ? 'EN' : '中';
+            document.documentElement.lang = currentLang === 'zh' ? 'zh-CN' : 'en';
+        }
+
+        function toggleLang() {
+            currentLang = currentLang === 'zh' ? 'en' : 'zh';
+            localStorage.setItem('manymail-lang', currentLang);
+            applyLang();
+            // re-render dynamic content
+            if (currentMessages.length > 0 && currentTab === 'inbox') renderMessages(currentMessages);
+            if (currentSentMessages.length > 0 && currentTab === 'sent') renderSentMessages(currentSentMessages);
+            if (!currentEmail) resetMailDetail();
+        }
+
         let currentEmail = '';
         let currentMessages = [];
         let currentSentMessages = [];
@@ -688,7 +873,7 @@
                 const resp = await fetch('/api/domains');
                 const data = await resp.json();
                 if (!data.success) {
-                    domainList.innerHTML = `<div class="text-danger small">${_escapeHtml(data.message || '加载失败')}</div>`;
+                    domainList.innerHTML = `<div class="text-danger small">${_escapeHtml(data.message || t('loadFailed'))}</div>`;
                     return;
                 }
                 const domains = (data.domains || []).filter(d => d.is_active);
@@ -708,19 +893,19 @@
 
                 // 更新域名管理列表
                 if (activeDomains.length === 0) {
-                    domainList.innerHTML = '<div class="text-muted small text-center py-2">暂无域名</div>';
+                    domainList.innerHTML = `<div class="text-muted small text-center py-2">${t('noDomains')}</div>`;
                 } else {
                     domainList.innerHTML = activeDomains.map(d => `
                         <div class="d-flex justify-content-between align-items-center py-1 px-2 mb-1" style="background:#f5f9f7;border-radius:6px;">
                             <span class="small"><i class="bi bi-globe2 me-1 text-muted"></i>${_escapeHtml(d)}</span>
-                            <button class="btn btn-sm p-0 text-danger" onclick="deleteDomain(decodeURIComponent('${encodeURIComponent(d)}'))" title="停用此域名">
+                            <button class="btn btn-sm p-0 text-danger" onclick="deleteDomain(decodeURIComponent('${encodeURIComponent(d)}'))" title="${t('disableDomain')}">
                                 <i class="bi bi-x-lg" style="font-size:0.75rem;"></i>
                             </button>
                         </div>
                     `).join('');
                 }
             } catch (e) {
-                domainList.innerHTML = `<div class="text-danger small">加载失败: ${_escapeHtml(e.message)}</div>`;
+                domainList.innerHTML = `<div class="text-danger small">${t('loadFailed')}: ${_escapeHtml(e.message)}</div>`;
             }
         }
 
@@ -731,12 +916,12 @@
             errorDiv.style.display = 'none';
 
             if (!domain) {
-                errorDiv.textContent = '请输入域名';
+                errorDiv.textContent = t('enterDomainErr');
                 errorDiv.style.display = 'block';
                 return;
             }
             if (!domain.includes('.') || domain.length < 3) {
-                errorDiv.textContent = '域名格式不正确';
+                errorDiv.textContent = t('domainInvalid');
                 errorDiv.style.display = 'block';
                 return;
             }
@@ -754,11 +939,11 @@
                     input.value = '';
                     await loadDomains();
                 } else {
-                    errorDiv.textContent = data.message || '添加失败';
+                    errorDiv.textContent = data.message || t('loadFailed');
                     errorDiv.style.display = 'block';
                 }
             } catch (e) {
-                errorDiv.textContent = '网络错误: ' + e.message;
+                errorDiv.textContent = t('networkError') + ': ' + e.message;
                 errorDiv.style.display = 'block';
             } finally {
                 btn.disabled = false;
@@ -766,7 +951,7 @@
         }
 
         async function deleteDomain(domain) {
-            if (!confirm(`确定要停用域名 "${domain}" 吗？停用后该域名的邮件将不再接收。`)) return;
+            if (!confirm(t('confirmDisableDomain', {d: domain}))) return;
             const errorDiv = document.getElementById('domain-error');
             errorDiv.style.display = 'none';
             try {
@@ -775,17 +960,17 @@
                 if (data.success) {
                     await loadDomains();
                 } else {
-                    errorDiv.textContent = data.message || '删除失败';
+                    errorDiv.textContent = data.message || t('deleteFailed');
                     errorDiv.style.display = 'block';
                 }
             } catch (e) {
-                errorDiv.textContent = '网络错误: ' + e.message;
+                errorDiv.textContent = t('networkError') + ': ' + e.message;
                 errorDiv.style.display = 'block';
             }
         }
 
-        // 页面加载时自动获取域名列表
-        document.addEventListener('DOMContentLoaded', loadDomains);
+        // 页面加载时初始化语言 + 获取域名列表
+        document.addEventListener('DOMContentLoaded', () => { applyLang(); loadDomains(); });
         window.addEventListener('message', (event) => {
             if (event.origin !== window.location.origin) return;
             if (event.data?.type === 'mail-viewer-switch-tab' && event.data.tab) {
@@ -869,7 +1054,7 @@
                     if (currentEmail) {
                         querySent();
                     } else {
-                        document.getElementById('mail-list').innerHTML = '<div class="text-center text-muted py-4"><i class="bi bi-arrow-left me-2"></i>请先查询一个邮箱</div>';
+                        document.getElementById('mail-list').innerHTML = `<div class="text-center text-muted py-4"><i class="bi bi-arrow-left me-2"></i>${t('queryFirst')}</div>`;
                     }
                     resetMailDetail();
                 } else {
@@ -898,7 +1083,7 @@
         async function querySent() {
             if (!currentEmail) return;
             const mailList = document.getElementById('mail-list');
-            mailList.innerHTML = '<div class="text-center py-3"><span class="spinner-border spinner-border-sm"></span> 加载中...</div>';
+            mailList.innerHTML = `<div class="text-center py-3"><span class="spinner-border spinner-border-sm"></span> ${t('loading')}</div>`;
 
             try {
                 const resp = await fetch('/api/sent/query', {
@@ -908,12 +1093,12 @@
                 });
                 const data = await resp.json();
                 if (!data.success) {
-                    mailList.innerHTML = `<div class="error-state"><p>${_escapeHtml(data.message || '加载失败')}</p></div>`;
+                    mailList.innerHTML = `<div class="error-state"><p>${_escapeHtml(data.message || t('loadFailed'))}</p></div>`;
                     return;
                 }
                 renderSentMessages(data.messages);
             } catch (e) {
-                mailList.innerHTML = `<div class="error-state"><p>加载失败: ${_escapeHtml(e.message)}</p></div>`;
+                mailList.innerHTML = `<div class="error-state"><p>${t('loadFailed')}: ${_escapeHtml(e.message)}</p></div>`;
             }
         }
 
@@ -921,18 +1106,18 @@
             currentSentMessages = messages;
             const mailList = document.getElementById('mail-list');
             if (messages.length === 0) {
-                mailList.innerHTML = `<div class="empty-state"><i class="bi bi-send d-block"></i><p>暂无已发送邮件</p></div>`;
+                mailList.innerHTML = `<div class="empty-state"><i class="bi bi-send d-block"></i><p>${t('noSentMail')}</p></div>`;
                 return;
             }
             mailList.innerHTML = messages.map(msg => {
                 const toStr = _escapeHtml((msg.to || []).join(', '));
-                const subject = _escapeHtml(msg.subject || '(无主题)');
+                const subject = _escapeHtml(msg.subject || t('noSubject'));
                 return `
                     <div class="card mb-2 mail-item" data-msg-id="${msg.id}" onclick="viewSentDetailById('${msg.id}', this)">
                         <div class="card-body py-2">
                             <div class="d-flex justify-content-between align-items-start">
                                 <strong><i class="bi bi-arrow-right me-1 text-muted"></i><span class="mail-copy">${toStr}</span></strong>
-                                <small class="text-muted">${new Date(msg.createdAt).toLocaleString('zh-CN')}</small>
+                                <small class="text-muted">${new Date(msg.createdAt).toLocaleString(currentLang === 'zh' ? 'zh-CN' : 'en-US')}</small>
                             </div>
                             <div class="text-truncate"><span class="mail-copy">${subject}</span></div>
                         </div>
@@ -952,16 +1137,16 @@
             const detailContent = document.getElementById('mail-detail-content');
             const toStr = _escapeHtml((msg.to || []).join(', '));
             detailContent.innerHTML = `
-                <div class="mb-3"><strong>收件人:</strong> ${toStr}</div>
-                <div class="mb-3"><strong>主题:</strong> ${_escapeHtml(msg.subject || '(无主题)')}</div>
-                <div class="mb-3"><strong>时间:</strong> ${new Date(msg.createdAt).toLocaleString('zh-CN')}</div>
+                <div class="mb-3"><strong>${t('to')}:</strong> ${toStr}</div>
+                <div class="mb-3"><strong>${t('subject')}:</strong> ${_escapeHtml(msg.subject || t('noSubject'))}</div>
+                <div class="mb-3"><strong>${t('time')}:</strong> ${new Date(msg.createdAt).toLocaleString(currentLang === 'zh' ? 'zh-CN' : 'en-US')}</div>
                 <hr>
                 <div class="mail-body-container" style="background:#f8f9fa; padding:0; border-radius:8px; overflow:hidden;">
                     <iframe id="sent-body-frame" sandbox="allow-same-origin" referrerpolicy="no-referrer" style="width:100%;border:none;min-height:200px;"></iframe>
                 </div>`;
             // 安全渲染已发送邮件内容
             const iframe = document.getElementById('sent-body-frame');
-            const mailContent = msg.html || _escapeHtml(msg.text || '').replace(/\n/g, '<br>') || '<i style="color:#6c757d;">邮件内容为空</i>';
+            const mailContent = msg.html || _escapeHtml(msg.text || '').replace(/\n/g, '<br>') || `<i style="color:#6c757d;">${t('emptyContent')}</i>`;
             _renderMailBodyIframe(iframe, mailContent);
         }
 
@@ -969,7 +1154,7 @@
             document.getElementById('mail-detail-content').innerHTML = `
                 <div class="text-center text-muted py-5">
                     <i class="bi bi-envelope-paper" style="font-size:3rem;opacity:0.3;"></i>
-                    <p class="mt-3">请选择一封邮件查看详情</p>
+                    <p class="mt-3">${t('selectMailHint')}</p>
                 </div>`;
             document.querySelectorAll('.mail-item').forEach(el => el.classList.remove('active'));
         }
@@ -985,7 +1170,7 @@
             
             if (!prefix) {
                 if (!silent) {
-                    errorDiv.textContent = '请输入邮箱前缀';
+                    errorDiv.textContent = t('enterPrefixErr');
                     errorDiv.style.display = 'block';
                 }
                 return;
@@ -997,7 +1182,7 @@
             errorDiv.style.display = 'none';
             if (!silent && !append) {
                 btn.disabled = true;
-                btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>查询中...';
+                btn.innerHTML = `<span class="spinner-border spinner-border-sm me-1"></span>${t('querying')}`;
                 mailList.innerHTML = `
                     <div class="card mb-2">
                         <div class="card-body py-3">
@@ -1017,7 +1202,7 @@
                 const loadMoreBtn = document.getElementById('btn-load-more');
                 if (loadMoreBtn) {
                     loadMoreBtn.disabled = true;
-                    loadMoreBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>加载中...';
+                    loadMoreBtn.innerHTML = `<span class="spinner-border spinner-border-sm me-1"></span>${t('loading')}`;
                 }
             }
             
@@ -1036,7 +1221,7 @@
                         mailList.innerHTML = `
                             <div class="error-state">
                                 <i class="bi bi-exclamation-triangle d-block"></i>
-                                <p>${_escapeHtml(data.message || '查询失败')}</p>
+                                <p>${_escapeHtml(data.message || t('queryFailed'))}</p>
                             </div>`;
                     }
                     return;
@@ -1085,18 +1270,18 @@
                 
             } catch (e) {
                 if (!silent) {
-                    errorDiv.textContent = '网络错误: ' + e.message;
+                    errorDiv.textContent = t('networkError') + ': ' + e.message;
                     errorDiv.style.display = 'block';
                     mailList.innerHTML = `
                         <div class="error-state">
                             <i class="bi bi-exclamation-triangle d-block"></i>
-                            <p>网络错误: ${_escapeHtml(e.message)}</p>
+                            <p>${t('networkError')}: ${_escapeHtml(e.message)}</p>
                         </div>`;
                 }
             } finally {
                 if (!silent) {
                     btn.disabled = false;
-                    btn.innerHTML = '<i class="bi bi-search me-1"></i>查询';
+                    btn.innerHTML = `<i class="bi bi-search me-1"></i>${t('query')}`;
                 }
             }
         }
@@ -1120,9 +1305,9 @@
                 mailList.innerHTML = `
                     <div class="empty-state">
                         <i class="bi bi-inbox d-block"></i>
-                        <p>收件箱为空</p>
+                        <p>${t('inboxEmpty')}</p>
                         <button class="btn-refresh" onclick="queryInbox()">
-                            <i class="bi bi-arrow-clockwise"></i>刷新
+                            <i class="bi bi-arrow-clockwise"></i>${t('refresh')}
                         </button>
                     </div>`;
                 return;
@@ -1137,13 +1322,13 @@
                             </div>
                             <div class="flex-grow-1 mail-item-body" onclick="viewMailDetail('${msg.id}', this.closest('.mail-item'))">
                                 <div class="d-flex justify-content-between align-items-start">
-                                    <span class="mail-sender text-truncate me-2"><span class="mail-copy">${_escapeHtml(msg.from?.name || msg.from?.address || '未知发件人')}</span></span>
+                                    <span class="mail-sender text-truncate me-2"><span class="mail-copy">${_escapeHtml(msg.from?.name || msg.from?.address || t('unknownSender'))}</span></span>
                                     <div class="mail-item-meta text-end ms-2">
                                         ${msg.extracted_code ? `<span class="badge bg-success me-1" title="验证码"><i class="bi bi-key me-1"></i>${msg.extracted_code}</span>` : ''}
-                                        <small class="text-muted">${new Date(msg.createdAt).toLocaleString('zh-CN')}</small>
+                                        <small class="text-muted">${new Date(msg.createdAt).toLocaleString(currentLang === 'zh' ? 'zh-CN' : 'en-US')}</small>
                                     </div>
                                 </div>
-                                <div class="mail-subject text-truncate"><span class="mail-copy">${_escapeHtml(msg.subject || '(无主题)')}</span></div>
+                                <div class="mail-subject text-truncate"><span class="mail-copy">${_escapeHtml(msg.subject || t('noSubject'))}</span></div>
                                 <small class="mail-intro text-muted text-truncate d-block"><span class="mail-copy">${_escapeHtml(msg.intro || '')}</span></small>
                             </div>
                         </div>
@@ -1156,7 +1341,7 @@
                 mailList.insertAdjacentHTML('beforeend', `
                     <div class="text-center py-3">
                         <button class="btn btn-outline-primary btn-sm" id="btn-load-more" onclick="queryInbox(false, true)">
-                            <i class="bi bi-arrow-down-circle me-1"></i>加载更多 (${currentMessages.length}/${currentTotal})
+                            <i class="bi bi-arrow-down-circle me-1"></i>${t('loadMore')} (${currentMessages.length}/${currentTotal})
                         </button>
                     </div>`);
             }
@@ -1169,7 +1354,7 @@
             if (!query) { clearSearch(); return; }
 
             const mailList = document.getElementById('mail-list');
-            mailList.innerHTML = '<div class="text-center py-3"><span class="spinner-border spinner-border-sm"></span> 搜索中...</div>';
+            mailList.innerHTML = `<div class="text-center py-3"><span class="spinner-border spinner-border-sm"></span> ${t('searching')}</div>`;
 
             try {
                 const resp = await fetch('/api/inbox/search', {
@@ -1181,13 +1366,13 @@
                 if (data.success) {
                     renderMessages(data.messages);
                     if (data.messages.length === 0) {
-                        mailList.innerHTML = `<div class="empty-state"><i class="bi bi-search d-block"></i><p>没有找到匹配的邮件</p></div>`;
+                        mailList.innerHTML = `<div class="empty-state"><i class="bi bi-search d-block"></i><p>${t('noMatch')}</p></div>`;
                     }
                 } else {
-                    mailList.innerHTML = `<div class="error-state"><p>${_escapeHtml(data.message || '搜索失败')}</p></div>`;
+                    mailList.innerHTML = `<div class="error-state"><p>${_escapeHtml(data.message || t('searchFailed'))}</p></div>`;
                 }
             } catch (e) {
-                mailList.innerHTML = `<div class="error-state"><p>搜索失败: ${_escapeHtml(e.message)}</p></div>`;
+                mailList.innerHTML = `<div class="error-state"><p>${t('searchFailed')}: ${_escapeHtml(e.message)}</p></div>`;
             }
         }
 
@@ -1232,11 +1417,11 @@
                     detailContent.innerHTML = `
                         <div class="error-state">
                             <i class="bi bi-exclamation-triangle d-block"></i>
-                            <p>${_escapeHtml(data.message || '加载失败')}</p>
+                            <p>${_escapeHtml(data.message || t('loadFailed'))}</p>
                         </div>`;
                     return;
                 }
-                
+
                 const msg = data.detail;
                 // 保存当前查看的邮件详情供回复使用
                 window._currentDetailMsg = msg;
@@ -1245,28 +1430,28 @@
                 if (idx !== -1) currentMessages[idx].seen = true;
                 if (element) element.classList.remove('mail-unread');
                 _updateUnreadBadge();
-                const escapedSubject = _escapeHtml(msg.subject || '(无主题)');
+                const escapedSubject = _escapeHtml(msg.subject || t('noSubject'));
                 const escapedFromName = _escapeHtml(msg.from?.name || '');
                 const escapedFromAddr = _escapeHtml(msg.from?.address || '');
                 detailContent.innerHTML = `
                     <div class="d-flex justify-content-between align-items-start mb-3">
                         <div>
-                            <strong>发件人:</strong> ${escapedFromName} &lt;${escapedFromAddr}&gt;
+                            <strong>${t('from')}:</strong> ${escapedFromName} &lt;${escapedFromAddr}&gt;
                         </div>
                         <div>
                             <button class="btn btn-sm btn-outline-primary me-1" onclick="openReply()">
-                                <i class="bi bi-reply me-1"></i>回复
+                                <i class="bi bi-reply me-1"></i>${t('reply')}
                             </button>
                             <button class="btn btn-sm btn-outline-danger" onclick="deleteEmail('${messageId}')">
-                                <i class="bi bi-trash me-1"></i>删除
+                                <i class="bi bi-trash me-1"></i>${t('delete')}
                             </button>
                         </div>
                     </div>
                     <div class="mb-3">
-                        <strong>主题:</strong> ${escapedSubject}
+                        <strong>${t('subject')}:</strong> ${escapedSubject}
                     </div>
                     <div class="mb-3">
-                        <strong>时间:</strong> ${new Date(msg.createdAt).toLocaleString('zh-CN')}
+                        <strong>${t('time')}:</strong> ${new Date(msg.createdAt).toLocaleString(currentLang === 'zh' ? 'zh-CN' : 'en-US')}
                     </div>
                     <hr>
                     <div class="mail-body-container" style="background:#f8f9fa; padding:0; border-radius:8px; overflow:hidden;">
@@ -1275,11 +1460,11 @@
                 `;
                 // 安全渲染邮件内容到 iframe sandbox
                 const iframe = document.getElementById('mail-body-frame');
-                const mailContent = msg.html || _escapeHtml(msg.text || '').replace(/\n/g, '<br>') || '<i style="color:#6c757d;">邮件内容为空</i>';
+                const mailContent = msg.html || _escapeHtml(msg.text || '').replace(/\n/g, '<br>') || `<i style="color:#6c757d;">${t('emptyContent')}</i>`;
                 _renderMailBodyIframe(iframe, mailContent);
                 
             } catch (e) {
-                detailContent.innerHTML = `<div class="alert alert-danger">加载失败: ${e.message}</div>`;
+                detailContent.innerHTML = `<div class="alert alert-danger">${t('loadFailed')}: ${e.message}</div>`;
             }
         }
 
@@ -1299,7 +1484,7 @@
             if (!quillEditor) {
                 quillEditor = new Quill('#compose-editor', {
                     theme: 'snow',
-                    placeholder: '输入邮件正文...',
+                    placeholder: t('editorPlaceholder'),
                     modules: {
                         toolbar: [
                             [{ 'header': [1, 2, 3, false] }],
@@ -1332,8 +1517,8 @@
             alert.style.display = 'none';
             alert.className = 'alert';
             document.getElementById('btn-send-email').disabled = false;
-            document.getElementById('btn-send-email').innerHTML = '<i class="bi bi-send me-1"></i>发送';
-            document.getElementById('composeModalLabel').innerHTML = '<i class="bi bi-pencil-square me-2"></i>撰写邮件';
+            document.getElementById('btn-send-email').innerHTML = `<i class="bi bi-send me-1"></i>${t('send')}`;
+            document.getElementById('composeModalLabel').innerHTML = `<i class="bi bi-pencil-square me-2"></i>${t('composeEmail')}`;
         }
 
         function openCompose() {
@@ -1355,7 +1540,7 @@
 
             _resetComposeForm();
             _syncComposeDomains();
-            document.getElementById('composeModalLabel').innerHTML = '<i class="bi bi-reply me-2"></i>回复邮件';
+            document.getElementById('composeModalLabel').innerHTML = `<i class="bi bi-reply me-2"></i>${t('replyEmail')}`;
 
             // 填充收件人 = 原发件人
             document.getElementById('compose-to').value = msg.from?.address || '';
@@ -1373,7 +1558,7 @@
             }
 
             // 引用原文
-            const origDate = msg.createdAt ? new Date(msg.createdAt).toLocaleString('zh-CN') : '';
+            const origDate = msg.createdAt ? new Date(msg.createdAt).toLocaleString(currentLang === 'zh' ? 'zh-CN' : 'en-US') : '';
             const origFrom = msg.from?.address || '';
             const origText = msg.text || '';
             const editor = _getQuillEditor();
@@ -1403,25 +1588,25 @@
 
             if (!fromPrefix || !fromDomain) {
                 alertDiv.className = 'alert alert-danger';
-                alertDiv.textContent = '请填写发件人';
+                alertDiv.textContent = t('fillFrom');
                 alertDiv.style.display = 'block';
                 return;
             }
             if (!to) {
                 alertDiv.className = 'alert alert-danger';
-                alertDiv.textContent = '请填写收件人';
+                alertDiv.textContent = t('fillTo');
                 alertDiv.style.display = 'block';
                 return;
             }
             if (!subject) {
                 alertDiv.className = 'alert alert-danger';
-                alertDiv.textContent = '请填写主题';
+                alertDiv.textContent = t('fillSubject');
                 alertDiv.style.display = 'block';
                 return;
             }
             if (!body) {
                 alertDiv.className = 'alert alert-danger';
-                alertDiv.textContent = '请填写正文';
+                alertDiv.textContent = t('fillBody');
                 alertDiv.style.display = 'block';
                 return;
             }
@@ -1429,7 +1614,7 @@
             const fromEmail = `${fromPrefix}@${fromDomain}`;
 
             btn.disabled = true;
-            btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span>发送中...';
+            btn.innerHTML = `<span class="spinner-border spinner-border-sm me-1"></span>${t('sending')}`;
 
             try {
                 const resp = await fetch('/api/send', {
@@ -1449,24 +1634,24 @@
 
                 if (data.success) {
                     alertDiv.className = 'alert alert-success';
-                    alertDiv.textContent = '邮件发送成功！';
+                    alertDiv.textContent = t('sentSuccess');
                     alertDiv.style.display = 'block';
-                    btn.innerHTML = '<i class="bi bi-check-lg me-1"></i>已发送';
+                    btn.innerHTML = `<i class="bi bi-check-lg me-1"></i>${t('sent')}`;
                     // 2秒后自动关闭弹窗
                     setTimeout(() => { _getComposeModal().hide(); }, 2000);
                 } else {
                     alertDiv.className = 'alert alert-danger';
-                    alertDiv.textContent = data.message || '发送失败';
+                    alertDiv.textContent = data.message || t('sendFailed');
                     alertDiv.style.display = 'block';
                     btn.disabled = false;
-                    btn.innerHTML = '<i class="bi bi-send me-1"></i>发送';
+                    btn.innerHTML = `<i class="bi bi-send me-1"></i>${t('send')}`;
                 }
             } catch (e) {
                 alertDiv.className = 'alert alert-danger';
-                alertDiv.textContent = '网络错误: ' + e.message;
+                alertDiv.textContent = t('networkError') + ': ' + e.message;
                 alertDiv.style.display = 'block';
                 btn.disabled = false;
-                btn.innerHTML = '<i class="bi bi-send me-1"></i>发送';
+                btn.innerHTML = `<i class="bi bi-send me-1"></i>${t('send')}`;
             }
         }
 
@@ -1481,7 +1666,7 @@
             const count = ids.length;
             document.getElementById('btn-batch-delete').disabled = count === 0;
             document.getElementById('btn-batch-read').disabled = count === 0;
-            document.getElementById('selected-count').textContent = count > 0 ? `已选 ${count} 封` : '';
+            document.getElementById('selected-count').textContent = count > 0 ? t('selected', {n: count}) : '';
         }
 
         function toggleSelectAll(checked) {
@@ -1493,8 +1678,8 @@
             const ids = getSelectedIds();
             if (ids.length === 0) return;
 
-            const label = action === 'delete' ? '删除' : '标记已读';
-            if (action === 'delete' && !confirm(`确定要删除选中的 ${ids.length} 封邮件吗？`)) return;
+            const label = action === 'delete' ? t('delete') : t('markRead');
+            if (action === 'delete' && !confirm(t('confirmDeleteN', {n: ids.length}))) return;
 
             try {
                 const resp = await fetch('/api/inbox/batch', {
@@ -1525,7 +1710,7 @@
                     alert(data.message || `${label}失败`);
                 }
             } catch (e) {
-                alert('网络错误: ' + e.message);
+                alert(t('networkError') + ': ' + e.message);
             }
         }
 
@@ -1536,7 +1721,7 @@
 
         async function deleteEmail(messageId) {
             if (!currentEmail) return;
-            if (!confirm('确定要删除这封邮件吗？')) return;
+            if (!confirm(t('confirmDelete1'))) return;
 
             try {
                 const resp = await fetch('/api/inbox/delete', {
@@ -1555,10 +1740,10 @@
                     renderMessages(currentMessages);
                     resetMailDetail();
                 } else {
-                    alert(data.message || '删除失败');
+                    alert(data.message || t('deleteFailed'));
                 }
             } catch (e) {
-                alert('网络错误: ' + e.message);
+                alert(t('networkError') + ': ' + e.message);
             }
         }
     </script>
