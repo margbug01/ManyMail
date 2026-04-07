@@ -1040,13 +1040,22 @@ async function readMail(index) {
       iframe.onload = function() {
         var doc = iframe.contentDocument;
         doc.open();
-        doc.write('<!DOCTYPE html><html><head><base target="_blank"></head><body>' + data.html + '</body></html>');
+        doc.write('<!DOCTYPE html><html><head><base target="_blank"><style>img{max-width:100%;height:auto;}</style></head><body>' + data.html + '</body></html>');
         doc.close();
         doc.querySelectorAll('a[href]').forEach(function(a) {
           a.setAttribute('target', '_blank');
           a.setAttribute('rel', 'noopener noreferrer');
         });
-        iframe.style.height = doc.body.scrollHeight + 40 + 'px';
+        var recalc = function() { iframe.style.height = doc.body.scrollHeight + 40 + 'px'; };
+        doc.querySelectorAll('img').forEach(function(img) {
+          if (!img.complete) {
+            img.addEventListener('load', recalc);
+            img.addEventListener('error', recalc);
+          }
+        });
+        recalc();
+        setTimeout(recalc, 200);
+        setTimeout(recalc, 800);
       };
       iframe.src = 'about:blank';
     }

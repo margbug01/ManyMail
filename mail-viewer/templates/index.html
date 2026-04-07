@@ -799,40 +799,8 @@
             iframe.setAttribute('scrolling', 'no');
             iframe.style.overflow = 'hidden';
 
-            const resizeScript = `
-                (function () {
-                    const resize = () => {
-                        const body = document.body;
-                        const doc = document.documentElement;
-                        const height = Math.max(
-                            body ? body.scrollHeight : 0,
-                            body ? body.offsetHeight : 0,
-                            doc ? doc.scrollHeight : 0,
-                            doc ? doc.offsetHeight : 0
-                        );
-                        if (window.frameElement) {
-                            window.frameElement.style.height = (height + 20) + 'px';
-                        }
-                    };
-
-                    window.addEventListener('load', resize);
-                    if (window.ResizeObserver && document.body) {
-                        new ResizeObserver(resize).observe(document.body);
-                    }
-                    Array.from(document.images || []).forEach((img) => {
-                        if (!img.complete) {
-                            img.addEventListener('load', resize);
-                            img.addEventListener('error', resize);
-                        }
-                    });
-                    requestAnimationFrame(resize);
-                    setTimeout(resize, 120);
-                    setTimeout(resize, 500);
-                })();
-            `;
-
             iframeDoc.open();
-            iframeDoc.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><base target="_blank"><style>html,body{margin:0;padding:0;overflow:hidden;background:transparent;}body{font-family:"Noto Sans SC",system-ui,sans-serif;font-size:14px;color:#1a2421;padding:12px;word-break:break-word;overflow:hidden;}img{max-width:100%;height:auto;}a{color:#4a7c9b;}</style></head><body>${mailContent}<script>${resizeScript}<\/script></body></html>`);
+            iframeDoc.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><base target="_blank"><style>html,body{margin:0;padding:0;background:transparent;}body{font-family:"Noto Sans SC",system-ui,sans-serif;font-size:14px;color:#1a2421;padding:12px;word-break:break-word;}img{max-width:100%;height:auto;}a{color:#4a7c9b;}</style></head><body>${mailContent}</body></html>`);
             iframeDoc.close();
 
             // 强制所有链接在新标签页打开（覆盖邮件中显式设置的 target）
@@ -841,17 +809,32 @@
                 a.setAttribute('rel', 'noopener noreferrer');
             });
 
-            try {
-                const body = iframeDoc.body;
-                const doc = iframeDoc.documentElement;
-                const height = Math.max(
-                    body ? body.scrollHeight : 0,
-                    body ? body.offsetHeight : 0,
-                    doc ? doc.scrollHeight : 0,
-                    doc ? doc.offsetHeight : 0
-                );
-                iframe.style.height = (height + 20) + 'px';
-            } catch (e) {}
+            // 从父页面计算 iframe 高度（sandbox 无 allow-scripts，脚本无法在 iframe 内执行）
+            const recalcHeight = () => {
+                try {
+                    const body = iframeDoc.body;
+                    const doc = iframeDoc.documentElement;
+                    const height = Math.max(
+                        body ? body.scrollHeight : 0,
+                        body ? body.offsetHeight : 0,
+                        doc ? doc.scrollHeight : 0,
+                        doc ? doc.offsetHeight : 0
+                    );
+                    iframe.style.height = (height + 20) + 'px';
+                } catch (e) {}
+            };
+
+            // 监听 iframe 内图片加载完成后重新计算高度
+            iframeDoc.querySelectorAll('img').forEach(img => {
+                if (!img.complete) {
+                    img.addEventListener('load', recalcHeight);
+                    img.addEventListener('error', recalcHeight);
+                }
+            });
+
+            recalcHeight();
+            setTimeout(recalcHeight, 200);
+            setTimeout(recalcHeight, 800);
         }
 
         // 更新未读邮件计数 badge
