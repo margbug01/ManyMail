@@ -832,7 +832,7 @@
             `;
 
             iframeDoc.open();
-            iframeDoc.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><style>html,body{margin:0;padding:0;overflow:hidden;background:transparent;}body{font-family:"Noto Sans SC",system-ui,sans-serif;font-size:14px;color:#1a2421;padding:12px;word-break:break-word;overflow:hidden;}img{max-width:100%;height:auto;}a{color:#4a7c9b;}</style></head><body>${mailContent}<script>${resizeScript}<\/script></body></html>`);
+            iframeDoc.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><base target="_blank"><style>html,body{margin:0;padding:0;overflow:hidden;background:transparent;}body{font-family:"Noto Sans SC",system-ui,sans-serif;font-size:14px;color:#1a2421;padding:12px;word-break:break-word;overflow:hidden;}img{max-width:100%;height:auto;}a{color:#4a7c9b;}</style></head><body>${mailContent}<script>${resizeScript}<\/script></body></html>`);
             iframeDoc.close();
 
             try {
@@ -1142,7 +1142,7 @@
                 <div class="mb-3"><strong>${t('time')}:</strong> ${new Date(msg.createdAt).toLocaleString(currentLang === 'zh' ? 'zh-CN' : 'en-US')}</div>
                 <hr>
                 <div class="mail-body-container" style="background:#f8f9fa; padding:0; border-radius:8px; overflow:hidden;">
-                    <iframe id="sent-body-frame" sandbox="allow-same-origin" referrerpolicy="no-referrer" style="width:100%;border:none;min-height:200px;"></iframe>
+                    <iframe id="sent-body-frame" sandbox="allow-same-origin allow-popups allow-popups-to-escape-sandbox" referrerpolicy="no-referrer" style="width:100%;border:none;min-height:200px;"></iframe>
                 </div>`;
             // 安全渲染已发送邮件内容
             const iframe = document.getElementById('sent-body-frame');
@@ -1455,7 +1455,7 @@
                     </div>
                     <hr>
                     <div class="mail-body-container" style="background:#f8f9fa; padding:0; border-radius:8px; overflow:hidden;">
-                        <iframe id="mail-body-frame" sandbox="allow-same-origin" referrerpolicy="no-referrer" style="width:100%;border:none;min-height:200px;"></iframe>
+                        <iframe id="mail-body-frame" sandbox="allow-same-origin allow-popups allow-popups-to-escape-sandbox" referrerpolicy="no-referrer" style="width:100%;border:none;min-height:200px;"></iframe>
                     </div>
                 `;
                 // 安全渲染邮件内容到 iframe sandbox

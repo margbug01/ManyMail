@@ -1008,7 +1008,7 @@ async function readMail(index) {
     var date = data.date ? new Date(data.date).toLocaleString('zh-CN') : '';
     var bodyHtml = '';
     if (data.html) {
-      bodyHtml = '<iframe id="mail-iframe" sandbox="allow-same-origin"></iframe>';
+      bodyHtml = '<iframe id="mail-iframe" sandbox="allow-same-origin allow-popups allow-popups-to-escape-sandbox"></iframe>';
     } else {
       bodyHtml = '<pre style="white-space:pre-wrap;font-family:inherit;">' + esc(data.text) + '</pre>';
     }
@@ -1040,7 +1040,7 @@ async function readMail(index) {
       iframe.onload = function() {
         var doc = iframe.contentDocument;
         doc.open();
-        doc.write(data.html);
+        doc.write('<!DOCTYPE html><html><head><base target="_blank"></head><body>' + data.html + '</body></html>');
         doc.close();
         iframe.style.height = doc.body.scrollHeight + 40 + 'px';
       };
