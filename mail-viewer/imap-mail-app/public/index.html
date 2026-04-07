@@ -1042,6 +1042,10 @@ async function readMail(index) {
         doc.open();
         doc.write('<!DOCTYPE html><html><head><base target="_blank"></head><body>' + data.html + '</body></html>');
         doc.close();
+        doc.querySelectorAll('a[href]').forEach(function(a) {
+          a.setAttribute('target', '_blank');
+          a.setAttribute('rel', 'noopener noreferrer');
+        });
         iframe.style.height = doc.body.scrollHeight + 40 + 'px';
       };
       iframe.src = 'about:blank';

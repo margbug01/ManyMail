@@ -835,6 +835,12 @@
             iframeDoc.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><base target="_blank"><style>html,body{margin:0;padding:0;overflow:hidden;background:transparent;}body{font-family:"Noto Sans SC",system-ui,sans-serif;font-size:14px;color:#1a2421;padding:12px;word-break:break-word;overflow:hidden;}img{max-width:100%;height:auto;}a{color:#4a7c9b;}</style></head><body>${mailContent}<script>${resizeScript}<\/script></body></html>`);
             iframeDoc.close();
 
+            // 强制所有链接在新标签页打开（覆盖邮件中显式设置的 target）
+            iframeDoc.querySelectorAll('a[href]').forEach(a => {
+                a.setAttribute('target', '_blank');
+                a.setAttribute('rel', 'noopener noreferrer');
+            });
+
             try {
                 const body = iframeDoc.body;
                 const doc = iframeDoc.documentElement;
