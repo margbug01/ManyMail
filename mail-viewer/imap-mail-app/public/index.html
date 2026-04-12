@@ -54,29 +54,6 @@ html.embedded-mode .sidebar-header {
   width: min(100%, 1680px);
   margin: 0 auto;
 
-.lang-toggle {
-  margin-left: auto;
-  border: 1px solid var(--embed-border);
-  background: var(--embed-surface);
-  color: var(--embed-muted);
-  border-radius: 999px;
-  min-width: 42px;
-  height: 30px;
-  padding: 0 10px;
-  font-size: 12px;
-  font-weight: 600;
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 4px;
-}
-
-.lang-toggle:hover {
-  background: var(--embed-bg);
-  color: var(--embed-text);
-  border-color: var(--embed-primary);
-}
   padding: 24px;
   gap: 20px;
 }
@@ -916,9 +893,6 @@ if (new URLSearchParams(window.location.search).get('embedded') === '1') {
       <button type="button" class="embedded-home-btn" onclick="goBackToMailboxHome()" aria-label="返回邮箱主页" title="返回邮箱主页">←</button>
       <div class="embedded-title" data-i18n="embeddedTitle">ManyMail IMAP</div>
     </div>
-    <button type="button" class="lang-toggle" onclick="toggleLang()" id="btn-lang" title="Switch Language">
-      <i class="bi bi-translate"></i><span id="lang-label">EN</span>
-    </button>
   </div>
 <div class="app">
   <div class="sidebar">
@@ -1141,8 +1115,6 @@ function refreshStaticText() {
   document.querySelectorAll('[data-i18n-ph]').forEach(function(el) {
     el.placeholder = t(el.dataset.i18nPh);
   });
-  var langLabel = document.getElementById('lang-label');
-  if (langLabel) langLabel.textContent = currentLang === 'zh' ? 'EN' : '中';
   document.documentElement.lang = currentLang === 'zh' ? 'zh-CN' : 'en';
 }
 
