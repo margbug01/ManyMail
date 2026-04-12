@@ -4,6 +4,9 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>IMAP 邮件客户端</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;600&family=Satisfy&display=swap" rel="stylesheet">
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
 
@@ -12,16 +15,23 @@
   --embed-primary-hover: #4a8a7b;
   --embed-bg: #f5f9f7;
   --embed-surface: #ffffff;
+  --embed-surface-soft: rgba(245,249,247,0.95);
   --embed-border: #d4e4de;
   --embed-text: #1a2421;
   --embed-muted: #4a5752;
+  --embed-navy: #4a7c9b;
+  --embed-shadow: 0 2px 8px rgba(91,154,139,0.12);
+  --embed-shadow-lg: 0 10px 28px rgba(91,154,139,0.16);
+  --embed-radius: 10px;
+  --embed-radius-sm: 6px;
 }
 
 body {
-  font-family: -apple-system, "Microsoft YaHei", "Segoe UI", sans-serif;
+  font-family: "Noto Sans SC", "Microsoft YaHei", system-ui, sans-serif;
   font-size: 14px;
-  color: #1a1a1a;
-  background: #fff;
+  color: var(--embed-text);
+  background: linear-gradient(135deg, #ffffff 0%, #fafcfb 30%, var(--embed-bg) 60%, #ffffff 100%);
+  background-attachment: fixed;
 }
 
 html.embedded-mode .sidebar-header {
@@ -39,36 +49,60 @@ html.embedded-mode .sidebar-header {
 .app {
   display: flex;
   height: 100vh;
+  background: transparent;
+  width: min(100%, 1680px);
+  margin: 0 auto;
+  padding: 24px;
+  gap: 20px;
 }
 
 /* 侧边栏 */
 .sidebar {
   width: 230px;
   min-width: 230px;
-  border-right: 1px solid #d0d0d0;
+  border: 1px solid var(--embed-border);
   display: flex;
   flex-direction: column;
-  background: #f5f5f5;
+  background: var(--embed-surface-soft);
   overflow-y: auto;
+  backdrop-filter: blur(6px);
+  border-radius: var(--embed-radius);
+  box-shadow: var(--embed-shadow);
 }
 
 .sidebar-header {
-  padding: 14px 16px;
-  border-bottom: 1px solid #d0d0d0;
-  font-size: 15px;
-  font-weight: 600;
+  padding: 14px 16px 12px;
+  border-bottom: 1px solid var(--embed-border);
+  font-size: 1.1rem;
+  font-weight: 400;
+  letter-spacing: 1px;
+  font-family: "Satisfy", cursive;
+  color: #2a5f8a;
+  position: relative;
+}
+
+.sidebar-header::after {
+  content: "";
+  position: absolute;
+  left: 16px;
+  right: 16px;
+  bottom: -1px;
+  height: 4px;
+  background: repeating-linear-gradient(45deg, var(--embed-primary) 0 10px, #ffffff 10px 20px, var(--embed-navy) 20px 30px, #ffffff 30px 40px);
+  opacity: 0.45;
 }
 
 .sidebar-section {
   padding: 6px 0;
-  border-bottom: 1px solid #e0e0e0;
+  border-bottom: 1px solid var(--embed-border);
 }
 
 .sidebar-section-title {
-  padding: 4px 16px;
+  padding: 6px 16px;
   font-size: 11px;
-  color: #888;
-  letter-spacing: 0.5px;
+  color: var(--embed-muted);
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
 }
 
 .account-item, .folder-item {
@@ -79,10 +113,11 @@ html.embedded-mode .sidebar-header {
   align-items: center;
   font-size: 13px;
   transition: all 0.15s ease;
+  color: var(--embed-text);
 }
 
-.account-item:hover, .folder-item:hover { background: #e8e8e8; }
-.account-item.active, .folder-item.active { background: #e0e0e0; border-left: 2px solid #555; padding-left: 14px; }
+.account-item:hover, .folder-item:hover { background: #edf5f2; }
+.account-item.active, .folder-item.active { background: #e7f2ee; border-left: 3px solid var(--embed-primary); padding-left: 13px; }
 
 .account-name {
   overflow: hidden;
@@ -93,14 +128,14 @@ html.embedded-mode .sidebar-header {
 
 .account-remove {
   font-size: 12px;
-  color: #999;
+  color: var(--embed-muted);
   cursor: pointer;
   border: none;
   background: none;
   padding: 0 4px;
 }
 
-.account-remove:hover { color: #c00; }
+.account-remove:hover { color: #c76b6b; }
 
 .sidebar-buttons {
   padding: 8px 16px;
@@ -110,17 +145,18 @@ html.embedded-mode .sidebar-header {
 
 .btn {
   flex: 1;
-  padding: 6px 0;
-  border: 1px solid #aaa;
-  background: #fff;
+  padding: 7px 0;
+  border: 1px solid var(--embed-border);
+  background: var(--embed-surface);
   cursor: pointer;
   font-size: 12px;
   text-align: center;
   transition: all 0.15s ease;
-  border-radius: 4px;
+  border-radius: var(--embed-radius-sm);
+  color: var(--embed-text);
 }
 
-.btn:hover { background: #eee; }
+.btn:hover { background: var(--embed-bg); border-color: var(--embed-primary); }
 
 /* 主区域 */
 .main {
@@ -128,46 +164,54 @@ html.embedded-mode .sidebar-header {
   display: flex;
   flex-direction: column;
   min-width: 0;
+  border: 1px solid var(--embed-border);
+  border-radius: var(--embed-radius);
+  background: rgba(255,255,255,0.88);
+  box-shadow: var(--embed-shadow);
+  overflow: hidden;
 }
 
 .toolbar {
-  padding: 8px 16px;
-  border-bottom: 1px solid #d0d0d0;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--embed-border);
   display: flex;
   align-items: center;
   gap: 8px;
-  background: #fafafa;
+  background: var(--embed-surface-soft);
+  backdrop-filter: blur(6px);
 }
 
 .toolbar input[type="text"] {
   flex: 1;
-  padding: 5px 8px;
-  border: 1px solid #bbb;
+  padding: 7px 10px;
+  border: 1px solid var(--embed-border);
   font-size: 13px;
   outline: none;
-  border-radius: 4px 0 0 4px;
-  background: #f5f5f5;
+  border-radius: var(--embed-radius-sm) 0 0 var(--embed-radius-sm);
+  background: #fbfdfc;
+  color: var(--embed-text);
 }
 
-.toolbar input[type="text"]:focus { border-color: #888; background: #fff; box-shadow: 0 0 0 2px rgba(0,0,0,0.04); }
+.toolbar input[type="text"]:focus { border-color: var(--embed-primary); background: #fff; box-shadow: 0 0 0 2px rgba(91,154,139,0.12); }
 
 .toolbar button {
-  padding: 5px 12px;
-  border: 1px solid #aaa;
-  background: #fff;
+  padding: 7px 12px;
+  border: 1px solid var(--embed-border);
+  background: var(--embed-surface);
   cursor: pointer;
   font-size: 13px;
   transition: all 0.15s ease;
-  border-radius: 4px;
+  border-radius: var(--embed-radius-sm);
+  color: var(--embed-text);
 }
 
-.toolbar button:first-of-type { border-radius: 0 4px 4px 0; border-left: none; }
+.toolbar button:first-of-type { border-radius: 0 var(--embed-radius-sm) var(--embed-radius-sm) 0; border-left: none; }
 
-.toolbar button:hover { background: #eee; }
+.toolbar button:hover { background: var(--embed-bg); border-color: var(--embed-primary); }
 
 .mail-info {
   font-size: 12px;
-  color: #666;
+  color: var(--embed-muted);
   white-space: nowrap;
 }
 
@@ -182,21 +226,27 @@ html.embedded-mode .sidebar-header {
 .mail-list-pane {
   height: 45%;
   overflow-y: auto;
-  border-bottom: 1px solid #d0d0d0;
+  border-bottom: 1px solid var(--embed-border);
+  background: transparent;
 }
 
 .mail-row {
-  padding: 8px 16px;
-  border-bottom: 1px solid #eee;
+  padding: 12px 16px;
+  border-bottom: 1px solid rgba(212,228,222,0.8);
   cursor: pointer;
   display: flex;
   gap: 12px;
   transition: all 0.15s ease;
+  position: relative;
+  align-items: flex-start;
 }
 
-.mail-row:hover { background: #f5f5f5; }
-.mail-row.active { background: #e8e8e8; }
-.mail-row.unread { font-weight: 600; border-left: 2px solid #5a7a9a; padding-left: 14px; }
+.mail-row:hover { background: #edf5f2; }
+.mail-row.active {
+  background: #e7f2ee;
+  box-shadow: inset 0 0 0 1px rgba(91,154,139,0.12);
+}
+.mail-row.unread { font-weight: 600; border-left: 3px solid var(--embed-primary); padding-left: 13px; }
 
 .mail-row .dot {
   width: 8px;
@@ -206,7 +256,7 @@ html.embedded-mode .sidebar-header {
   margin-top: 5px;
 }
 
-.mail-row.unread .dot { background: #5a7a9a; }
+.mail-row.unread .dot { background: var(--embed-primary); }
 
 .mail-col { min-width: 0; flex: 1; }
 
@@ -217,11 +267,16 @@ html.embedded-mode .sidebar-header {
   white-space: nowrap;
 }
 
-.mail-subject { color: #333; }
+.mail-from {
+  color: var(--embed-muted);
+  margin-bottom: 2px;
+}
+
+.mail-subject { color: var(--embed-text); }
 
 .mail-date {
   font-size: 12px;
-  color: #888;
+  color: var(--embed-muted);
   white-space: nowrap;
   min-width: 80px;
   text-align: right;
@@ -230,19 +285,58 @@ html.embedded-mode .sidebar-header {
 .mail-detail {
   flex: 1;
   overflow-y: auto;
+  background: rgba(255,255,255,0.96);
+}
+
+.load-more-btn {
+  padding: 12px;
+  text-align: center;
+  color: var(--embed-muted);
+  cursor: pointer;
+  border-top: 1px solid var(--embed-border);
+  font-size: 13px;
+  transition: all 0.15s ease;
+}
+
+.load-more-btn:hover {
+  background: rgba(245,249,247,0.72);
+  color: var(--embed-text);
 }
 
 .detail-empty {
-  padding: 40px;
+  padding: 56px 24px;
   text-align: center;
-  color: #bbb;
+  color: var(--embed-muted);
   font-size: 14px;
 }
 
+.detail-empty::before {
+  content: "✉";
+  display: block;
+  font-size: 32px;
+  line-height: 1;
+  margin-bottom: 14px;
+  opacity: 0.32;
+  color: var(--embed-navy);
+}
+
+.detail-empty strong {
+  display: block;
+  margin-bottom: 8px;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--embed-text);
+}
+
+.detail-empty span {
+  display: block;
+  line-height: 1.7;
+}
+
 .detail-header {
-  padding: 16px;
-  border-bottom: 1px solid #eee;
-  background: #fafafa;
+  padding: 18px 20px 16px;
+  border-bottom: 1px solid var(--embed-border);
+  background: var(--embed-surface-soft);
 }
 
 .detail-subject {
@@ -254,7 +348,7 @@ html.embedded-mode .sidebar-header {
 
 .detail-meta {
   font-size: 12px;
-  color: #777;
+  color: var(--embed-muted);
   line-height: 1.6;
 }
 
@@ -267,21 +361,23 @@ html.embedded-mode .sidebar-header {
 
 .detail-back {
   display: none;
-  border: 1px solid #d0d0d0;
-  background: #fff;
-  color: #333;
+  border: 1px solid var(--embed-border);
+  background: var(--embed-surface);
+  color: var(--embed-primary);
   border-radius: 999px;
-  padding: 4px 10px;
+  padding: 5px 12px;
   font-size: 12px;
   cursor: pointer;
+  font-weight: 500;
 }
 
 .detail-back:hover {
-  background: #f2f2f2;
+  background: var(--embed-bg);
+  border-color: var(--embed-primary);
 }
 
 .detail-body {
-  padding: 16px;
+  padding: 20px;
   line-height: 1.6;
 }
 
@@ -289,18 +385,35 @@ html.embedded-mode .sidebar-header {
   width: 100%;
   border: none;
   min-height: 300px;
+  background: #fff;
+  border-radius: 8px;
 }
 
 .detail-attachments {
-  padding: 12px 16px;
-  border-top: 1px solid #eee;
+  padding: 12px 20px;
+  border-top: 1px solid var(--embed-border);
   font-size: 13px;
+  background: rgba(245,249,247,0.65);
 }
 
 .detail-attachments span {
   display: inline-block;
   margin-right: 16px;
-  color: #555;
+  color: var(--embed-muted);
+}
+
+.detail-attachments a {
+  display: inline-block;
+  margin-right: 16px;
+  color: var(--embed-muted);
+  text-decoration: none;
+  border-bottom: 1px dashed rgba(91,154,139,0.45);
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
+
+.detail-attachments a:hover {
+  color: var(--embed-primary);
+  border-bottom-color: var(--embed-primary);
 }
 
 /* 弹窗 */
@@ -308,50 +421,56 @@ html.embedded-mode .sidebar-header {
   display: none;
   position: fixed;
   top: 0; left: 0; right: 0; bottom: 0;
-  background: rgba(0,0,0,0.3);
+  background: rgba(26,36,33,0.18);
   z-index: 100;
   justify-content: center;
   align-items: center;
+  backdrop-filter: blur(4px);
 }
 
 .modal-overlay.show { display: flex; }
 
 .modal {
-  background: #fff;
+  background: var(--embed-surface);
   padding: 24px;
   width: 420px;
   max-width: 90vw;
   max-height: 90vh;
   overflow-y: auto;
-  border-radius: 8px;
-  box-shadow: 0 8px 32px rgba(0,0,0,0.12), 0 2px 8px rgba(0,0,0,0.08);
+  border-radius: var(--embed-radius);
+  border: 1px solid var(--embed-border);
+  box-shadow: var(--embed-shadow-lg);
 }
 
 .modal h3 {
   margin-bottom: 16px;
   font-size: 16px;
+  color: var(--embed-text);
 }
 
 .modal label {
   display: block;
   margin-bottom: 4px;
   font-size: 13px;
-  color: #555;
+  color: var(--embed-muted);
 }
 
 .modal input, .modal select, .modal textarea {
   width: 100%;
-  padding: 6px 8px;
+  padding: 8px 10px;
   margin-bottom: 12px;
-  border: 1px solid #bbb;
+  border: 1px solid var(--embed-border);
   font-size: 13px;
   outline: none;
   font-family: inherit;
-  border-radius: 4px;
+  border-radius: var(--embed-radius-sm);
+  background: #fbfdfc;
+  color: var(--embed-text);
 }
 
 .modal input:focus, .modal select:focus, .modal textarea:focus {
-  border-color: #666;
+  border-color: var(--embed-primary);
+  box-shadow: 0 0 0 2px rgba(91,154,139,0.12);
 }
 
 .modal textarea {
@@ -367,29 +486,30 @@ html.embedded-mode .sidebar-header {
 }
 
 .modal-buttons button {
-  padding: 6px 16px;
-  border: 1px solid #aaa;
-  background: #fff;
+  padding: 7px 16px;
+  border: 1px solid var(--embed-border);
+  background: var(--embed-surface);
   cursor: pointer;
   font-size: 13px;
   transition: all 0.15s ease;
-  border-radius: 4px;
+  border-radius: var(--embed-radius-sm);
+  color: var(--embed-text);
 }
 
-.modal-buttons button:hover { background: #eee; }
+.modal-buttons button:hover { background: var(--embed-bg); border-color: var(--embed-primary); }
 
 .modal-buttons button.primary {
-  background: #333;
+  background: var(--embed-primary);
   color: #fff;
-  border-color: #333;
+  border-color: var(--embed-primary);
 }
 
-.modal-buttons button.primary:hover { background: #555; }
+.modal-buttons button.primary:hover { background: var(--embed-primary-hover); border-color: var(--embed-primary-hover); }
 
 .custom-fields { display: none; }
 
 .error-msg {
-  color: #c00;
+  color: #c76b6b;
   font-size: 13px;
   margin-bottom: 8px;
 }
@@ -397,9 +517,9 @@ html.embedded-mode .sidebar-header {
 @keyframes pulse { 0%,100% { opacity: 0.4 } 50% { opacity: 1 } }
 
 .loading {
-  padding: 20px;
+  padding: 28px 20px;
   text-align: center;
-  color: #888;
+  color: var(--embed-muted);
   animation: pulse 1.4s ease-in-out infinite;
 }
 
@@ -407,35 +527,37 @@ html.embedded-mode .sidebar-header {
 .copy-btn {
   display: inline-block;
   cursor: pointer;
-  margin-left: 4px;
-  padding: 0 3px;
+  margin-left: 6px;
+  padding: 0 4px;
   font-size: 11px;
-  color: #999;
-  border: 1px solid #ccc;
-  border-radius: 3px;
-  background: #fff;
+  color: var(--embed-muted);
+  border: 1px solid var(--embed-border);
+  border-radius: 4px;
+  background: var(--embed-surface);
   vertical-align: middle;
-  line-height: 16px;
+  line-height: 17px;
   user-select: none;
   transition: all 0.15s ease;
 }
 
-.copy-btn:hover { color: #333; border-color: #999; background: #f0f0f0; }
+.copy-btn:hover { color: var(--embed-text); border-color: var(--embed-primary); background: var(--embed-bg); }
 
 .copy-toast {
   position: fixed;
   top: 20px;
   left: 50%;
   transform: translateX(-50%);
-  background: #333;
+  background: var(--embed-primary);
   color: #fff;
-  padding: 6px 16px;
+  padding: 8px 16px;
   font-size: 13px;
-  border-radius: 4px;
+  border-radius: var(--embed-radius-sm);
   z-index: 9999;
   opacity: 0;
   transition: opacity 0.2s;
   pointer-events: none;
+  box-shadow: var(--embed-shadow);
+  font-weight: 500;
 }
 
 .copy-toast.show { opacity: 1; }
@@ -446,27 +568,42 @@ html.embedded-mode .sidebar-header {
   max-height: 200px;
   overflow-y: auto;
   font-size: 12px;
-  border: 1px solid #ddd;
+  border: 1px solid var(--embed-border);
   display: none;
-  border-radius: 4px;
+  border-radius: var(--embed-radius-sm);
+  background: rgba(245,249,247,0.65);
 }
 
 .batch-results.show { display: block; }
 
 .batch-row {
   padding: 4px 8px;
-  border-bottom: 1px solid #eee;
+  border-bottom: 1px solid rgba(212,228,222,0.7);
   display: flex;
   justify-content: space-between;
 }
 
-.batch-row.success { color: #080; }
-.batch-row.fail { color: #c00; }
+.batch-row.success { color: var(--embed-primary); }
+.batch-row.fail { color: #c76b6b; }
+
+.batch-hint {
+  font-size: 12px;
+  color: var(--embed-muted);
+  margin-bottom: 12px;
+}
+
+.batch-summary {
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--embed-border);
+  font-weight: 600;
+  color: var(--embed-text);
+  background: rgba(245,249,247,0.85);
+}
 
 /* tabs */
 .modal-tabs {
   display: flex;
-  border-bottom: 1px solid #ccc;
+  border-bottom: 1px solid var(--embed-border);
   margin-bottom: 16px;
 }
 
@@ -475,33 +612,34 @@ html.embedded-mode .sidebar-header {
   cursor: pointer;
   font-size: 13px;
   border-bottom: 2px solid transparent;
-  color: #666;
+  color: var(--embed-muted);
   transition: all 0.15s ease;
 }
 
-.modal-tab:hover { color: #333; }
-.modal-tab.active { color: #1a1a1a; border-bottom-color: #333; }
+.modal-tab:hover { color: var(--embed-text); }
+.modal-tab.active { color: var(--embed-text); border-bottom-color: var(--embed-primary); }
 
 .tab-content { display: none; }
 .tab-content.active { display: block; }
 
 ::-webkit-scrollbar { width: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: #ccc; border-radius: 3px; }
-::-webkit-scrollbar-thumb:hover { background: #aaa; }
+::-webkit-scrollbar-thumb { background: #c7d8d1; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #a8c0b7; }
 
 @media (max-width: 991.98px) {
   .app {
     flex-direction: column;
     height: auto;
     min-height: 100dvh;
+    padding: 12px;
+    gap: 12px;
   }
 
   .sidebar {
     width: 100%;
     min-width: 0;
-    border-right: none;
-    border-bottom: 1px solid #d0d0d0;
+    border-right: 1px solid var(--embed-border);
   }
 
   .sidebar-buttons {
@@ -529,8 +667,8 @@ html.embedded-mode .sidebar-header {
   }
 
   .toolbar button:first-of-type {
-    border-left: 1px solid #aaa;
-    border-radius: 4px;
+    border-left: 1px solid var(--embed-border);
+    border-radius: var(--embed-radius-sm);
   }
 
   .mail-list-pane,
@@ -639,11 +777,13 @@ html.embedded-mode .embedded-home-btn:hover {
 
 html.embedded-mode .app {
   height: calc(100vh - 62px);
+  padding: 16px;
+  gap: 16px;
 }
 
 html.embedded-mode .sidebar {
   background: rgba(245,249,247,0.95);
-  border-right-color: var(--embed-border);
+  border-color: var(--embed-border);
 }
 
 html.embedded-mode .sidebar-section,
@@ -749,17 +889,17 @@ if (new URLSearchParams(window.location.search).get('embedded') === '1') {
   <div class="embedded-topbar">
     <div class="embedded-topbar-left">
       <button type="button" class="embedded-home-btn" onclick="goBackToMailboxHome()" aria-label="返回邮箱主页" title="返回邮箱主页">←</button>
-      <div class="embedded-title">IMAP</div>
+      <div class="embedded-title">ManyMail IMAP</div>
     </div>
   </div>
 <div class="app">
   <div class="sidebar">
-    <div class="sidebar-header">IMAP 邮件客户端</div>
+    <div class="sidebar-header">ManyMail</div>
     <div class="sidebar-section">
-      <div class="sidebar-section-title">账户列表</div>
+      <div class="sidebar-section-title">邮箱账户</div>
       <div id="account-list"></div>
       <div class="sidebar-buttons">
-        <div class="btn" onclick="showAddModal('single')">添加账户</div>
+        <div class="btn" onclick="showAddModal('single')">添加邮箱</div>
         <div class="btn" onclick="showAddModal('batch')">批量导入</div>
       </div>
     </div>
@@ -771,17 +911,17 @@ if (new URLSearchParams(window.location.search).get('embedded') === '1') {
 
   <div class="main">
     <div class="toolbar">
-      <input type="text" id="search-input" placeholder="按主题搜索邮件...">
-      <button onclick="doSearch()">搜索</button>
-      <button onclick="refreshMails()">刷新</button>
+      <input type="text" id="search-input" placeholder="搜索发件人 / 主题...">
+      <button onclick="doSearch()">搜索邮件</button>
+      <button onclick="refreshMails()">刷新列表</button>
       <span class="mail-info" id="mail-info"></span>
     </div>
     <div class="mail-list-container">
       <div class="mail-list-pane" id="mail-list">
-        <div class="detail-empty">请先添加邮箱账户</div>
+        <div class="detail-empty"><strong>还没有连接邮箱</strong><span>添加一个 IMAP 邮箱后，即可在 ManyMail 中统一浏览邮件。</span></div>
       </div>
       <div class="mail-detail" id="mail-detail">
-        <div class="detail-empty">选择一封邮件查看内容</div>
+        <div class="detail-empty"><strong>请选择一封邮件</strong><span>在左侧选择邮件后，可在这里查看正文、附件与收发件信息。</span></div>
       </div>
     </div>
   </div>
@@ -791,9 +931,9 @@ if (new URLSearchParams(window.location.search).get('embedded') === '1') {
 <!-- 添加账户弹窗 -->
 <div class="modal-overlay" id="add-modal">
   <div class="modal">
-    <h3>添加邮箱账户</h3>
+    <h3>连接 IMAP 邮箱</h3>
     <div class="modal-tabs">
-      <div class="modal-tab active" data-tab="single" onclick="switchTab('single')">单个添加</div>
+      <div class="modal-tab active" data-tab="single" onclick="switchTab('single')">单个连接</div>
       <div class="modal-tab" data-tab="batch" onclick="switchTab('batch')">批量导入</div>
     </div>
 
@@ -816,7 +956,7 @@ if (new URLSearchParams(window.location.search).get('embedded') === '1') {
       <input id="m-pass" type="password" placeholder="密码">
       <div class="modal-buttons">
         <button onclick="hideAddModal()">取消</button>
-        <button class="primary" onclick="doAddAccount()">连接</button>
+        <button class="primary" onclick="doAddAccount()">连接邮箱</button>
       </div>
     </div>
 
@@ -827,7 +967,7 @@ if (new URLSearchParams(window.location.search).get('embedded') === '1') {
       <textarea id="batch-input" placeholder="user1@gmail.com:password1
 user2@gmx.com:password2
 user3@outlook.com:password3"></textarea>
-      <p style="font-size:12px;color:#888;margin-bottom:12px;">
+      <p class="batch-hint">
         支持自动识别: Gmail, GMX, Outlook, QQ, 163, Yahoo 等邮箱的 IMAP 服务器
       </p>
       <div class="batch-results" id="batch-results"></div>
@@ -846,6 +986,29 @@ let mailCache = [];
 let hasMore = false;
 let oldestSeq = null;
 let detailVisible = false;
+const UX_COPY = {
+  emptyAccounts: '<strong>还没有连接邮箱</strong><span>添加一个 IMAP 邮箱后，即可在 ManyMail 中统一浏览邮件。</span>',
+  emptyDetail: '<strong>请选择一封邮件</strong><span>在左侧选择邮件后，可在这里查看正文、附件与收发件信息。</span>',
+  noMails: '<strong>这里还没有邮件</strong><span>可以切换文件夹，或者点击刷新查看最新内容。</span>',
+  loading: '加载中...',
+  searching: '搜索中...',
+  loadMore: '加载更多',
+  loadingMore: '加载中...',
+  retryLoadMore: '加载失败，点击重试',
+  infoSummary: function(total, unseen) { return '共 ' + total + ' 封 / 未读 ' + unseen + ' 封'; },
+  searchSummary: function(count) { return '搜索结果：共 ' + count + ' 封'; },
+  backToList: '返回邮件列表',
+  attachments: '附件',
+  from: '发件人',
+  to: '收件人',
+  cc: '抄送',
+  date: '日期',
+  fillCredentials: '请填写邮箱地址和密码',
+  importRequired: '请输入账户列表',
+  importing: function(count) { return '正在导入 ' + count + ' 个账户...'; },
+  importDone: function(success, total) { return '导入完成：成功 ' + success + ' / 共 ' + total; },
+  copied: function(text) { return '已复制：' + text; },
+};
 
 async function api(method, url, body) {
   const opts = { method, headers: {} };
@@ -889,7 +1052,7 @@ async function removeAccount(id) {
   if (activeAccountId === id) {
     activeAccountId = null;
     document.getElementById('folder-section').style.display = 'none';
-    document.getElementById('mail-list').innerHTML = '<div class="detail-empty">请先添加邮箱账户</div>';
+    document.getElementById('mail-list').innerHTML = '<div class="detail-empty">' + UX_COPY.emptyAccounts + '</div>';
     resetMailDetail();
     document.getElementById('mail-info').textContent = '';
   }
@@ -931,7 +1094,7 @@ function syncResponsiveView() {
 
 function resetMailDetail(message) {
   detailVisible = false;
-  document.getElementById('mail-detail').innerHTML = '<div class="detail-empty">' + (message || '选择一封邮件查看内容') + '</div>';
+  document.getElementById('mail-detail').innerHTML = '<div class="detail-empty">' + (message || UX_COPY.emptyDetail) + '</div>';
   syncResponsiveView();
 }
 
@@ -956,17 +1119,17 @@ async function loadMails() {
   detailVisible = false;
   syncResponsiveView();
   const el = document.getElementById('mail-list');
-  el.innerHTML = '<div class="loading">加载中...</div>';
+  el.innerHTML = '<div class="loading">' + UX_COPY.loading + '</div>';
   try {
     const data = await api('GET', '/api/accounts/' + activeAccountId + '/mails?folder=' + encodeURIComponent(activeFolder) + '&count=30');
     mailCache = data.mails || [];
     hasMore = data.hasMore;
-    document.getElementById('mail-info').textContent = '共 ' + data.total + ' 封 / 未读 ' + data.unseen + ' 封';
+    document.getElementById('mail-info').textContent = UX_COPY.infoSummary(data.total, data.unseen);
     renderMailList(mailCache);
     if (data.hasMore) {
       oldestSeq = Math.min.apply(null, mailCache.map(function(m) { return m.seq; }));
       document.getElementById('mail-list').insertAdjacentHTML('beforeend',
-        '<div id="load-more-btn" onclick="loadMoreMails()" style="padding:12px;text-align:center;color:#888;cursor:pointer;border-top:1px solid #eee;font-size:13px;">加载更多</div>');
+        '<div id="load-more-btn" class="load-more-btn" onclick="loadMoreMails()">' + UX_COPY.loadMore + '</div>');
     }
   } catch (err) {
     el.innerHTML = '<div class="detail-empty">' + err.message + '</div>';
@@ -976,7 +1139,7 @@ async function loadMails() {
 function renderMailList(mails) {
   const el = document.getElementById('mail-list');
   if (mails.length === 0) {
-    el.innerHTML = '<div class="detail-empty">暂无邮件</div>';
+    el.innerHTML = '<div class="detail-empty">' + UX_COPY.noMails + '</div>';
     return;
   }
   el.innerHTML = mails.map(function(m, i) {
@@ -1002,7 +1165,7 @@ async function readMail(index) {
     r.classList.toggle('active', i === index);
   });
   var el = document.getElementById('mail-detail');
-  el.innerHTML = '<div class="loading">加载中...</div>';
+  el.innerHTML = '<div class="loading">' + UX_COPY.loading + '</div>';
   try {
     var data = await api('GET', '/api/accounts/' + activeAccountId + '/mails/' + mail.uid + '?folder=' + encodeURIComponent(activeFolder));
     var date = data.date ? new Date(data.date).toLocaleString('zh-CN') : '';
@@ -1014,23 +1177,23 @@ async function readMail(index) {
     }
     var attachHtml = '';
     if (data.attachments.length > 0) {
-      attachHtml = '<div class="detail-attachments">附件: ' +
+      attachHtml = '<div class="detail-attachments">' + UX_COPY.attachments + ': ' +
         data.attachments.map(function(a) {
           var dlUrl = '/api/accounts/' + activeAccountId + '/mails/' + mail.uid + '/attachments/' + a.index + '?folder=' + encodeURIComponent(activeFolder);
-          return '<a href="' + dlUrl + '" download style="display:inline-block;margin-right:16px;color:#555;text-decoration:none;border-bottom:1px dashed #aaa;" onmouseover="this.style.color=\'#222\'" onmouseout="this.style.color=\'#555\'">' + esc(a.filename) + ' (' + (a.size/1024).toFixed(1) + 'KB)</a>';
+          return '<a href="' + dlUrl + '" download>' + esc(a.filename) + ' (' + (a.size/1024).toFixed(1) + 'KB)</a>';
         }).join('') + '</div>';
     }
     el.innerHTML =
       '<div class="detail-header">' +
         '<div class="detail-header-top">' +
-          '<button type="button" class="detail-back" onclick="showMailListView()">返回列表</button>' +
+          '<button type="button" class="detail-back" onclick="showMailListView()">' + UX_COPY.backToList + '</button>' +
           '<div class="detail-subject">' + esc(data.subject) + '</div>' +
         '</div>' +
         '<div class="detail-meta">' +
-          '发件人: ' + makeCopyable(data.from) + '<br>' +
-          '收件人: ' + makeCopyable(data.to) + '<br>' +
-          (data.cc ? '抄送: ' + makeCopyable(data.cc) + '<br>' : '') +
-          '日期: ' + date +
+          UX_COPY.from + ': ' + makeCopyable(data.from) + '<br>' +
+          UX_COPY.to + ': ' + makeCopyable(data.to) + '<br>' +
+          (data.cc ? UX_COPY.cc + ': ' + makeCopyable(data.cc) + '<br>' : '') +
+          UX_COPY.date + ': ' + date +
         '</div>' +
       '</div>' +
       attachHtml +
@@ -1078,7 +1241,7 @@ function refreshMails() {
 async function loadMoreMails() {
   if (!activeAccountId || !oldestSeq) return;
   var btn = document.getElementById('load-more-btn');
-  if (btn) btn.textContent = '加载中...';
+  if (btn) btn.textContent = UX_COPY.loadingMore;
   try {
     var data = await api('GET', '/api/accounts/' + activeAccountId + '/mails?folder=' + encodeURIComponent(activeFolder) + '&count=30&before=' + oldestSeq);
     var newMails = data.mails || [];
@@ -1090,10 +1253,10 @@ async function loadMoreMails() {
     renderMailList(mailCache);
     if (hasMore) {
       document.getElementById('mail-list').insertAdjacentHTML('beforeend',
-        '<div id="load-more-btn" onclick="loadMoreMails()" style="padding:12px;text-align:center;color:#888;cursor:pointer;border-top:1px solid #eee;font-size:13px;">加载更多</div>');
+        '<div id="load-more-btn" class="load-more-btn" onclick="loadMoreMails()">' + UX_COPY.loadMore + '</div>');
     }
   } catch (err) {
-    if (btn) btn.textContent = '加载失败，点击重试';
+    if (btn) btn.textContent = UX_COPY.retryLoadMore;
   }
 }
 
@@ -1104,11 +1267,11 @@ async function doSearch() {
   detailVisible = false;
   syncResponsiveView();
   var el = document.getElementById('mail-list');
-  el.innerHTML = '<div class="loading">搜索中...</div>';
+  el.innerHTML = '<div class="loading">' + UX_COPY.searching + '</div>';
   try {
     var mails = await api('GET', '/api/accounts/' + activeAccountId + '/search?folder=' + encodeURIComponent(activeFolder) + '&q=' + encodeURIComponent(q));
     mailCache = mails;
-    document.getElementById('mail-info').textContent = '搜索结果: ' + mails.length + ' 封';
+    document.getElementById('mail-info').textContent = UX_COPY.searchSummary(mails.length);
     renderMailList(mails);
   } catch (err) {
     el.innerHTML = '<div class="detail-empty">' + err.message + '</div>';
@@ -1158,7 +1321,7 @@ async function doAddAccount() {
   var host = document.getElementById('m-host').value.trim();
   var port = document.getElementById('m-port').value.trim();
   var errEl = document.getElementById('modal-error');
-  if (!email || !password) { errEl.textContent = '请填写邮箱地址和密码'; return; }
+  if (!email || !password) { errEl.textContent = UX_COPY.fillCredentials; return; }
   errEl.textContent = '';
   try {
     var acc = await api('POST', '/api/accounts', { preset: preset, email: email, password: password, host: host, port: port });
@@ -1178,13 +1341,13 @@ async function doBatchImport() {
   var text = document.getElementById('batch-input').value.trim();
   var errEl = document.getElementById('batch-error');
   var resEl = document.getElementById('batch-results');
-  if (!text) { errEl.textContent = '请输入账户列表'; return; }
+  if (!text) { errEl.textContent = UX_COPY.importRequired; return; }
 
   var lines = text.split('\n').filter(function(l) { return l.trim(); });
-  if (lines.length === 0) { errEl.textContent = '请输入账户列表'; return; }
+  if (lines.length === 0) { errEl.textContent = UX_COPY.importRequired; return; }
 
   errEl.textContent = '';
-  resEl.innerHTML = '<div class="loading">正在导入 ' + lines.length + ' 个账户...</div>';
+  resEl.innerHTML = '<div class="loading">' + UX_COPY.importing(lines.length) + '</div>';
   resEl.classList.add('show');
 
   try {
@@ -1199,7 +1362,7 @@ async function doBatchImport() {
         html += '<div class="batch-row fail"><span>' + esc(r.email) + '</span><span>' + esc(r.error) + '</span></div>';
       }
     });
-    resEl.innerHTML = '<div style="padding:6px 8px;border-bottom:1px solid #ddd;font-weight:600;">导入完成: 成功 ' + successCount + ' / 共 ' + results.length + '</div>' + html;
+    resEl.innerHTML = '<div class="batch-summary">' + UX_COPY.importDone(successCount, results.length) + '</div>' + html;
 
     await loadAccounts();
     if (successCount > 0 && !activeAccountId) {
@@ -1217,7 +1380,7 @@ function copyEmail(text, event) {
   if (event) event.stopPropagation();
   navigator.clipboard.writeText(text).then(function() {
     var toast = document.getElementById('copy-toast');
-    toast.textContent = '已复制: ' + text;
+    toast.textContent = UX_COPY.copied(text);
     toast.classList.add('show');
     clearTimeout(copyEmail._timer);
     copyEmail._timer = setTimeout(function() { toast.classList.remove('show'); }, 1500);
