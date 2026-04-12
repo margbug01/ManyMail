@@ -7,6 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;600&family=Satisfy&display=swap" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" rel="stylesheet">
 <style>
 * { margin: 0; padding: 0; box-sizing: border-box; }
 
@@ -52,6 +53,30 @@ html.embedded-mode .sidebar-header {
   background: transparent;
   width: min(100%, 1680px);
   margin: 0 auto;
+
+.lang-toggle {
+  margin-left: auto;
+  border: 1px solid var(--embed-border);
+  background: var(--embed-surface);
+  color: var(--embed-muted);
+  border-radius: 999px;
+  min-width: 42px;
+  height: 30px;
+  padding: 0 10px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+}
+
+.lang-toggle:hover {
+  background: var(--embed-bg);
+  color: var(--embed-text);
+  border-color: var(--embed-primary);
+}
   padding: 24px;
   gap: 20px;
 }
@@ -889,31 +914,34 @@ if (new URLSearchParams(window.location.search).get('embedded') === '1') {
   <div class="embedded-topbar">
     <div class="embedded-topbar-left">
       <button type="button" class="embedded-home-btn" onclick="goBackToMailboxHome()" aria-label="返回邮箱主页" title="返回邮箱主页">←</button>
-      <div class="embedded-title">ManyMail IMAP</div>
+      <div class="embedded-title" data-i18n="embeddedTitle">ManyMail IMAP</div>
     </div>
+    <button type="button" class="lang-toggle" onclick="toggleLang()" id="btn-lang" title="Switch Language">
+      <i class="bi bi-translate"></i><span id="lang-label">EN</span>
+    </button>
   </div>
 <div class="app">
   <div class="sidebar">
-    <div class="sidebar-header">ManyMail</div>
+    <div class="sidebar-header" data-i18n="brandTitle">ManyMail</div>
     <div class="sidebar-section">
-      <div class="sidebar-section-title">邮箱账户</div>
+      <div class="sidebar-section-title" data-i18n="accountSection">邮箱账户</div>
       <div id="account-list"></div>
       <div class="sidebar-buttons">
-        <div class="btn" onclick="showAddModal('single')">添加邮箱</div>
-        <div class="btn" onclick="showAddModal('batch')">批量导入</div>
+        <div class="btn" onclick="showAddModal('single')" data-i18n="addAccount">添加邮箱</div>
+        <div class="btn" onclick="showAddModal('batch')" data-i18n="batchImport">批量导入</div>
       </div>
     </div>
     <div class="sidebar-section" id="folder-section" style="display:none">
-      <div class="sidebar-section-title">文件夹</div>
+      <div class="sidebar-section-title" data-i18n="folderSection">文件夹</div>
       <div id="folder-list"></div>
     </div>
   </div>
 
   <div class="main">
     <div class="toolbar">
-      <input type="text" id="search-input" placeholder="搜索发件人 / 主题...">
-      <button onclick="doSearch()">搜索邮件</button>
-      <button onclick="refreshMails()">刷新列表</button>
+      <input type="text" id="search-input" data-i18n-ph="searchPlaceholder" placeholder="搜索发件人 / 主题...">
+      <button onclick="doSearch()" data-i18n="searchButton">搜索邮件</button>
+      <button onclick="refreshMails()" data-i18n="refreshButton">刷新列表</button>
       <span class="mail-info" id="mail-info"></span>
     </div>
     <div class="mail-list-container">
@@ -931,49 +959,49 @@ if (new URLSearchParams(window.location.search).get('embedded') === '1') {
 <!-- 添加账户弹窗 -->
 <div class="modal-overlay" id="add-modal">
   <div class="modal">
-    <h3>连接 IMAP 邮箱</h3>
+    <h3 data-i18n="modalTitle">连接 IMAP 邮箱</h3>
     <div class="modal-tabs">
-      <div class="modal-tab active" data-tab="single" onclick="switchTab('single')">单个连接</div>
-      <div class="modal-tab" data-tab="batch" onclick="switchTab('batch')">批量导入</div>
+      <div class="modal-tab active" data-tab="single" onclick="switchTab('single')" data-i18n="singleTab">单个连接</div>
+      <div class="modal-tab" data-tab="batch" onclick="switchTab('batch')" data-i18n="batchImport">批量导入</div>
     </div>
 
     <!-- 单个添加 -->
     <div class="tab-content active" id="tab-single">
       <div class="error-msg" id="modal-error"></div>
-      <label>邮箱类型</label>
+      <label data-i18n="presetLabel">邮箱类型</label>
       <select id="m-preset" onchange="onPresetChange()">
-        <option value="">加载中...</option>
+        <option value="" data-i18n="loading">加载中...</option>
       </select>
       <div class="custom-fields" id="custom-fields">
-        <label>IMAP 服务器</label>
+        <label data-i18n="hostLabel">IMAP 服务器</label>
         <input id="m-host" placeholder="imap.example.com">
-        <label>端口</label>
+        <label data-i18n="portLabel">端口</label>
         <input id="m-port" value="993">
       </div>
-      <label>邮箱地址</label>
+      <label data-i18n="emailLabel">邮箱地址</label>
       <input id="m-email" type="email" placeholder="you@example.com">
-      <label>密码 / 应用专用密码</label>
-      <input id="m-pass" type="password" placeholder="密码">
+      <label data-i18n="passwordLabel">密码 / 应用专用密码</label>
+      <input id="m-pass" type="password" data-i18n-ph="passwordPlaceholder" placeholder="密码">
       <div class="modal-buttons">
-        <button onclick="hideAddModal()">取消</button>
-        <button class="primary" onclick="doAddAccount()">连接邮箱</button>
+        <button onclick="hideAddModal()" data-i18n="cancel">取消</button>
+        <button class="primary" onclick="doAddAccount()" data-i18n="connectButton">连接邮箱</button>
       </div>
     </div>
 
     <!-- 批量导入 -->
     <div class="tab-content" id="tab-batch">
       <div class="error-msg" id="batch-error"></div>
-      <label>账户列表（每行一个，格式: 邮箱:密码）</label>
+      <label data-i18n="batchLabel">账户列表（每行一个，格式: 邮箱:密码）</label>
       <textarea id="batch-input" placeholder="user1@gmail.com:password1
 user2@gmx.com:password2
 user3@outlook.com:password3"></textarea>
-      <p class="batch-hint">
+      <p class="batch-hint" data-i18n="batchHint">
         支持自动识别: Gmail, GMX, Outlook, QQ, 163, Yahoo 等邮箱的 IMAP 服务器
       </p>
       <div class="batch-results" id="batch-results"></div>
       <div class="modal-buttons">
-        <button onclick="hideAddModal()">取消</button>
-        <button class="primary" onclick="doBatchImport()">开始导入</button>
+        <button onclick="hideAddModal()" data-i18n="cancel">取消</button>
+        <button class="primary" onclick="doBatchImport()" data-i18n="startImport">开始导入</button>
       </div>
     </div>
   </div>
@@ -986,29 +1014,162 @@ let mailCache = [];
 let hasMore = false;
 let oldestSeq = null;
 let detailVisible = false;
-const UX_COPY = {
-  emptyAccounts: '<strong>还没有连接邮箱</strong><span>添加一个 IMAP 邮箱后，即可在 ManyMail 中统一浏览邮件。</span>',
-  emptyDetail: '<strong>请选择一封邮件</strong><span>在左侧选择邮件后，可在这里查看正文、附件与收发件信息。</span>',
-  noMails: '<strong>这里还没有邮件</strong><span>可以切换文件夹，或者点击刷新查看最新内容。</span>',
-  loading: '加载中...',
-  searching: '搜索中...',
-  loadMore: '加载更多',
-  loadingMore: '加载中...',
-  retryLoadMore: '加载失败，点击重试',
-  infoSummary: function(total, unseen) { return '共 ' + total + ' 封 / 未读 ' + unseen + ' 封'; },
-  searchSummary: function(count) { return '搜索结果：共 ' + count + ' 封'; },
-  backToList: '返回邮件列表',
-  attachments: '附件',
-  from: '发件人',
-  to: '收件人',
-  cc: '抄送',
-  date: '日期',
-  fillCredentials: '请填写邮箱地址和密码',
-  importRequired: '请输入账户列表',
-  importing: function(count) { return '正在导入 ' + count + ' 个账户...'; },
-  importDone: function(success, total) { return '导入完成：成功 ' + success + ' / 共 ' + total; },
-  copied: function(text) { return '已复制：' + text; },
+const LANGS = {
+  zh: {
+    embeddedTitle: 'ManyMail IMAP',
+    brandTitle: 'ManyMail',
+    accountSection: '邮箱账户',
+    folderSection: '文件夹',
+    addAccount: '添加邮箱',
+    batchImport: '批量导入',
+    searchPlaceholder: '搜索发件人 / 主题...',
+    searchButton: '搜索邮件',
+    refreshButton: '刷新列表',
+    modalTitle: '连接 IMAP 邮箱',
+    singleTab: '单个连接',
+    presetLabel: '邮箱类型',
+    loading: '加载中...',
+    hostLabel: 'IMAP 服务器',
+    portLabel: '端口',
+    emailLabel: '邮箱地址',
+    passwordLabel: '密码 / 应用专用密码',
+    passwordPlaceholder: '密码',
+    cancel: '取消',
+    connectButton: '连接邮箱',
+    batchLabel: '账户列表（每行一个，格式: 邮箱:密码）',
+    batchHint: '支持自动识别: Gmail, GMX, Outlook, QQ, 163, Yahoo 等邮箱的 IMAP 服务器',
+    startImport: '开始导入',
+    emptyAccountsTitle: '还没有连接邮箱',
+    emptyAccountsDesc: '添加一个 IMAP 邮箱后，即可在 ManyMail 中统一浏览邮件。',
+    emptyDetailTitle: '请选择一封邮件',
+    emptyDetailDesc: '在左侧选择邮件后，可在这里查看正文、附件与收发件信息。',
+    noMailsTitle: '这里还没有邮件',
+    noMailsDesc: '可以切换文件夹，或者点击刷新查看最新内容。',
+    searching: '搜索中...',
+    loadMore: '加载更多',
+    retryLoadMore: '加载失败，点击重试',
+    backToList: '返回邮件列表',
+    attachments: '附件',
+    from: '发件人',
+    to: '收件人',
+    cc: '抄送',
+    date: '日期',
+    fillCredentials: '请填写邮箱地址和密码',
+    importRequired: '请输入账户列表',
+    importSuccess: '成功',
+    copiedPrefix: '已复制：',
+    infoSummary: '共 {total} 封 / 未读 {unseen} 封',
+    searchSummary: '搜索结果：共 {count} 封',
+    importing: '正在导入 {count} 个账户...',
+    importDone: '导入完成：成功 {success} / 共 {total}',
+    disconnectTitle: '断开',
+    copyEmailTitle: '复制邮箱',
+    customPreset: '自定义',
+  },
+  en: {
+    embeddedTitle: 'ManyMail IMAP',
+    brandTitle: 'ManyMail',
+    accountSection: 'Accounts',
+    folderSection: 'Folders',
+    addAccount: 'Add account',
+    batchImport: 'Batch import',
+    searchPlaceholder: 'Search sender / subject...',
+    searchButton: 'Search mail',
+    refreshButton: 'Refresh list',
+    modalTitle: 'Connect IMAP mailbox',
+    singleTab: 'Single account',
+    presetLabel: 'Mailbox type',
+    loading: 'Loading...',
+    hostLabel: 'IMAP server',
+    portLabel: 'Port',
+    emailLabel: 'Email address',
+    passwordLabel: 'Password / app password',
+    passwordPlaceholder: 'Password',
+    cancel: 'Cancel',
+    connectButton: 'Connect mailbox',
+    batchLabel: 'Accounts (one per line, format: email:password)',
+    batchHint: 'Auto-detects IMAP settings for Gmail, GMX, Outlook, QQ, 163, Yahoo, and more.',
+    startImport: 'Start import',
+    emptyAccountsTitle: 'No mailbox connected yet',
+    emptyAccountsDesc: 'Add an IMAP mailbox to browse everything inside ManyMail.',
+    emptyDetailTitle: 'Select an email',
+    emptyDetailDesc: 'Choose an email from the left to view its body, attachments, and delivery details here.',
+    noMailsTitle: 'No mail here yet',
+    noMailsDesc: 'Try another folder, or refresh to check for the latest messages.',
+    searching: 'Searching...',
+    loadMore: 'Load more',
+    retryLoadMore: 'Load failed, click to retry',
+    backToList: 'Back to list',
+    attachments: 'Attachments',
+    from: 'From',
+    to: 'To',
+    cc: 'Cc',
+    date: 'Date',
+    fillCredentials: 'Please enter both email address and password',
+    importRequired: 'Please enter the account list',
+    importSuccess: 'Success',
+    copiedPrefix: 'Copied: ',
+    infoSummary: '{total} total / {unseen} unread',
+    searchSummary: 'Search results: {count}',
+    importing: 'Importing {count} accounts...',
+    importDone: 'Import complete: {success} succeeded / {total} total',
+    disconnectTitle: 'Disconnect',
+    copyEmailTitle: 'Copy email',
+    customPreset: 'Custom',
+  }
 };
+let currentLang = localStorage.getItem('manymail-lang') || 'zh';
+
+function t(key, vars) {
+  let s = (LANGS[currentLang] || LANGS.zh)[key] || key;
+  if (vars) {
+    Object.keys(vars).forEach(function(k) {
+      s = s.replace(new RegExp('\\{' + k + '\\}', 'g'), vars[k]);
+    });
+  }
+  return s;
+}
+
+function richEmpty(titleKey, descKey) {
+  return '<strong>' + esc(t(titleKey)) + '</strong><span>' + esc(t(descKey)) + '</span>';
+}
+
+function refreshStaticText() {
+  document.querySelectorAll('[data-i18n]').forEach(function(el) {
+    el.textContent = t(el.dataset.i18n);
+  });
+  document.querySelectorAll('[data-i18n-ph]').forEach(function(el) {
+    el.placeholder = t(el.dataset.i18nPh);
+  });
+  var langLabel = document.getElementById('lang-label');
+  if (langLabel) langLabel.textContent = currentLang === 'zh' ? 'EN' : '中';
+  document.documentElement.lang = currentLang === 'zh' ? 'zh-CN' : 'en';
+}
+
+function toggleLang() {
+  currentLang = currentLang === 'zh' ? 'en' : 'zh';
+  localStorage.setItem('manymail-lang', currentLang);
+  applyLang();
+}
+
+function applyLang() {
+  refreshStaticText();
+  if (!activeAccountId) {
+    document.getElementById('mail-list').innerHTML = '<div class="detail-empty">' + richEmpty('emptyAccountsTitle', 'emptyAccountsDesc') + '</div>';
+  } else if (mailCache.length === 0) {
+    renderMailList(mailCache);
+  } else {
+    renderMailList(mailCache);
+  }
+  if (!detailVisible) {
+    resetMailDetail();
+  } else if (selectedMailIndex >= 0 && mailCache[selectedMailIndex]) {
+    readMail(selectedMailIndex);
+  }
+  document.getElementById('m-preset').querySelectorAll('option[data-i18n]').forEach(function(opt) {
+    opt.textContent = t(opt.dataset.i18n);
+  });
+}
 
 async function api(method, url, body) {
   const opts = { method, headers: {} };
@@ -1031,8 +1192,8 @@ async function loadAccounts() {
     <div class="account-item ${a.id === activeAccountId ? 'active' : ''}"
          onclick="selectAccount(${a.id})">
       <span class="account-name" title="${a.email}">${a.email}</span>
-      <span class="copy-btn" onclick="copyEmail('${a.email}', event)" title="复制邮箱">&#x2398;</span>
-      <button class="account-remove" onclick="event.stopPropagation();removeAccount(${a.id})" title="断开">x</button>
+      <span class="copy-btn" onclick="copyEmail('${a.email}', event)" title="${esc(t('copyEmailTitle'))}">&#x2398;</span>
+      <button class="account-remove" onclick="event.stopPropagation();removeAccount(${a.id})" title="${esc(t('disconnectTitle'))}">x</button>
     </div>
   `).join('');
 }
@@ -1052,7 +1213,7 @@ async function removeAccount(id) {
   if (activeAccountId === id) {
     activeAccountId = null;
     document.getElementById('folder-section').style.display = 'none';
-    document.getElementById('mail-list').innerHTML = '<div class="detail-empty">' + UX_COPY.emptyAccounts + '</div>';
+    document.getElementById('mail-list').innerHTML = '<div class="detail-empty">' + richEmpty('emptyAccountsTitle', 'emptyAccountsDesc') + '</div>';
     resetMailDetail();
     document.getElementById('mail-info').textContent = '';
   }
@@ -1094,7 +1255,7 @@ function syncResponsiveView() {
 
 function resetMailDetail(message) {
   detailVisible = false;
-  document.getElementById('mail-detail').innerHTML = '<div class="detail-empty">' + (message || UX_COPY.emptyDetail) + '</div>';
+  document.getElementById('mail-detail').innerHTML = '<div class="detail-empty">' + (message || richEmpty('emptyDetailTitle', 'emptyDetailDesc')) + '</div>';
   syncResponsiveView();
 }
 
@@ -1119,17 +1280,17 @@ async function loadMails() {
   detailVisible = false;
   syncResponsiveView();
   const el = document.getElementById('mail-list');
-  el.innerHTML = '<div class="loading">' + UX_COPY.loading + '</div>';
+  el.innerHTML = '<div class="loading">' + t('loading') + '</div>';
   try {
     const data = await api('GET', '/api/accounts/' + activeAccountId + '/mails?folder=' + encodeURIComponent(activeFolder) + '&count=30');
     mailCache = data.mails || [];
     hasMore = data.hasMore;
-    document.getElementById('mail-info').textContent = UX_COPY.infoSummary(data.total, data.unseen);
+    document.getElementById('mail-info').textContent = t('infoSummary', { total: data.total, unseen: data.unseen });
     renderMailList(mailCache);
     if (data.hasMore) {
       oldestSeq = Math.min.apply(null, mailCache.map(function(m) { return m.seq; }));
       document.getElementById('mail-list').insertAdjacentHTML('beforeend',
-        '<div id="load-more-btn" class="load-more-btn" onclick="loadMoreMails()">' + UX_COPY.loadMore + '</div>');
+        '<div id="load-more-btn" class="load-more-btn" onclick="loadMoreMails()">' + t('loadMore') + '</div>');
     }
   } catch (err) {
     el.innerHTML = '<div class="detail-empty">' + err.message + '</div>';
@@ -1139,7 +1300,7 @@ async function loadMails() {
 function renderMailList(mails) {
   const el = document.getElementById('mail-list');
   if (mails.length === 0) {
-    el.innerHTML = '<div class="detail-empty">' + UX_COPY.noMails + '</div>';
+    el.innerHTML = '<div class="detail-empty">' + richEmpty('noMailsTitle', 'noMailsDesc') + '</div>';
     return;
   }
   el.innerHTML = mails.map(function(m, i) {
@@ -1149,7 +1310,7 @@ function renderMailList(mails) {
     return '<div class="mail-row ' + (m.seen ? '' : 'unread') + '" onclick="readMail(' + i + ')">' +
       '<div class="dot"></div>' +
       '<div class="mail-col">' +
-        '<div class="mail-from">' + fromDisplay + esc(addr) + ' <span class="copy-btn" onclick="copyEmail(\'' + esc(addr) + '\', event)" title="复制邮箱">&#x2398;</span></div>' +
+        '<div class="mail-from">' + fromDisplay + esc(addr) + ' <span class="copy-btn" onclick="copyEmail(\'' + esc(addr) + '\', event)" title="' + esc(t('copyEmailTitle')) + '">&#x2398;</span></div>' +
         '<div class="mail-subject">' + esc(m.subject) + '</div>' +
       '</div>' +
       '<div class="mail-date">' + date + '</div>' +
@@ -1165,7 +1326,7 @@ async function readMail(index) {
     r.classList.toggle('active', i === index);
   });
   var el = document.getElementById('mail-detail');
-  el.innerHTML = '<div class="loading">' + UX_COPY.loading + '</div>';
+  el.innerHTML = '<div class="loading">' + t('loading') + '</div>';
   try {
     var data = await api('GET', '/api/accounts/' + activeAccountId + '/mails/' + mail.uid + '?folder=' + encodeURIComponent(activeFolder));
     var date = data.date ? new Date(data.date).toLocaleString('zh-CN') : '';
@@ -1177,7 +1338,7 @@ async function readMail(index) {
     }
     var attachHtml = '';
     if (data.attachments.length > 0) {
-      attachHtml = '<div class="detail-attachments">' + UX_COPY.attachments + ': ' +
+      attachHtml = '<div class="detail-attachments">' + t('attachments') + ': ' +
         data.attachments.map(function(a) {
           var dlUrl = '/api/accounts/' + activeAccountId + '/mails/' + mail.uid + '/attachments/' + a.index + '?folder=' + encodeURIComponent(activeFolder);
           return '<a href="' + dlUrl + '" download>' + esc(a.filename) + ' (' + (a.size/1024).toFixed(1) + 'KB)</a>';
@@ -1186,14 +1347,14 @@ async function readMail(index) {
     el.innerHTML =
       '<div class="detail-header">' +
         '<div class="detail-header-top">' +
-          '<button type="button" class="detail-back" onclick="showMailListView()">' + UX_COPY.backToList + '</button>' +
+          '<button type="button" class="detail-back" onclick="showMailListView()">' + t('backToList') + '</button>' +
           '<div class="detail-subject">' + esc(data.subject) + '</div>' +
         '</div>' +
         '<div class="detail-meta">' +
-          UX_COPY.from + ': ' + makeCopyable(data.from) + '<br>' +
-          UX_COPY.to + ': ' + makeCopyable(data.to) + '<br>' +
-          (data.cc ? UX_COPY.cc + ': ' + makeCopyable(data.cc) + '<br>' : '') +
-          UX_COPY.date + ': ' + date +
+          t('from') + ': ' + makeCopyable(data.from) + '<br>' +
+          t('to') + ': ' + makeCopyable(data.to) + '<br>' +
+          (data.cc ? t('cc') + ': ' + makeCopyable(data.cc) + '<br>' : '') +
+          t('date') + ': ' + date +
         '</div>' +
       '</div>' +
       attachHtml +
@@ -1241,7 +1402,7 @@ function refreshMails() {
 async function loadMoreMails() {
   if (!activeAccountId || !oldestSeq) return;
   var btn = document.getElementById('load-more-btn');
-  if (btn) btn.textContent = UX_COPY.loadingMore;
+  if (btn) btn.textContent = t('loading');
   try {
     var data = await api('GET', '/api/accounts/' + activeAccountId + '/mails?folder=' + encodeURIComponent(activeFolder) + '&count=30&before=' + oldestSeq);
     var newMails = data.mails || [];
@@ -1253,10 +1414,10 @@ async function loadMoreMails() {
     renderMailList(mailCache);
     if (hasMore) {
       document.getElementById('mail-list').insertAdjacentHTML('beforeend',
-        '<div id="load-more-btn" class="load-more-btn" onclick="loadMoreMails()">' + UX_COPY.loadMore + '</div>');
+        '<div id="load-more-btn" class="load-more-btn" onclick="loadMoreMails()">' + t('loadMore') + '</div>');
     }
   } catch (err) {
-    if (btn) btn.textContent = UX_COPY.retryLoadMore;
+    if (btn) btn.textContent = t('retryLoadMore');
   }
 }
 
@@ -1267,11 +1428,11 @@ async function doSearch() {
   detailVisible = false;
   syncResponsiveView();
   var el = document.getElementById('mail-list');
-  el.innerHTML = '<div class="loading">' + UX_COPY.searching + '</div>';
+  el.innerHTML = '<div class="loading">' + t('searching') + '</div>';
   try {
     var mails = await api('GET', '/api/accounts/' + activeAccountId + '/search?folder=' + encodeURIComponent(activeFolder) + '&q=' + encodeURIComponent(q));
     mailCache = mails;
-    document.getElementById('mail-info').textContent = UX_COPY.searchSummary(mails.length);
+    document.getElementById('mail-info').textContent = t('searchSummary', { count: mails.length });
     renderMailList(mails);
   } catch (err) {
     el.innerHTML = '<div class="detail-empty">' + err.message + '</div>';
@@ -1300,8 +1461,9 @@ async function showAddModal(tab) {
   try {
     var presets = await api('GET', '/api/presets');
     var sel = document.getElementById('m-preset');
-    sel.innerHTML = presets.map(function(p) { return '<option value="' + p + '">' + p + '</option>'; }).join('')
-      + '<option value="custom">自定义</option>';
+    sel.innerHTML = '<option value="" data-i18n="loading">' + t('loading') + '</option>' +
+      presets.map(function(p) { return '<option value="' + p + '">' + p + '</option>'; }).join('')
+      + '<option value="custom">' + t('customPreset') + '</option>';
   } catch(e) {}
 }
 
@@ -1321,7 +1483,7 @@ async function doAddAccount() {
   var host = document.getElementById('m-host').value.trim();
   var port = document.getElementById('m-port').value.trim();
   var errEl = document.getElementById('modal-error');
-  if (!email || !password) { errEl.textContent = UX_COPY.fillCredentials; return; }
+  if (!email || !password) { errEl.textContent = t('fillCredentials'); return; }
   errEl.textContent = '';
   try {
     var acc = await api('POST', '/api/accounts', { preset: preset, email: email, password: password, host: host, port: port });
@@ -1341,13 +1503,13 @@ async function doBatchImport() {
   var text = document.getElementById('batch-input').value.trim();
   var errEl = document.getElementById('batch-error');
   var resEl = document.getElementById('batch-results');
-  if (!text) { errEl.textContent = UX_COPY.importRequired; return; }
+  if (!text) { errEl.textContent = t('importRequired'); return; }
 
   var lines = text.split('\n').filter(function(l) { return l.trim(); });
-  if (lines.length === 0) { errEl.textContent = UX_COPY.importRequired; return; }
+  if (lines.length === 0) { errEl.textContent = t('importRequired'); return; }
 
   errEl.textContent = '';
-  resEl.innerHTML = '<div class="loading">' + UX_COPY.importing(lines.length) + '</div>';
+  resEl.innerHTML = '<div class="loading">' + t('importing', { count: lines.length }) + '</div>';
   resEl.classList.add('show');
 
   try {
@@ -1357,12 +1519,12 @@ async function doBatchImport() {
     results.forEach(function(r) {
       if (r.ok) {
         successCount++;
-        html += '<div class="batch-row success"><span>' + esc(r.email) + '</span><span>成功</span></div>';
+        html += '<div class="batch-row success"><span>' + esc(r.email) + '</span><span>' + t('importSuccess') + '</span></div>';
       } else {
         html += '<div class="batch-row fail"><span>' + esc(r.email) + '</span><span>' + esc(r.error) + '</span></div>';
       }
     });
-    resEl.innerHTML = '<div class="batch-summary">' + UX_COPY.importDone(successCount, results.length) + '</div>' + html;
+    resEl.innerHTML = '<div class="batch-summary">' + t('importDone', { success: successCount, total: results.length }) + '</div>' + html;
 
     await loadAccounts();
     if (successCount > 0 && !activeAccountId) {
@@ -1380,7 +1542,7 @@ function copyEmail(text, event) {
   if (event) event.stopPropagation();
   navigator.clipboard.writeText(text).then(function() {
     var toast = document.getElementById('copy-toast');
-    toast.textContent = UX_COPY.copied(text);
+    toast.textContent = t('copiedPrefix') + text;
     toast.classList.add('show');
     clearTimeout(copyEmail._timer);
     copyEmail._timer = setTimeout(function() { toast.classList.remove('show'); }, 1500);
@@ -1433,7 +1595,7 @@ function esc(s) {
 function makeCopyable(text) {
   if (!text) return '';
   return esc(text).replace(/([a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,})/g, function(addr) {
-    return addr + ' <span class="copy-btn" onclick="copyEmail(\'' + addr + '\', event)" title="复制邮箱">&#x2398;</span>';
+    return addr + ' <span class="copy-btn" onclick="copyEmail(\'' + addr + '\', event)" title="' + esc(t('copyEmailTitle')) + '">&#x2398;</span>';
   });
 }
 
@@ -1442,9 +1604,9 @@ function formatDate(d) {
   var date = new Date(d);
   var now = new Date();
   if (date.toDateString() === now.toDateString()) {
-    return date.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
+    return date.toLocaleTimeString(currentLang === 'zh' ? 'zh-CN' : 'en-US', { hour: '2-digit', minute: '2-digit' });
   }
-  return date.toLocaleDateString('zh-CN', { month: '2-digit', day: '2-digit' });
+  return date.toLocaleDateString(currentLang === 'zh' ? 'zh-CN' : 'en-US', { month: '2-digit', day: '2-digit' });
 }
 
 // === 键盘快捷键 ===
@@ -1508,6 +1670,7 @@ function highlightMail(index) {
 window.addEventListener('resize', syncResponsiveView);
 syncResponsiveView();
 loadAccounts();
+applyLang();
 </script>
 
 </body>
