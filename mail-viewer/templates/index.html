@@ -772,6 +772,13 @@
             currentLang = currentLang === 'zh' ? 'en' : 'zh';
             localStorage.setItem('manymail-lang', currentLang);
             applyLang();
+            const imapFrame = document.getElementById('imap-frame');
+            try {
+                imapFrame?.contentWindow?.postMessage({
+                    type: 'manymail-lang-change',
+                    lang: currentLang,
+                }, window.location.origin);
+            } catch (e) {}
             // re-render dynamic content
             if (currentMessages.length > 0 && currentTab === 'inbox') renderMessages(currentMessages);
             if (currentSentMessages.length > 0 && currentTab === 'sent') renderSentMessages(currentSentMessages);

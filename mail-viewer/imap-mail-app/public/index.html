@@ -1143,6 +1143,15 @@ function applyLang() {
   });
 }
 
+window.addEventListener('message', function(event) {
+  if (event.origin !== window.location.origin) return;
+  if (event.data?.type === 'manymail-lang-change' && event.data.lang) {
+    currentLang = event.data.lang === 'en' ? 'en' : 'zh';
+    localStorage.setItem('manymail-lang', currentLang);
+    applyLang();
+  }
+});
+
 async function api(method, url, body) {
   const opts = { method, headers: {} };
   if (body) {
