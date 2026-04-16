@@ -1543,7 +1543,7 @@ function renderMailList(mails) {
     var checkbox = selectMode ? '<input type="checkbox" class="mail-checkbox" ' + (selectedUids.has(String(m.uid)) ? 'checked' : '') + ' onclick="toggleMailSelect(event, \'' + m.uid + '\')">' : '';
     var starCls = m.flagged ? 'mail-star active' : 'mail-star';
     var starIcon = m.flagged ? '<i class="bi bi-star-fill"></i>' : '<i class="bi bi-star"></i>';
-    return '<div class="mail-row ' + (m.seen ? '' : 'unread') + '" onclick="readMail(' + i + ')">' +
+    return '<div class="mail-row ' + (m.seen ? '' : 'unread') + (i === selectedMailIndex ? ' active' : '') + '" onclick="readMail(' + i + ')">' +
       checkbox +
       '<span class="' + starCls + '" onclick="toggleStarInList(event, ' + i + ')" title="' + esc(t(m.flagged ? 'unstar' : 'star')) + '">' + starIcon + '</span>' +
       '<div class="mail-col">' +
