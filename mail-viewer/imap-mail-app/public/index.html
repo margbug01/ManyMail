@@ -419,6 +419,120 @@ html.embedded-mode .sidebar-header {
   border-bottom-color: var(--embed-primary);
 }
 
+/* 操作栏 */
+.detail-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 10px;
+  flex-wrap: wrap;
+}
+
+.detail-actions .action-btn {
+  border: 1px solid var(--embed-border);
+  background: var(--embed-surface);
+  color: var(--embed-muted);
+  border-radius: var(--embed-radius-sm);
+  padding: 4px 10px;
+  font-size: 13px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  transition: all 0.15s ease;
+}
+
+.detail-actions .action-btn:hover { color: var(--embed-text); border-color: var(--embed-primary); background: var(--embed-bg); }
+.detail-actions .action-btn.danger:hover { color: #c76b6b; border-color: #c76b6b; }
+.detail-actions .action-btn .bi-star-fill { color: #e8a73d; }
+
+.detail-actions .action-select {
+  border: 1px solid var(--embed-border);
+  background: var(--embed-surface);
+  color: var(--embed-muted);
+  border-radius: var(--embed-radius-sm);
+  padding: 4px 8px;
+  font-size: 13px;
+  cursor: pointer;
+  outline: none;
+}
+
+/* 星标图标 in mail list */
+.mail-star {
+  cursor: pointer;
+  font-size: 14px;
+  color: var(--embed-border);
+  transition: color 0.15s ease;
+  margin-right: 4px;
+  flex-shrink: 0;
+}
+
+.mail-star:hover { color: #e8a73d; }
+.mail-star.active { color: #e8a73d; }
+
+/* 多选模式 */
+.batch-bar {
+  padding: 6px 16px;
+  background: var(--embed-primary);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  flex-wrap: wrap;
+}
+
+.batch-bar button {
+  border: 1px solid rgba(255,255,255,0.4);
+  background: transparent;
+  color: #fff;
+  border-radius: var(--embed-radius-sm);
+  padding: 3px 8px;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.batch-bar button:hover { background: rgba(255,255,255,0.18); border-color: #fff; }
+.batch-bar button.danger:hover { background: rgba(199,107,107,0.5); border-color: rgba(199,107,107,0.7); }
+.batch-bar .batch-count { margin-right: auto; font-weight: 600; }
+
+.mail-checkbox {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--embed-primary);
+  cursor: pointer;
+  flex-shrink: 0;
+  margin-top: 3px;
+}
+
+/* 搜索字段选择 */
+.search-field-select {
+  border: 1px solid var(--embed-border);
+  background: var(--embed-surface);
+  color: var(--embed-muted);
+  padding: 7px 6px;
+  font-size: 13px;
+  border-radius: var(--embed-radius-sm) 0 0 var(--embed-radius-sm);
+  outline: none;
+  cursor: pointer;
+}
+
+.search-field-select + input[type="text"] { border-radius: 0; border-left: none; }
+
+/* 文件夹未读徽章 */
+.folder-badge {
+  background: var(--embed-primary);
+  color: #fff;
+  font-size: 11px;
+  padding: 0 6px;
+  border-radius: 10px;
+  min-width: 18px;
+  text-align: center;
+  line-height: 18px;
+  float: right;
+}
+
 /* 弹窗 */
 .modal-overlay {
   display: none;
@@ -915,10 +1029,26 @@ if (new URLSearchParams(window.location.search).get('embedded') === '1') {
 
   <div class="main">
     <div class="toolbar">
+      <select class="search-field-select" id="search-field">
+        <option value="subject" data-i18n="searchSubject">主题</option>
+        <option value="from" data-i18n="searchFrom">发件人</option>
+        <option value="body" data-i18n="searchBody">正文</option>
+        <option value="all" data-i18n="searchAll">全部</option>
+      </select>
       <input type="text" id="search-input" data-i18n-ph="searchPlaceholder" placeholder="搜索发件人 / 主题...">
       <button onclick="doSearch()" data-i18n="searchButton">搜索邮件</button>
       <button onclick="refreshMails()" data-i18n="refreshButton">刷新列表</button>
+      <button onclick="toggleSelectMode()" id="select-mode-btn" title="Select"><i class="bi bi-check2-square"></i></button>
       <span class="mail-info" id="mail-info"></span>
+    </div>
+    <div class="batch-bar" id="batch-bar" style="display:none;">
+      <span class="batch-count" id="batch-count">0</span>
+      <button onclick="batchSelectAll()" data-i18n="selectAll">全选</button>
+      <button onclick="batchDeselectAll()" data-i18n="deselectAll">取消</button>
+      <button onclick="doBatchAction('read')" data-i18n="batchRead">已读</button>
+      <button onclick="doBatchAction('unread')" data-i18n="batchUnread">未读</button>
+      <button onclick="doBatchAction('flag')" data-i18n="batchStar">星标</button>
+      <button class="danger" onclick="doBatchAction('delete')" data-i18n="batchDelete">删除</button>
     </div>
     <div class="mail-list-container">
       <div class="mail-list-pane" id="mail-list">
@@ -990,6 +1120,9 @@ let mailCache = [];
 let hasMore = false;
 let oldestSeq = null;
 let detailVisible = false;
+let selectMode = false;
+let selectedUids = new Set();
+let folderCache = [];
 const LANGS = {
   zh: {
     embeddedTitle: 'ManyMail IMAP',
@@ -1041,6 +1174,29 @@ const LANGS = {
     disconnectTitle: '断开',
     copyEmailTitle: '复制邮箱',
     customPreset: '自定义',
+    markRead: '标记已读',
+    markUnread: '标记未读',
+    star: '星标',
+    unstar: '取消星标',
+    deleteButton: '删除',
+    deleteConfirm: '确定要永久删除这封邮件吗？',
+    moveToTrash: '移到回收站',
+    moveToFolder: '移动到...',
+    selectMode: '多选',
+    exitSelectMode: '退出多选',
+    selectAll: '全选',
+    deselectAll: '取消',
+    batchDelete: '删除',
+    batchRead: '已读',
+    batchUnread: '未读',
+    batchStar: '星标',
+    batchMove: '移动',
+    batchConfirmDelete: '确定要删除选中的 {n} 封邮件吗？',
+    searchSubject: '主题',
+    searchFrom: '发件人',
+    searchBody: '正文',
+    searchAll: '全部',
+    operationFailed: '操作失败',
   },
   en: {
     embeddedTitle: 'ManyMail IMAP',
@@ -1092,6 +1248,29 @@ const LANGS = {
     disconnectTitle: 'Disconnect',
     copyEmailTitle: 'Copy email',
     customPreset: 'Custom',
+    markRead: 'Mark read',
+    markUnread: 'Mark unread',
+    star: 'Star',
+    unstar: 'Unstar',
+    deleteButton: 'Delete',
+    deleteConfirm: 'Permanently delete this email?',
+    moveToTrash: 'Move to Trash',
+    moveToFolder: 'Move to...',
+    selectMode: 'Select',
+    exitSelectMode: 'Cancel',
+    selectAll: 'All',
+    deselectAll: 'None',
+    batchDelete: 'Delete',
+    batchRead: 'Read',
+    batchUnread: 'Unread',
+    batchStar: 'Star',
+    batchMove: 'Move',
+    batchConfirmDelete: 'Delete {n} selected emails?',
+    searchSubject: 'Subject',
+    searchFrom: 'From',
+    searchBody: 'Body',
+    searchAll: 'All',
+    operationFailed: 'Operation failed',
   }
 };
 let currentLang = localStorage.getItem('manymail-lang') || 'zh';
@@ -1206,15 +1385,31 @@ async function removeAccount(id) {
 // === 文件夹 ===
 async function loadFolders(id) {
   const folders = await api('GET', '/api/accounts/' + id + '/folders');
+  const selectable = folders.filter(f => !f.noselect);
+  folderCache = selectable;
   document.getElementById('folder-section').style.display = 'block';
   const el = document.getElementById('folder-list');
-  const selectable = folders.filter(f => !f.noselect);
   el.innerHTML = selectable.map(f => `
     <div class="folder-item ${f.path === activeFolder ? 'active' : ''}"
          onclick="selectFolder('${f.path}')">
       ${translateFolder(f.name)}
+      <span class="folder-badge" id="badge-${f.path.replace(/[^a-zA-Z0-9]/g,'_')}" style="display:none"></span>
     </div>
   `).join('');
+  // Load unread counts in background
+  loadFolderStatus(id);
+}
+
+async function loadFolderStatus(id) {
+  try {
+    var statuses = await api('GET', '/api/accounts/' + id + '/folders/status');
+    statuses.forEach(function(s) {
+      if (s.unseen > 0) {
+        var badge = document.getElementById('badge-' + s.path.replace(/[^a-zA-Z0-9]/g, '_'));
+        if (badge) { badge.textContent = s.unseen; badge.style.display = ''; }
+      }
+    });
+  } catch (e) {}
 }
 
 function selectFolder(path) {
@@ -1290,8 +1485,13 @@ function renderMailList(mails) {
     var fromDisplay = m.from.name ? esc(m.from.name) + ' ' : '';
     var addr = m.from.address || '';
     var date = formatDate(m.date);
+    var checkbox = selectMode ? '<input type="checkbox" class="mail-checkbox" ' + (selectedUids.has(String(m.uid)) ? 'checked' : '') + ' onclick="toggleMailSelect(event, \'' + m.uid + '\')">' : '';
+    var starCls = m.flagged ? 'mail-star active' : 'mail-star';
+    var starIcon = m.flagged ? '<i class="bi bi-star-fill"></i>' : '<i class="bi bi-star"></i>';
     return '<div class="mail-row ' + (m.seen ? '' : 'unread') + '" onclick="readMail(' + i + ')">' +
+      checkbox +
       '<div class="dot"></div>' +
+      '<span class="' + starCls + '" onclick="toggleStarInList(event, ' + i + ')" title="' + esc(t(m.flagged ? 'unstar' : 'star')) + '">' + starIcon + '</span>' +
       '<div class="mail-col">' +
         '<div class="mail-from">' + fromDisplay + esc(addr) + ' <span class="copy-btn" onclick="copyEmail(\'' + esc(addr) + '\', event)" title="' + esc(t('copyEmailTitle')) + '">&#x2398;</span></div>' +
         '<div class="mail-subject">' + esc(m.subject) + '</div>' +
@@ -1327,11 +1527,23 @@ async function readMail(index) {
           return '<a href="' + dlUrl + '" download>' + esc(a.filename) + ' (' + (a.size/1024).toFixed(1) + 'KB)</a>';
         }).join('') + '</div>';
     }
+    var isSeen = mail.seen;
+    var isFlagged = mail.flagged;
+    var moveOptions = folderCache.filter(function(f) { return f.path !== activeFolder; })
+      .map(function(f) { return '<option value="' + esc(f.path) + '">' + esc(translateFolder(f.name)) + '</option>'; }).join('');
+
     el.innerHTML =
       '<div class="detail-header">' +
         '<div class="detail-header-top">' +
           '<button type="button" class="detail-back" onclick="showMailListView()">' + t('backToList') + '</button>' +
           '<div class="detail-subject">' + esc(data.subject) + '</div>' +
+        '</div>' +
+        '<div class="detail-actions">' +
+          '<button class="action-btn" onclick="toggleReadDetail()" title="' + esc(t(isSeen ? 'markUnread' : 'markRead')) + '"><i class="bi bi-envelope' + (isSeen ? '-open' : '') + '"></i> ' + esc(t(isSeen ? 'markUnread' : 'markRead')) + '</button>' +
+          '<button class="action-btn" onclick="toggleStarDetail()" title="' + esc(t(isFlagged ? 'unstar' : 'star')) + '"><i class="bi bi-star' + (isFlagged ? '-fill' : '') + '"' + (isFlagged ? ' style="color:#e8a73d"' : '') + '></i> ' + esc(t(isFlagged ? 'unstar' : 'star')) + '</button>' +
+          '<button class="action-btn" onclick="moveMailDetail(\'Trash\')" title="' + esc(t('moveToTrash')) + '"><i class="bi bi-trash"></i> ' + esc(t('moveToTrash')) + '</button>' +
+          '<button class="action-btn danger" onclick="deleteMailDetail()" title="' + esc(t('deleteButton')) + '"><i class="bi bi-x-circle"></i> ' + esc(t('deleteButton')) + '</button>' +
+          '<select class="action-select" onchange="moveMailDetail(this.value); this.selectedIndex=0;"><option value="">' + esc(t('moveToFolder')) + '</option>' + moveOptions + '</select>' +
         '</div>' +
         '<div class="detail-meta">' +
           t('from') + ': ' + makeCopyable(data.from) + '<br>' +
@@ -1413,7 +1625,8 @@ async function doSearch() {
   var el = document.getElementById('mail-list');
   el.innerHTML = '<div class="loading">' + t('searching') + '</div>';
   try {
-    var mails = await api('GET', '/api/accounts/' + activeAccountId + '/search?folder=' + encodeURIComponent(activeFolder) + '&q=' + encodeURIComponent(q));
+    var field = document.getElementById('search-field').value || 'subject';
+    var mails = await api('GET', '/api/accounts/' + activeAccountId + '/search?folder=' + encodeURIComponent(activeFolder) + '&q=' + encodeURIComponent(q) + '&field=' + field);
     mailCache = mails;
     document.getElementById('mail-info').textContent = t('searchSummary', { count: mails.length });
     renderMailList(mails);
@@ -1517,6 +1730,161 @@ async function doBatchImport() {
   } catch (err) {
     errEl.textContent = err.message;
     resEl.classList.remove('show');
+  }
+}
+
+// === 邮件操作 ===
+async function toggleStarInList(event, index) {
+  event.stopPropagation();
+  var mail = mailCache[index];
+  if (!mail || !activeAccountId) return;
+  var action = mail.flagged ? 'remove' : 'add';
+  try {
+    await api('PUT', '/api/accounts/' + activeAccountId + '/mails/' + mail.uid + '/flags?folder=' + encodeURIComponent(activeFolder), { action: action, flags: ['\\Flagged'] });
+    mail.flagged = !mail.flagged;
+    renderMailList(mailCache);
+  } catch (err) {
+    alert(t('operationFailed') + ': ' + err.message);
+  }
+}
+
+async function toggleReadDetail() {
+  if (selectedMailIndex < 0) return;
+  var mail = mailCache[selectedMailIndex];
+  if (!mail || !activeAccountId) return;
+  var action = mail.seen ? 'remove' : 'add';
+  try {
+    await api('PUT', '/api/accounts/' + activeAccountId + '/mails/' + mail.uid + '/flags?folder=' + encodeURIComponent(activeFolder), { action: action, flags: ['\\Seen'] });
+    mail.seen = !mail.seen;
+    renderMailList(mailCache);
+    readMail(selectedMailIndex);
+  } catch (err) {
+    alert(t('operationFailed') + ': ' + err.message);
+  }
+}
+
+async function toggleStarDetail() {
+  if (selectedMailIndex < 0) return;
+  var mail = mailCache[selectedMailIndex];
+  if (!mail || !activeAccountId) return;
+  var action = mail.flagged ? 'remove' : 'add';
+  try {
+    await api('PUT', '/api/accounts/' + activeAccountId + '/mails/' + mail.uid + '/flags?folder=' + encodeURIComponent(activeFolder), { action: action, flags: ['\\Flagged'] });
+    mail.flagged = !mail.flagged;
+    renderMailList(mailCache);
+    readMail(selectedMailIndex);
+  } catch (err) {
+    alert(t('operationFailed') + ': ' + err.message);
+  }
+}
+
+async function deleteMailDetail() {
+  if (selectedMailIndex < 0) return;
+  var mail = mailCache[selectedMailIndex];
+  if (!mail || !activeAccountId) return;
+  if (!confirm(t('deleteConfirm'))) return;
+  try {
+    await api('DELETE', '/api/accounts/' + activeAccountId + '/mails/' + mail.uid + '?folder=' + encodeURIComponent(activeFolder));
+    mailCache.splice(selectedMailIndex, 1);
+    selectedMailIndex = -1;
+    renderMailList(mailCache);
+    resetMailDetail();
+  } catch (err) {
+    alert(t('operationFailed') + ': ' + err.message);
+  }
+}
+
+async function moveMailDetail(destination) {
+  if (!destination || selectedMailIndex < 0) return;
+  var mail = mailCache[selectedMailIndex];
+  if (!mail || !activeAccountId) return;
+  try {
+    await api('POST', '/api/accounts/' + activeAccountId + '/mails/' + mail.uid + '/move?folder=' + encodeURIComponent(activeFolder), { destination: destination });
+    mailCache.splice(selectedMailIndex, 1);
+    selectedMailIndex = -1;
+    renderMailList(mailCache);
+    resetMailDetail();
+  } catch (err) {
+    alert(t('operationFailed') + ': ' + err.message);
+  }
+}
+
+// === 多选模式 ===
+function toggleSelectMode() {
+  selectMode = !selectMode;
+  selectedUids.clear();
+  document.getElementById('batch-bar').style.display = selectMode ? 'flex' : 'none';
+  document.getElementById('select-mode-btn').title = t(selectMode ? 'exitSelectMode' : 'selectMode');
+  updateBatchCount();
+  renderMailList(mailCache);
+  if (hasMore) {
+    document.getElementById('mail-list').insertAdjacentHTML('beforeend',
+      '<div id="load-more-btn" class="load-more-btn" onclick="loadMoreMails()">' + t('loadMore') + '</div>');
+  }
+}
+
+function toggleMailSelect(event, uid) {
+  event.stopPropagation();
+  uid = String(uid);
+  if (selectedUids.has(uid)) { selectedUids.delete(uid); } else { selectedUids.add(uid); }
+  updateBatchCount();
+}
+
+function updateBatchCount() {
+  document.getElementById('batch-count').textContent = selectedUids.size;
+}
+
+function batchSelectAll() {
+  mailCache.forEach(function(m) { selectedUids.add(String(m.uid)); });
+  updateBatchCount();
+  renderMailList(mailCache);
+  if (hasMore) {
+    document.getElementById('mail-list').insertAdjacentHTML('beforeend',
+      '<div id="load-more-btn" class="load-more-btn" onclick="loadMoreMails()">' + t('loadMore') + '</div>');
+  }
+}
+
+function batchDeselectAll() {
+  selectedUids.clear();
+  updateBatchCount();
+  renderMailList(mailCache);
+  if (hasMore) {
+    document.getElementById('mail-list').insertAdjacentHTML('beforeend',
+      '<div id="load-more-btn" class="load-more-btn" onclick="loadMoreMails()">' + t('loadMore') + '</div>');
+  }
+}
+
+async function doBatchAction(action) {
+  if (selectedUids.size === 0 || !activeAccountId) return;
+  if (action === 'delete' && !confirm(t('batchConfirmDelete', { n: selectedUids.size }))) return;
+  var uids = Array.from(selectedUids);
+  try {
+    await api('POST', '/api/accounts/' + activeAccountId + '/batch?folder=' + encodeURIComponent(activeFolder), { uids: uids, action: action });
+    if (action === 'delete') {
+      mailCache = mailCache.filter(function(m) { return !selectedUids.has(String(m.uid)); });
+      selectedUids.clear();
+      updateBatchCount();
+      renderMailList(mailCache);
+      resetMailDetail();
+    } else if (action === 'read') {
+      mailCache.forEach(function(m) { if (selectedUids.has(String(m.uid))) m.seen = true; });
+      renderMailList(mailCache);
+    } else if (action === 'unread') {
+      mailCache.forEach(function(m) { if (selectedUids.has(String(m.uid))) m.seen = false; });
+      renderMailList(mailCache);
+    } else if (action === 'flag') {
+      mailCache.forEach(function(m) { if (selectedUids.has(String(m.uid))) m.flagged = true; });
+      renderMailList(mailCache);
+    } else if (action === 'unflag') {
+      mailCache.forEach(function(m) { if (selectedUids.has(String(m.uid))) m.flagged = false; });
+      renderMailList(mailCache);
+    }
+    if (hasMore) {
+      document.getElementById('mail-list').insertAdjacentHTML('beforeend',
+        '<div id="load-more-btn" class="load-more-btn" onclick="loadMoreMails()">' + t('loadMore') + '</div>');
+    }
+  } catch (err) {
+    alert(t('operationFailed') + ': ' + err.message);
   }
 }
 
@@ -1636,7 +2004,24 @@ document.addEventListener('keydown', function(e) {
       e.preventDefault();
       document.getElementById('search-input').focus();
       break;
+    case 's':
+      if (selectedMailIndex >= 0 && selectedMailIndex < mailCache.length) {
+        toggleStarInList(e, selectedMailIndex);
+      }
+      break;
+    case 'd':
+    case '#':
+      if (selectedMailIndex >= 0 && detailVisible) {
+        deleteMailDetail();
+      }
+      break;
+    case 'u':
+      if (selectedMailIndex >= 0 && detailVisible) {
+        toggleReadDetail();
+      }
+      break;
     case 'Escape':
+      if (selectMode) { toggleSelectMode(); break; }
       selectedMailIndex = -1;
       document.querySelectorAll('.mail-row').forEach(function(r) { r.classList.remove('active'); });
       resetMailDetail();

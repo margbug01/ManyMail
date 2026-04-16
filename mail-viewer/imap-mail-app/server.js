@@ -4,6 +4,7 @@ const fs = require('fs');
 const { simpleParser } = require('mailparser');
 const MailClient = require('./client');
 const { fromPreset, PRESETS, autoDetect } = require('./config');
+const { prepareHtmlForRender } = require('./sanitize');
 
 const app = express();
 app.use(express.json());
@@ -224,7 +225,7 @@ app.get('/api/accounts/:id/mails/:uid', async (req, res) => {
         cc: parsed.cc?.text || '',
         date: parsed.date,
         text: parsed.text || '',
-        html: parsed.html || '',
+        html: parsed.html ? prepareHtmlForRender(parsed.html) : '',
         attachments: (parsed.attachments || []).map((a, i) => ({
           index: i,
           filename: a.filename || `attachment_${i}`,
@@ -278,13 +279,22 @@ app.get('/api/accounts/:id/search', async (req, res) => {
 
   const folder = req.query.folder || 'INBOX';
   const keyword = req.query.q || '';
+  const field = req.query.field || 'subject';
   if (!keyword) return res.status(400).json({ error: '请输入搜索关键词' });
 
   try {
     await client.ensureConnected();
     const lock = await client.client.getMailboxLock(folder);
     try {
-      const uids = await client.client.search({ subject: keyword }, { uid: true });
+      let searchQuery;
+      if (field === 'all') {
+        searchQuery = { or: [{ subject: keyword }, { from: keyword }, { body: keyword }] };
+      } else if (['from', 'body', 'subject'].includes(field)) {
+        searchQuery = { [field]: keyword };
+      } else {
+        searchQuery = { subject: keyword };
+      }
+      const uids = await client.client.search(searchQuery, { uid: true });
       if (uids.length === 0) return res.json([]);
 
       const mails = [];
@@ -308,6 +318,168 @@ app.get('/api/accounts/:id/search', async (req, res) => {
     } finally {
       lock.release();
     }
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 删除邮件
+app.delete('/api/accounts/:id/mails/:uid', async (req, res) => {
+  const client = clients.get(parseInt(req.params.id, 10));
+  if (!client) return res.status(404).json({ error: '账户不存在' });
+
+  const folder = req.query.folder || 'INBOX';
+  const uid = req.params.uid;
+
+  try {
+    await client.ensureConnected();
+    const lock = await client.client.getMailboxLock(folder);
+    try {
+      await client.client.messageDelete(uid, { uid: true });
+      res.json({ ok: true });
+    } finally {
+      lock.release();
+    }
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 修改邮件标记 (已读/未读/星标)
+const ALLOWED_FLAGS = new Set(['\\Seen', '\\Flagged', '\\Answered', '\\Draft', '\\Deleted']);
+
+app.put('/api/accounts/:id/mails/:uid/flags', async (req, res) => {
+  const client = clients.get(parseInt(req.params.id, 10));
+  if (!client) return res.status(404).json({ error: '账户不存在' });
+
+  const folder = req.query.folder || 'INBOX';
+  const uid = req.params.uid;
+  const { action, flags } = req.body || {};
+
+  if (!action || !Array.isArray(flags) || flags.length === 0) {
+    return res.status(400).json({ error: '需要 action 和 flags 参数' });
+  }
+  if (!['add', 'remove', 'set'].includes(action)) {
+    return res.status(400).json({ error: 'action 必须是 add / remove / set' });
+  }
+  const safeFlags = flags.filter(f => ALLOWED_FLAGS.has(f));
+  if (safeFlags.length === 0) {
+    return res.status(400).json({ error: '无有效的 flag' });
+  }
+
+  const methods = { add: 'messageFlagsAdd', remove: 'messageFlagsRemove', set: 'messageFlagsSet' };
+
+  try {
+    await client.ensureConnected();
+    const lock = await client.client.getMailboxLock(folder);
+    try {
+      await client.client[methods[action]](uid, safeFlags, { uid: true });
+      res.json({ ok: true });
+    } finally {
+      lock.release();
+    }
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 移动邮件到其他文件夹
+app.post('/api/accounts/:id/mails/:uid/move', async (req, res) => {
+  const client = clients.get(parseInt(req.params.id, 10));
+  if (!client) return res.status(404).json({ error: '账户不存在' });
+
+  const folder = req.query.folder || 'INBOX';
+  const uid = req.params.uid;
+  const { destination } = req.body || {};
+
+  if (!destination) {
+    return res.status(400).json({ error: '需要 destination 参数' });
+  }
+
+  try {
+    await client.ensureConnected();
+    const lock = await client.client.getMailboxLock(folder);
+    try {
+      await client.client.messageMove(uid, destination, { uid: true });
+      res.json({ ok: true });
+    } finally {
+      lock.release();
+    }
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 批量邮件操作
+app.post('/api/accounts/:id/batch', async (req, res) => {
+  const client = clients.get(parseInt(req.params.id, 10));
+  if (!client) return res.status(404).json({ error: '账户不存在' });
+
+  const folder = req.query.folder || 'INBOX';
+  const { uids, action, destination } = req.body || {};
+
+  if (!Array.isArray(uids) || uids.length === 0 || !action) {
+    return res.status(400).json({ error: '需要 uids 和 action 参数' });
+  }
+
+  const uidRange = uids.join(',');
+
+  try {
+    await client.ensureConnected();
+    const lock = await client.client.getMailboxLock(folder);
+    try {
+      switch (action) {
+        case 'delete':
+          await client.client.messageDelete(uidRange, { uid: true });
+          break;
+        case 'read':
+          await client.client.messageFlagsAdd(uidRange, ['\\Seen'], { uid: true });
+          break;
+        case 'unread':
+          await client.client.messageFlagsRemove(uidRange, ['\\Seen'], { uid: true });
+          break;
+        case 'flag':
+          await client.client.messageFlagsAdd(uidRange, ['\\Flagged'], { uid: true });
+          break;
+        case 'unflag':
+          await client.client.messageFlagsRemove(uidRange, ['\\Flagged'], { uid: true });
+          break;
+        case 'move':
+          if (!destination) return res.status(400).json({ error: '移动操作需要 destination 参数' });
+          await client.client.messageMove(uidRange, destination, { uid: true });
+          break;
+        default:
+          return res.status(400).json({ error: `未知操作: ${action}` });
+      }
+      res.json({ ok: true, count: uids.length });
+    } finally {
+      lock.release();
+    }
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// 获取所有文件夹的未读数
+app.get('/api/accounts/:id/folders/status', async (req, res) => {
+  const client = clients.get(parseInt(req.params.id, 10));
+  if (!client) return res.status(404).json({ error: '账户不存在' });
+
+  try {
+    await client.ensureConnected();
+    const folders = await client.client.list();
+    const selectable = folders.filter(f => !f.flags?.has('\\Noselect')).slice(0, 20);
+
+    const statuses = [];
+    for (const f of selectable) {
+      try {
+        const st = await client.client.status(f.path, { messages: true, unseen: true });
+        statuses.push({ path: f.path, name: f.name, messages: st.messages, unseen: st.unseen });
+      } catch {
+        statuses.push({ path: f.path, name: f.name, messages: 0, unseen: 0 });
+      }
+    }
+    res.json(statuses);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
