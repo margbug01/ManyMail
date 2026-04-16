@@ -341,29 +341,32 @@ html.embedded-mode .sidebar-header {
 }
 
 .detail-header {
-  padding: 18px 20px 16px;
-  border-bottom: 1px solid var(--embed-border);
-  background: var(--embed-surface-soft);
+  padding: 20px 20px 6px;
 }
 
-.detail-subject {
-  font-size: 17px;
-  font-weight: 600;
-  margin-bottom: 8px;
-  letter-spacing: -0.01em;
-}
-
-.detail-meta {
-  font-size: 13px;
-  color: var(--embed-muted);
-  line-height: 1.6;
-}
-
-.detail-header-top {
+.detail-top-row {
   display: flex;
-  align-items: center;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 14px;
   gap: 12px;
-  margin-bottom: 8px;
+}
+
+.detail-row {
+  margin-bottom: 14px;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.detail-row strong,
+.detail-top-row strong {
+  color: var(--embed-text);
+}
+
+.detail-divider {
+  border: none;
+  border-top: 1px solid var(--embed-border);
+  margin: 0;
 }
 
 .detail-back {
@@ -388,17 +391,27 @@ html.embedded-mode .sidebar-header {
   line-height: 1.6;
 }
 
+.mail-body-container {
+  background: #f8f9fa;
+  padding: 0;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.mail-body-container pre {
+  padding: 16px 20px;
+  margin: 0;
+}
+
 .detail-body iframe {
   width: 100%;
   border: none;
-  min-height: 300px;
+  min-height: 200px;
   background: #fff;
-  border-radius: 8px;
 }
 
 .detail-attachments {
   padding: 12px 20px;
-  border-top: 1px solid var(--embed-border);
   font-size: 14px;
   background: rgba(245,249,247,0.65);
 }
@@ -1551,26 +1564,25 @@ async function readMail(index) {
 
     el.innerHTML =
       '<div class="detail-header">' +
-        '<div class="detail-header-top">' +
-          '<button type="button" class="detail-back" onclick="showMailListView()">' + t('backToList') + '</button>' +
-          '<div class="detail-subject">' + esc(data.subject) + '</div>' +
+        '<button type="button" class="detail-back" onclick="showMailListView()">' + t('backToList') + '</button>' +
+        '<div class="detail-top-row">' +
+          '<div><strong>' + t('from') + ':</strong> ' + makeCopyable(data.from) + '</div>' +
+          '<div class="detail-actions">' +
+            '<button class="action-btn" onclick="toggleReadDetail()" title="' + esc(t(isSeen ? 'markUnread' : 'markRead')) + '"><i class="bi bi-envelope' + (isSeen ? '-open' : '') + '"></i> ' + esc(t(isSeen ? 'markUnread' : 'markRead')) + '</button>' +
+            '<button class="action-btn" onclick="toggleStarDetail()" title="' + esc(t(isFlagged ? 'unstar' : 'star')) + '"><i class="bi bi-star' + (isFlagged ? '-fill' : '') + '"' + (isFlagged ? ' style="color:#e8a73d"' : '') + '></i> ' + esc(t(isFlagged ? 'unstar' : 'star')) + '</button>' +
+            '<button class="action-btn" onclick="moveMailDetail(\'Trash\')" title="' + esc(t('moveToTrash')) + '"><i class="bi bi-trash"></i> ' + esc(t('moveToTrash')) + '</button>' +
+            '<button class="action-btn danger" onclick="deleteMailDetail()" title="' + esc(t('deleteButton')) + '"><i class="bi bi-x-circle"></i> ' + esc(t('deleteButton')) + '</button>' +
+            '<select class="action-select" onchange="moveMailDetail(this.value); this.selectedIndex=0;"><option value="">' + esc(t('moveToFolder')) + '</option>' + moveOptions + '</select>' +
+          '</div>' +
         '</div>' +
-        '<div class="detail-actions">' +
-          '<button class="action-btn" onclick="toggleReadDetail()" title="' + esc(t(isSeen ? 'markUnread' : 'markRead')) + '"><i class="bi bi-envelope' + (isSeen ? '-open' : '') + '"></i> ' + esc(t(isSeen ? 'markUnread' : 'markRead')) + '</button>' +
-          '<button class="action-btn" onclick="toggleStarDetail()" title="' + esc(t(isFlagged ? 'unstar' : 'star')) + '"><i class="bi bi-star' + (isFlagged ? '-fill' : '') + '"' + (isFlagged ? ' style="color:#e8a73d"' : '') + '></i> ' + esc(t(isFlagged ? 'unstar' : 'star')) + '</button>' +
-          '<button class="action-btn" onclick="moveMailDetail(\'Trash\')" title="' + esc(t('moveToTrash')) + '"><i class="bi bi-trash"></i> ' + esc(t('moveToTrash')) + '</button>' +
-          '<button class="action-btn danger" onclick="deleteMailDetail()" title="' + esc(t('deleteButton')) + '"><i class="bi bi-x-circle"></i> ' + esc(t('deleteButton')) + '</button>' +
-          '<select class="action-select" onchange="moveMailDetail(this.value); this.selectedIndex=0;"><option value="">' + esc(t('moveToFolder')) + '</option>' + moveOptions + '</select>' +
-        '</div>' +
-        '<div class="detail-meta">' +
-          t('from') + ': ' + makeCopyable(data.from) + '<br>' +
-          t('to') + ': ' + makeCopyable(data.to) + '<br>' +
-          (data.cc ? t('cc') + ': ' + makeCopyable(data.cc) + '<br>' : '') +
-          t('date') + ': ' + date +
-        '</div>' +
+        '<div class="detail-row"><strong>' + t('to') + ':</strong> ' + makeCopyable(data.to) + '</div>' +
+        (data.cc ? '<div class="detail-row"><strong>' + t('cc') + ':</strong> ' + makeCopyable(data.cc) + '</div>' : '') +
+        '<div class="detail-row"><strong>' + t('subject') + ':</strong> ' + esc(data.subject) + '</div>' +
+        '<div class="detail-row"><strong>' + t('date') + ':</strong> ' + date + '</div>' +
       '</div>' +
+      '<hr class="detail-divider">' +
       attachHtml +
-      '<div class="detail-body">' + bodyHtml + '</div>';
+      '<div class="detail-body"><div class="mail-body-container">' + bodyHtml + '</div></div>';
     if (data.html) {
       var iframe = document.getElementById('mail-iframe');
       iframe.onload = function() {
