@@ -1,0 +1,13 @@
+{
+  "name": "manymail-imap-server",
+  "version": "1.0.0",
+  "description": "Lightweight IMAP4rev1 server backed by MongoDB",
+  "main": "src/index.js",
+  "scripts": {
+    "start": "node src/index.js"
+  },
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "mongodb": "^6.12.0"
+  }
+}

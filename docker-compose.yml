@@ -118,6 +118,33 @@ services:
     networks:
       - mail-net
 
+  # ---- IMAP Server (Node.js) ----
+  imap-server:
+    build: ./imap-server
+    container_name: mail-imap-server
+    restart: unless-stopped
+    ports:
+      - "993:993"
+    environment:
+      - MONGO_URL=mongodb://mongodb:27017
+      - DB_NAME=mailserver
+      - IMAP_PORT=993
+      - TLS_CERT=/certs/fullchain.pem
+      - TLS_KEY=/certs/privkey.pem
+    volumes:
+      - ${IMAP_CERTS_PATH:-./certs}:/certs:ro
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "const n=require('net');const c=n.connect(993,'127.0.0.1',()=>{c.destroy();process.exit(0)});c.on('error',()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    networks:
+      - mail-net
+
 volumes:
   mongo_data:
   imap_mail_data:
