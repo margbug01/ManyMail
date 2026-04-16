@@ -234,58 +234,86 @@ html.embedded-mode .sidebar-header {
   border-right: 1px solid var(--embed-border);
   background: transparent;
   flex-shrink: 0;
+  padding-top: 8px;
 }
 
 .mail-row {
-  padding: 12px 16px;
-  border-bottom: 1px solid rgba(212,228,222,0.8);
+  padding: 10px 14px;
+  margin: 0 8px 8px;
+  border: 1px solid var(--embed-border);
+  border-radius: var(--embed-radius-sm);
   cursor: pointer;
   display: flex;
-  gap: 12px;
+  gap: 10px;
   transition: all 0.15s ease;
   position: relative;
   align-items: flex-start;
+  background: var(--embed-surface);
 }
 
-.mail-row:hover { background: #edf5f2; }
+.mail-row:hover { background: rgba(91,154,139,0.08); }
 .mail-row.active {
-  background: #e7f2ee;
-  box-shadow: inset 0 0 0 1px rgba(91,154,139,0.12);
+  background: rgba(91,154,139,0.15);
+  border-left: 3px solid var(--embed-primary);
 }
-.mail-row.unread { font-weight: 600; border-left: 3px solid var(--embed-primary); padding-left: 13px; }
-
-.mail-row .dot {
-  width: 8px;
-  min-width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  margin-top: 5px;
+.mail-row.unread {
+  border-left: 3px solid var(--embed-navy);
+  background: rgba(74,124,155,0.06);
 }
-
-.mail-row.unread .dot { background: var(--embed-primary); }
+.mail-row.unread .mail-from {
+  font-weight: 700;
+  color: var(--embed-text);
+}
+.mail-row.unread .mail-subject {
+  font-weight: 600;
+  color: var(--embed-text);
+}
+.mail-row:not(.unread) .mail-from {
+  font-weight: 400;
+  color: var(--embed-muted);
+}
+.mail-row:not(.unread) .mail-subject {
+  font-weight: 400;
+  color: var(--embed-muted);
+}
+.mail-row.active .mail-from,
+.mail-row.active .mail-subject {
+  font-weight: 700;
+  color: var(--embed-text);
+}
 
 .mail-col { min-width: 0; flex: 1; }
 
-.mail-from, .mail-subject {
+.mail-row-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 2px;
+}
+
+.mail-from {
+  font-size: 14px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex: 1;
+  min-width: 0;
+}
+
+.mail-subject {
   font-size: 14px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.mail-from {
-  color: var(--embed-muted);
-  margin-bottom: 2px;
-}
-
-.mail-subject { color: var(--embed-text); }
-
 .mail-date {
-  font-size: 13px;
+  font-size: 12px;
   color: var(--embed-muted);
   white-space: nowrap;
-  min-width: 80px;
-  text-align: right;
+  flex-shrink: 0;
+  opacity: 0.72;
 }
 
 .mail-detail {
@@ -480,8 +508,8 @@ html.embedded-mode .sidebar-header {
   font-size: 14px;
   color: var(--embed-border);
   transition: color 0.15s ease;
-  margin-right: 4px;
   flex-shrink: 0;
+  margin-top: 2px;
 }
 
 .mail-star:hover { color: #e8a73d; }
@@ -825,17 +853,14 @@ html.embedded-mode .sidebar-header {
   }
 
   .mail-row {
-    padding: 12px;
+    padding: 10px 12px;
+    margin: 0 6px 6px;
   }
 
   .mail-from,
   .mail-subject {
     white-space: normal;
     line-height: 1.5;
-  }
-
-  .mail-date {
-    min-width: auto;
   }
 
   .detail-back {
@@ -1520,13 +1545,14 @@ function renderMailList(mails) {
     var starIcon = m.flagged ? '<i class="bi bi-star-fill"></i>' : '<i class="bi bi-star"></i>';
     return '<div class="mail-row ' + (m.seen ? '' : 'unread') + '" onclick="readMail(' + i + ')">' +
       checkbox +
-      '<div class="dot"></div>' +
       '<span class="' + starCls + '" onclick="toggleStarInList(event, ' + i + ')" title="' + esc(t(m.flagged ? 'unstar' : 'star')) + '">' + starIcon + '</span>' +
       '<div class="mail-col">' +
-        '<div class="mail-from">' + fromDisplay + esc(addr) + ' <span class="copy-btn" onclick="copyEmail(\'' + esc(addr) + '\', event)" title="' + esc(t('copyEmailTitle')) + '">&#x2398;</span></div>' +
+        '<div class="mail-row-top">' +
+          '<span class="mail-from">' + (m.from.name ? esc(m.from.name) : esc(addr)) + '</span>' +
+          '<span class="mail-date">' + date + '</span>' +
+        '</div>' +
         '<div class="mail-subject">' + esc(m.subject) + '</div>' +
       '</div>' +
-      '<div class="mail-date">' + date + '</div>' +
     '</div>';
   }).join('');
 }
@@ -1981,12 +2007,7 @@ function makeCopyable(text) {
 
 function formatDate(d) {
   if (!d) return '';
-  var date = new Date(d);
-  var now = new Date();
-  if (date.toDateString() === now.toDateString()) {
-    return date.toLocaleTimeString(currentLang === 'zh' ? 'zh-CN' : 'en-US', { hour: '2-digit', minute: '2-digit' });
-  }
-  return date.toLocaleDateString(currentLang === 'zh' ? 'zh-CN' : 'en-US', { month: '2-digit', day: '2-digit' });
+  return new Date(d).toLocaleString(currentLang === 'zh' ? 'zh-CN' : 'en-US');
 }
 
 // === 键盘快捷键 ===
