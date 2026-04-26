@@ -257,6 +257,12 @@ ManyMail/
 
 <br>
 
+## Community
+
+ManyMail appreciates [linux.do](https://linux.do/) — a friendly Chinese tech community where people share ideas, projects, and practical self-hosting experience.
+
+<br>
+
 ## License
 
 [MIT](LICENSE)

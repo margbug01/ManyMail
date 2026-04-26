@@ -257,6 +257,12 @@ ManyMail/
 
 <br>
 
+## 社区
+
+ManyMail 感谢 [linux.do](https://linux.do/) 社区。这里有很多真实、友好的技术分享，也给了这个项目不少自托管和产品体验方面的启发。
+
+<br>
+
 ## 许可证
 
 [MIT](LICENSE)
