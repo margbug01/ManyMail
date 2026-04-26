@@ -6,8 +6,8 @@ import requests
 import bleach
 from functools import wraps
 from bleach.css_sanitizer import CSSSanitizer
-from urllib.parse import urlparse, urljoin
-from flask import Flask, render_template, jsonify, request, session, redirect, url_for, Response
+from urllib.parse import urlparse, urljoin, quote
+from flask import Flask, render_template, jsonify, request, session, redirect, url_for, Response, stream_with_context
 
 app = Flask(__name__)
 app.secret_key = os.getenv("SECRET_KEY", "mail-viewer-secret-key-change-me")
@@ -237,6 +237,57 @@ def _get_mail_token(email: str, password: str = "") -> tuple:
     except Exception as e:
         app.logger.error(f"获取 mail token 失败: {e}", exc_info=True)
         return None, ("连接邮件服务失败", 500)
+
+
+def _extract_api_error(resp, fallback: str = "操作失败") -> str:
+    try:
+        data = resp.json()
+        if isinstance(data, dict):
+            return data.get("detail") or data.get("message") or data.get("hydra:description") or fallback
+    except Exception:
+        pass
+    return fallback
+
+
+def _format_attachments(detail: dict) -> list:
+    attachments = detail.get("attachments") or []
+    if not isinstance(attachments, list):
+        attachments = []
+    if not attachments and detail.get("hasAttachments"):
+        attachments = [{"index": 0, "filename": "attachment", "size": 0}]
+    normalized = []
+    for index, item in enumerate(attachments):
+        if isinstance(item, dict):
+            normalized.append({
+                "index": item.get("index", index),
+                "id": item.get("id") or item.get("attachment_id") or item.get("contentId") or "",
+                "filename": item.get("filename") or item.get("name") or f"attachment_{index}",
+                "size": item.get("size") or 0,
+                "contentType": item.get("contentType") or item.get("content_type") or "",
+            })
+        else:
+            normalized.append({"index": index, "id": "", "filename": str(item), "size": 0, "contentType": ""})
+    return normalized
+
+
+def _find_attachment_download_url(base_url: str, message_id: str, attachment_id: str, headers: dict):
+    quoted_id = quote(attachment_id, safe="")
+    candidate_paths = [
+        f"/messages/{message_id}/attachments/{quoted_id}",
+        f"/messages/{message_id}/attachment/{quoted_id}",
+        f"/messages/{message_id}/attachments?index={quoted_id}",
+    ]
+
+    for path in candidate_paths:
+        url = f"{base_url}{path}"
+        try:
+            resp = http_session.get(url, headers=headers, stream=True, timeout=30)
+        except Exception:
+            continue
+        if resp.status_code == 200:
+            return url, resp
+        resp.close()
+    return None, None
 
 
 @app.route("/login", methods=["GET", "POST"])
@@ -553,11 +604,44 @@ def inbox_detail():
         detail = detail_resp.json()
         if isinstance(detail, dict):
             detail["html"] = _prepare_html_for_render(detail.get("html", ""))
+            detail["attachments"] = _format_attachments(detail)
         return jsonify({"success": True, "detail": detail})
 
     except Exception as e:
         app.logger.error(f"获取邮件详情失败: {e}", exc_info=True)
         return jsonify({"success": False, "message": "服务内部错误，请稍后重试"})
+
+
+@app.route("/api/inbox/attachment/<message_id>/<attachment_id>")
+@login_required
+def inbox_attachment(message_id, attachment_id):
+    """代理下载本地收件附件。"""
+    email = request.args.get("email", "").strip()
+    password = request.args.get("password", "").strip() or UNIFIED_PASSWORD
+    if not email:
+        return jsonify({"success": False, "message": "缺少邮箱参数"}), 400
+
+    base_url = DUCKMAIL_BASE_URL.rstrip("/")
+    token, err = _get_mail_token(email, password)
+    if err:
+        return jsonify({"success": False, "message": err[0]}), err[1]
+
+    headers = {"Authorization": f"Bearer {token}"}
+    url, download_resp = _find_attachment_download_url(base_url, message_id, attachment_id, headers)
+    if not download_resp:
+        return jsonify({"success": False, "message": "附件下载接口不可用"}), 404
+
+    try:
+        filename = request.args.get("filename", "attachment")
+        content_type = download_resp.headers.get("Content-Type", "application/octet-stream")
+        proxied = Response(stream_with_context(download_resp.iter_content(65536)), content_type=content_type)
+        proxied.headers["Content-Disposition"] = f"attachment; filename*=UTF-8''{quote(filename)}"
+        if "Content-Length" in download_resp.headers:
+            proxied.headers["Content-Length"] = download_resp.headers["Content-Length"]
+        return proxied
+    except Exception as e:
+        app.logger.error(f"附件下载失败: {e}", exc_info=True)
+        return jsonify({"success": False, "message": "附件下载失败"}), 502
 
 
 # ---- 批量操作 API ----
@@ -692,7 +776,150 @@ def inbox_delete():
         return jsonify({"success": False, "message": "服务内部错误，请稍后重试"})
 
 
+# ---- Trash / 恢复 / 彻底删除 API ----
+
+@app.route("/api/trash/query", methods=["POST"])
+@login_required
+def trash_query():
+    """查询回收站邮件。"""
+    data = request.json or {}
+    email = data.get("email", "").strip()
+    password = data.get("password", "").strip() or UNIFIED_PASSWORD
+    offset = int(data.get("offset", 0))
+    limit = int(data.get("limit", 30))
+
+    if not email:
+        return jsonify({"success": False, "message": "缺少邮箱地址", "messages": []})
+
+    base_url = DUCKMAIL_BASE_URL.rstrip("/")
+    try:
+        token, err = _get_mail_token(email, password)
+        if err:
+            return jsonify({"success": False, "message": err[0], "messages": []})
+
+        headers = {"Authorization": f"Bearer {token}"}
+        trash_resp = http_session.get(
+            f"{base_url}/messages/trash",
+            params={"offset": offset, "limit": limit},
+            headers=headers,
+            timeout=30,
+        )
+        if trash_resp.status_code == 404:
+            trash_resp = http_session.get(
+                f"{base_url}/trash",
+                params={"offset": offset, "limit": limit},
+                headers=headers,
+                timeout=30,
+            )
+        if trash_resp.status_code != 200:
+            return jsonify({"success": False, "message": "回收站接口不可用", "messages": []})
+
+        resp_data = trash_resp.json()
+        messages = resp_data.get("hydra:member", []) if isinstance(resp_data, dict) else resp_data
+        total = resp_data.get("hydra:totalItems", len(messages)) if isinstance(resp_data, dict) else len(messages)
+        return jsonify({"success": True, "messages": messages, "total": total, "offset": offset, "limit": limit})
+
+    except Exception as e:
+        app.logger.error(f"查询回收站失败: {e}", exc_info=True)
+        return jsonify({"success": False, "message": "服务内部错误，请稍后重试", "messages": []})
+
+
+@app.route("/api/inbox/restore", methods=["POST"])
+@login_required
+def inbox_restore():
+    """从回收站恢复邮件。"""
+    return _message_action(["restore"], "邮件已恢复")
+
+
+@app.route("/api/inbox/permanent-delete", methods=["POST"])
+@login_required
+def inbox_permanent_delete():
+    """彻底删除邮件。"""
+    return _message_action(["permanent-delete", "permanent_delete", "purge"], "邮件已彻底删除")
+
+
+def _message_action(actions: list[str], ok_message: str):
+    data = request.json or {}
+    email = data.get("email", "").strip()
+    password = data.get("password", "").strip() or UNIFIED_PASSWORD
+    message_id = data.get("message_id", "").strip()
+
+    if not email or not message_id:
+        return jsonify({"success": False, "message": "缺少必要参数"})
+
+    base_url = DUCKMAIL_BASE_URL.rstrip("/")
+    try:
+        token, err = _get_mail_token(email, password)
+        if err:
+            return jsonify({"success": False, "message": err[0]})
+
+        headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
+        last_resp = None
+        for action in actions:
+            endpoints = []
+            if action in {"permanent-delete", "permanent_delete", "purge"}:
+                endpoints.append(("delete", f"{base_url}/messages/{message_id}/permanent", None))
+            endpoints.extend([
+                ("post", f"{base_url}/messages/{message_id}/{action}", None),
+                ("patch", f"{base_url}/messages/{message_id}", {"action": action}),
+                ("post", f"{base_url}/messages/batch", {"action": action, "message_ids": [message_id]}),
+            ])
+            for method, url, payload in endpoints:
+                resp = http_session.request(method, url, json=payload, headers=headers, timeout=30)
+                last_resp = resp
+                if resp.status_code in (200, 204):
+                    payload = resp.json() if resp.content else {}
+                    return jsonify({"success": True, "message": ok_message, **payload})
+                if resp.status_code not in (404, 405, 422):
+                    detail = _extract_api_error(resp, ok_message)
+                    return jsonify({"success": False, "message": detail}), resp.status_code
+
+        detail = _extract_api_error(last_resp, "后端暂未提供该操作接口") if last_resp else "后端暂未提供该操作接口"
+        return jsonify({"success": False, "message": detail})
+
+    except Exception as e:
+        app.logger.error(f"邮件操作失败: {e}", exc_info=True)
+        return jsonify({"success": False, "message": "服务内部错误，请稍后重试"})
+
+
 # ---- 已发送邮件查询 API ----
+
+@app.route("/api/sent/detail", methods=["POST"])
+@login_required
+def sent_detail():
+    """查询已发送邮件详情。"""
+    data = request.json or {}
+    email = data.get("email", "").strip()
+    password = data.get("password", "").strip() or UNIFIED_PASSWORD
+    message_id = data.get("message_id", "").strip()
+
+    if not email or not message_id:
+        return jsonify({"success": False, "message": "缺少必要参数"})
+
+    base_url = DUCKMAIL_BASE_URL.rstrip("/")
+    try:
+        token, err = _get_mail_token(email, password)
+        if err:
+            return jsonify({"success": False, "message": err[0]})
+
+        detail_resp = http_session.get(
+            f"{base_url}/sent/{message_id}",
+            headers={"Authorization": f"Bearer {token}"},
+            timeout=30,
+        )
+        if detail_resp.status_code != 200:
+            detail = _extract_api_error(detail_resp, "获取已发送详情失败")
+            return jsonify({"success": False, "message": detail})
+
+        detail = detail_resp.json()
+        if isinstance(detail, dict):
+            detail["html"] = _prepare_html_for_render(detail.get("html", ""))
+        return jsonify({"success": True, "detail": detail})
+
+    except Exception as e:
+        app.logger.error(f"获取已发送详情失败: {e}", exc_info=True)
+        return jsonify({"success": False, "message": "服务内部错误，请稍后重试"})
+
 
 @app.route("/api/sent/query", methods=["POST"])
 @login_required
@@ -712,22 +939,31 @@ def sent_query():
         if err:
             return jsonify({"success": False, "message": err[0], "messages": []})
 
+        offset = int(data.get("offset", 0))
+        limit = int(data.get("limit", 30))
         sent_resp = http_session.get(
             f"{base_url}/sent",
+            params={"offset": offset, "limit": limit},
             headers={"Authorization": f"Bearer {token}"},
             timeout=30,
         )
         if sent_resp.status_code != 200:
             return jsonify({"success": False, "message": "查询已发送失败", "messages": []})
 
-        messages = sent_resp.json()
-        if isinstance(messages, dict):
-            messages = messages.get("hydra:member", [])
+        resp_data = sent_resp.json()
+        if isinstance(resp_data, dict):
+            messages = resp_data.get("hydra:member", [])
+            total = resp_data.get("hydra:totalItems", len(messages))
+        else:
+            messages = resp_data
+            total = len(messages)
+        if total == len(messages) and len(messages) > limit:
+            messages = messages[offset:offset + limit]
         for msg in messages:
             if isinstance(msg, dict):
                 msg["html"] = _prepare_html_for_render(msg.get("html", ""))
 
-        return jsonify({"success": True, "messages": messages})
+        return jsonify({"success": True, "messages": messages, "total": total, "offset": offset, "limit": limit})
 
     except Exception as e:
         app.logger.error(f"查询已发送邮件失败: {e}", exc_info=True)

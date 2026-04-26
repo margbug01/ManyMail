@@ -15,6 +15,7 @@ from contextlib import asynccontextmanager
 from datetime import datetime, timedelta, timezone
 from email import policy
 from email.parser import BytesParser
+from urllib.parse import quote
 
 import jwt
 import bcrypt
@@ -22,7 +23,7 @@ import uvicorn
 from bson import ObjectId
 from pymongo import MongoClient, DESCENDING
 from fastapi import FastAPI, Request, HTTPException, Depends
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
 from fastapi.middleware.cors import CORSMiddleware
 from aiosmtpd.controller import Controller
 
@@ -463,6 +464,8 @@ def _require_api_key(request: Request):
     """验证 API Key（用于管理端点）"""
     auth = request.headers.get("Authorization", "")
     key = auth.replace("Bearer ", "").strip() if auth.startswith("Bearer ") else ""
+    if not key:
+        key = request.headers.get("X-API-Key", "").strip()
     if not API_KEY or not hmac.compare_digest(key, API_KEY):
         raise HTTPException(status_code=403, detail="Invalid or missing API key")
 
@@ -542,11 +545,28 @@ def _dt_to_iso_utc(dt) -> str:
     return str(dt) if dt else ""
 
 
+def _format_attachment_meta(message_id: str, attachment: dict) -> dict:
+    """格式化附件元数据，内容本身不直接出现在列表/详情响应中。"""
+    attachment_id = attachment.get("id", "")
+    filename = attachment.get("filename", "")
+    content_type = attachment.get("content_type", "application/octet-stream")
+    size = attachment.get("size", 0)
+    return {
+        "id": attachment_id,
+        "filename": filename,
+        "contentType": content_type,
+        "content_type": content_type,
+        "size": size,
+        "downloadUrl": f"/messages/{message_id}/attachments/{attachment_id}",
+    }
+
+
 def _format_message(msg: dict, include_body: bool = False) -> dict:
     """格式化消息为 DuckMail 兼容格式"""
     msg_id = str(msg["_id"])
     created = msg["created_at"]
     updated = msg.get("updated_at", created)
+    attachments = msg.get("attachments", [])
 
     result = {
         "@context": "/contexts/Message",
@@ -558,7 +578,7 @@ def _format_message(msg: dict, include_body: bool = False) -> dict:
         "to": msg.get("to", []),
         "subject": msg.get("subject", ""),
         "intro": msg.get("intro", ""),
-        "hasAttachments": msg.get("has_attachments", False),
+        "hasAttachments": msg.get("has_attachments", bool(attachments)),
         "seen": msg.get("seen", False),
         "isDeleted": msg.get("is_deleted", False),
         "size": msg.get("size", 0),
@@ -569,6 +589,7 @@ def _format_message(msg: dict, include_body: bool = False) -> dict:
     if include_body:
         result["text"] = msg.get("text", "")
         result["html"] = msg.get("html", "")
+        result["attachments"] = [_format_attachment_meta(msg_id, a) for a in attachments]
 
     return result
 
@@ -619,6 +640,8 @@ async def search_messages(
         "$or": [
             {"subject": {"$regex": escaped_q, "$options": "i"}},
             {"intro": {"$regex": escaped_q, "$options": "i"}},
+            {"text": {"$regex": escaped_q, "$options": "i"}},
+            {"html": {"$regex": escaped_q, "$options": "i"}},
             {"from.address": {"$regex": escaped_q, "$options": "i"}},
             {"from.name": {"$regex": escaped_q, "$options": "i"}},
         ],
@@ -630,6 +653,34 @@ async def search_messages(
     )
     messages = [_format_message(msg) for msg in cursor]
     return {"hydra:member": messages}
+
+
+@app.get("/messages/trash")
+async def list_trash_messages(
+    account=Depends(get_current_account),
+    offset: int = 0,
+    limit: int = 30,
+):
+    """查询回收站（软删除邮件），支持分页"""
+    address = account["address"]
+    limit = min(limit, 100)
+    offset = max(offset, 0)
+
+    query_filter = {"to_addresses": address, "is_deleted": True}
+    total = db.messages.count_documents(query_filter)
+    cursor = (
+        db.messages.find(query_filter)
+        .sort("updated_at", DESCENDING)
+        .skip(offset)
+        .limit(limit)
+    )
+    messages = [_format_message(msg) for msg in cursor]
+    return {
+        "hydra:member": messages,
+        "hydra:totalItems": total,
+        "offset": offset,
+        "limit": limit,
+    }
 
 
 @app.get("/messages/{message_id}")
@@ -648,9 +699,83 @@ async def get_message(message_id: str, account=Depends(get_current_account)):
 
     # 标记已读
     if not msg.get("seen"):
-        db.messages.update_one({"_id": oid}, {"$set": {"seen": True}})
+        db.messages.update_one({"_id": oid}, {"$set": {"seen": True, "updated_at": datetime.now(timezone.utc)}})
 
     return _format_message(msg, include_body=True)
+
+
+@app.get("/messages/{message_id}/attachments/{attachment_id}")
+async def download_attachment(message_id: str, attachment_id: str, account=Depends(get_current_account)):
+    """下载邮件附件"""
+    address = account["address"]
+
+    try:
+        oid = ObjectId(message_id)
+    except Exception:
+        raise HTTPException(status_code=404, detail="Message not found")
+
+    msg = db.messages.find_one({"_id": oid, "to_addresses": address})
+    if not msg:
+        raise HTTPException(status_code=404, detail="Message not found")
+
+    attachment = None
+    for item in msg.get("attachments", []):
+        if item.get("id") == attachment_id:
+            attachment = item
+            break
+    if not attachment:
+        raise HTTPException(status_code=404, detail="Attachment not found")
+
+    filename = attachment.get("filename") or "attachment"
+    content_type = attachment.get("content_type", "application/octet-stream")
+    content = attachment.get("content", b"")
+    if isinstance(content, str):
+        content = content.encode("utf-8")
+    quoted_filename = quote(filename)
+    return Response(
+        content=content,
+        media_type=content_type,
+        headers={"Content-Disposition": f"attachment; filename*=UTF-8''{quoted_filename}"},
+    )
+
+
+@app.post("/messages/{message_id}/restore")
+async def restore_message(message_id: str, account=Depends(get_current_account)):
+    """从回收站恢复邮件"""
+    address = account["address"]
+
+    try:
+        oid = ObjectId(message_id)
+    except Exception:
+        raise HTTPException(status_code=404, detail="Message not found")
+
+    result = db.messages.update_one(
+        {"_id": oid, "to_addresses": address, "is_deleted": True},
+        {"$set": {"is_deleted": False, "updated_at": datetime.now(timezone.utc)}},
+    )
+    if result.matched_count == 0:
+        raise HTTPException(status_code=404, detail="Message not found")
+
+    logger.info(f"Message restored: {message_id} by {address}")
+    return {"message": "Restored", "id": message_id}
+
+
+@app.delete("/messages/{message_id}/permanent")
+async def permanent_delete_message(message_id: str, account=Depends(get_current_account)):
+    """永久删除回收站中的邮件"""
+    address = account["address"]
+
+    try:
+        oid = ObjectId(message_id)
+    except Exception:
+        raise HTTPException(status_code=404, detail="Message not found")
+
+    result = db.messages.delete_one({"_id": oid, "to_addresses": address, "is_deleted": True})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Message not found")
+
+    logger.info(f"Message permanently deleted: {message_id} by {address}")
+    return {"message": "Permanently deleted", "id": message_id}
 
 
 @app.delete("/messages/{message_id}")
@@ -665,7 +790,7 @@ async def delete_message(message_id: str, account=Depends(get_current_account)):
 
     result = db.messages.update_one(
         {"_id": oid, "to_addresses": address},
-        {"$set": {"is_deleted": True}},
+        {"$set": {"is_deleted": True, "updated_at": datetime.now(timezone.utc)}},
     )
     if result.matched_count == 0:
         raise HTTPException(status_code=404, detail="Message not found")
@@ -680,7 +805,7 @@ async def batch_action(request: Request, account=Depends(get_current_account)):
     address = account["address"]
     data = await request.json()
     action = data.get("action", "")
-    message_ids = data.get("message_ids", [])
+    message_ids = data.get("message_ids", data.get("ids", []))
 
     if not message_ids or not isinstance(message_ids, list):
         raise HTTPException(status_code=422, detail="message_ids is required")
@@ -697,14 +822,23 @@ async def batch_action(request: Request, account=Depends(get_current_account)):
 
     query_filter = {"_id": {"$in": oids}, "to_addresses": address}
 
+    now = datetime.now(timezone.utc)
     if action == "delete":
-        result = db.messages.update_many(query_filter, {"$set": {"is_deleted": True}})
+        result = db.messages.update_many(query_filter, {"$set": {"is_deleted": True, "updated_at": now}})
         logger.info(f"Batch delete: {result.modified_count} messages by {address}")
         return {"message": f"Deleted {result.modified_count} messages", "count": result.modified_count}
     elif action == "mark_read":
-        result = db.messages.update_many(query_filter, {"$set": {"seen": True}})
+        result = db.messages.update_many(query_filter, {"$set": {"seen": True, "updated_at": now}})
         logger.info(f"Batch mark_read: {result.modified_count} messages by {address}")
         return {"message": f"Marked {result.modified_count} as read", "count": result.modified_count}
+    elif action == "restore":
+        result = db.messages.update_many({**query_filter, "is_deleted": True}, {"$set": {"is_deleted": False, "updated_at": now}})
+        logger.info(f"Batch restore: {result.modified_count} messages by {address}")
+        return {"message": f"Restored {result.modified_count} messages", "count": result.modified_count}
+    elif action in {"permanent_delete", "delete_permanent"}:
+        result = db.messages.delete_many({**query_filter, "is_deleted": True})
+        logger.info(f"Batch permanent_delete: {result.deleted_count} messages by {address}")
+        return {"message": f"Permanently deleted {result.deleted_count} messages", "count": result.deleted_count}
     else:
         raise HTTPException(status_code=422, detail=f"Unknown action: {action}")
 
@@ -745,28 +879,63 @@ async def store_sent_message(request: Request):
     })
 
 
+def _format_sent_message(doc: dict, include_body: bool = True) -> dict:
+    result = {
+        "id": str(doc["_id"]),
+        "from_address": doc.get("from_address", ""),
+        "to": doc.get("to", []),
+        "subject": doc.get("subject", ""),
+        "resend_id": doc.get("resend_id", ""),
+        "createdAt": _dt_to_iso_utc(doc.get("created_at")),
+    }
+    if include_body:
+        result["text"] = doc.get("text", "")
+        result["html"] = doc.get("html", "")
+    return result
+
+
 @app.get("/sent")
-async def list_sent_messages(account=Depends(get_current_account)):
-    """查询已发送邮件（Bearer Token 鉴权）"""
+async def list_sent_messages(
+    account=Depends(get_current_account),
+    offset: int = 0,
+    limit: int = 100,
+):
+    """查询已发送邮件（Bearer Token 鉴权），支持分页"""
     address = account["address"]
+    limit = min(limit, 100)
+    offset = max(offset, 0)
+    query_filter = {"from_address": address}
+    total = db.sent_messages.count_documents(query_filter)
     cursor = (
-        db.sent_messages.find({"from_address": address})
+        db.sent_messages.find(query_filter)
         .sort("created_at", DESCENDING)
-        .limit(100)
+        .skip(offset)
+        .limit(limit)
     )
-    messages = []
-    for doc in cursor:
-        messages.append({
-            "id": str(doc["_id"]),
-            "from_address": doc.get("from_address", ""),
-            "to": doc.get("to", []),
-            "subject": doc.get("subject", ""),
-            "text": doc.get("text", ""),
-            "html": doc.get("html", ""),
-            "resend_id": doc.get("resend_id", ""),
-            "createdAt": _dt_to_iso_utc(doc.get("created_at")),
-        })
-    return {"hydra:member": messages}
+    messages = [_format_sent_message(doc) for doc in cursor]
+    return {
+        "hydra:member": messages,
+        "hydra:totalItems": total,
+        "offset": offset,
+        "limit": limit,
+    }
+
+
+@app.get("/sent/{message_id}")
+async def get_sent_message(message_id: str, account=Depends(get_current_account)):
+    """获取已发送邮件详情"""
+    address = account["address"]
+
+    try:
+        oid = ObjectId(message_id)
+    except Exception:
+        raise HTTPException(status_code=404, detail="Sent message not found")
+
+    doc = db.sent_messages.find_one({"_id": oid, "from_address": address})
+    if not doc:
+        raise HTTPException(status_code=404, detail="Sent message not found")
+
+    return _format_sent_message(doc)
 
 
 # ---------------------------------------------------------------------------
@@ -843,17 +1012,29 @@ class MailHandler:
             to_addresses = [a.lower() for a in envelope.rcpt_tos]
             to_list = [{"address": a, "name": ""} for a in to_addresses]
 
-            # 提取正文
+            # 提取正文和附件
             text_body = ""
             html_body = ""
-            has_attachments = False
+            attachments = []
 
             if msg.is_multipart():
                 for part in msg.walk():
+                    if part.is_multipart():
+                        continue
                     ct = part.get_content_type()
                     cd = part.get("Content-Disposition", "")
-                    if "attachment" in cd:
-                        has_attachments = True
+                    filename = part.get_filename()
+                    is_attachment = "attachment" in cd.lower() or bool(filename)
+                    if is_attachment:
+                        payload = part.get_payload(decode=True) or b""
+                        attachment_id = str(ObjectId())
+                        attachments.append({
+                            "id": attachment_id,
+                            "filename": filename or f"attachment-{len(attachments) + 1}",
+                            "content_type": ct or "application/octet-stream",
+                            "size": len(payload),
+                            "content": payload,
+                        })
                         continue
                     if ct == "text/plain" and not text_body:
                         try:
@@ -876,6 +1057,7 @@ class MailHandler:
                 else:
                     text_body = content
 
+            has_attachments = bool(attachments)
             subject = msg.get("Subject", "")
             # 从纯文本中截取摘要
             intro = re.sub(r"\s+", " ", (text_body or "")).strip()[:200]
@@ -892,6 +1074,7 @@ class MailHandler:
                 "text": text_body,
                 "html": html_body,
                 "has_attachments": has_attachments,
+                "attachments": attachments,
                 "seen": False,
                 "is_deleted": False,
                 "size": len(raw),

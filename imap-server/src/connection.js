@@ -12,7 +12,7 @@ const { buildEnvelope, quoteString } = require('./envelope');
 const { buildBodyStructure } = require('./bodystructure');
 const { getDb } = require('./mongo');
 
-const CAPABILITIES = 'IMAP4rev1 IDLE CHILDREN';
+const CAPABILITIES = 'IMAP4rev1 IDLE CHILDREN MOVE';
 
 class ImapConnection {
   constructor(socket) {
@@ -94,6 +94,11 @@ class ImapConnection {
         case 'FETCH': return await this.cmdFetch(tag, args, false);
         case 'STORE': return await this.cmdStore(tag, args, false);
         case 'SEARCH': return await this.cmdSearch(tag, args, false);
+        case 'COPY': return await this.cmdCopy(tag, args, false, false);
+        case 'MOVE': return await this.cmdCopy(tag, args, false, true);
+        case 'CREATE': return this.cmdCreate(tag, args);
+        case 'DELETE': return this.cmdDelete(tag, args);
+        case 'RENAME': return this.cmdRename(tag, args);
         case 'EXPUNGE': return await this.cmdExpunge(tag);
         case 'CLOSE': return await this.cmdClose(tag);
         case 'IDLE': return this.cmdIdle(tag);
@@ -157,7 +162,6 @@ class ImapConnection {
     }
 
     const tokens = tokenize(args);
-    const reference = tokens[0] || '';
     const pattern = tokens[1] || '*';
 
     if (pattern === '' || pattern === '%') {
@@ -172,6 +176,43 @@ class ImapConnection {
       this.send(`* LIST (${flags}) "/" "${name}"`);
     }
     this.send(`${tag} OK LIST completed`);
+  }
+
+  cmdCreate(tag, args) {
+    if (this.state === 'NOT_AUTHENTICATED') {
+      return this.send(`${tag} NO Not authenticated`);
+    }
+
+    const tokens = tokenize(args);
+    const folderName = tokens[0] || '';
+    if (!folderName) return this.send(`${tag} BAD Missing mailbox name`);
+    if (getFolder(folderName)) return this.send(`${tag} NO Mailbox already exists`);
+    return this.send(`${tag} NO Cannot create mailboxes on this server`);
+  }
+
+  cmdDelete(tag, args) {
+    if (this.state === 'NOT_AUTHENTICATED') {
+      return this.send(`${tag} NO Not authenticated`);
+    }
+
+    const tokens = tokenize(args);
+    const folderName = tokens[0] || '';
+    if (!folderName) return this.send(`${tag} BAD Missing mailbox name`);
+    if (getFolder(folderName)) return this.send(`${tag} NO Cannot delete fixed mailbox`);
+    return this.send(`${tag} NO Mailbox does not exist`);
+  }
+
+  cmdRename(tag, args) {
+    if (this.state === 'NOT_AUTHENTICATED') {
+      return this.send(`${tag} NO Not authenticated`);
+    }
+
+    const tokens = tokenize(args);
+    const oldName = tokens[0] || '';
+    const newName = tokens[1] || '';
+    if (!oldName || !newName) return this.send(`${tag} BAD Missing mailbox name`);
+    if (!getFolder(oldName)) return this.send(`${tag} NO Mailbox does not exist`);
+    return this.send(`${tag} NO Cannot rename fixed mailbox`);
   }
 
   async cmdSelect(tag, args, readOnly) {
@@ -209,8 +250,9 @@ class ImapConnection {
     // Re-assign seq after sort
     this.messages.forEach((m, i) => m.seq = i + 1);
 
+    const effectiveReadOnly = readOnly || !folder.writable;
     this.selectedFolder = folder;
-    this.selectedReadOnly = readOnly;
+    this.selectedReadOnly = effectiveReadOnly;
     this.state = 'SELECTED';
 
     const uidValidity = await getUidValidity(this.user.address, folder.name);
@@ -229,7 +271,7 @@ class ImapConnection {
     this.send(`* OK [UIDVALIDITY ${uidValidity}]`);
     this.send(`* OK [UIDNEXT ${uidNext}]`);
     const cmd = readOnly ? 'EXAMINE' : 'SELECT';
-    this.send(`${tag} OK [READ-${readOnly ? 'ONLY' : 'WRITE'}] ${cmd} completed`);
+    this.send(`${tag} OK [READ-${effectiveReadOnly ? 'ONLY' : 'WRITE'}] ${cmd} completed`);
   }
 
   _docToFlags(doc, folderName) {
@@ -261,21 +303,8 @@ class ImapConnection {
       itemsStr = itemsStr.substring(1, itemsStr.length - 1);
     }
 
-    const ranges = parseSequenceSet(seqSet);
     const items = parseFetchItems(itemsStr);
-
-    // Determine which messages match the sequence/UID set
-    const maxVal = isUid
-      ? Math.max(...this.messages.map(m => m.uid), 0)
-      : this.messages.length;
-
-    const matched = this.messages.filter(m => {
-      const val = isUid ? m.uid : m.seq;
-      return isInSequenceSet(val, ranges.map(r => ({
-        start: r.start === Infinity ? maxVal : r.start,
-        end: r.end === Infinity ? maxVal : r.end,
-      })));
-    });
+    const matched = this._matchMessages(seqSet, isUid);
 
     const needsFullDoc = items.some(it =>
       it.type === 'ENVELOPE' || it.type === 'BODYSTRUCTURE' ||
@@ -465,16 +494,7 @@ class ImapConnection {
     const silent = /\.SILENT/i.test(rest);
     const flags = flagMatch[2].trim().split(/\s+/).filter(Boolean);
 
-    const ranges = parseSequenceSet(seqSet);
-    const maxVal = isUid ? Math.max(...this.messages.map(m => m.uid), 0) : this.messages.length;
-
-    const matched = this.messages.filter(m => {
-      const val = isUid ? m.uid : m.seq;
-      return isInSequenceSet(val, ranges.map(r => ({
-        start: r.start === Infinity ? maxVal : r.start,
-        end: r.end === Infinity ? maxVal : r.end,
-      })));
-    });
+    const matched = this._matchMessages(seqSet, isUid);
 
     const flagFieldMap = {
       '\\Seen': 'seen',
@@ -640,6 +660,117 @@ class ImapConnection {
     return true;
   }
 
+  // ---- COPY / MOVE ----
+
+  async cmdCopy(tag, args, isUid, isMove) {
+    if (this.state !== 'SELECTED') return this.send(`${tag} NO No mailbox selected`);
+    if (isMove && this.selectedReadOnly) return this.send(`${tag} NO Mailbox is read-only`);
+
+    const tokens = tokenize(args);
+    if (tokens.length < 2) return this.send(`${tag} BAD Missing arguments`);
+
+    const seqSet = tokens[0];
+    const destFolder = getFolder(tokens[1]);
+    if (!destFolder) return this.send(`${tag} NO Mailbox does not exist`);
+    if (!destFolder.writable) return this.send(`${tag} NO Destination mailbox is read-only`);
+    if (this.selectedFolder.name === 'Sent') {
+      return this.send(`${tag} NO Sent mailbox is read-only`);
+    }
+
+    const matched = this._matchMessages(seqSet, isUid);
+    if (matched.length === 0) {
+      return this.send(`${tag} OK ${isUid ? 'UID ' : ''}${isMove ? 'MOVE' : 'COPY'} completed`);
+    }
+
+    const sameFolder = destFolder.name === this.selectedFolder.name;
+    if (isMove && sameFolder) {
+      return this.send(`${tag} OK ${isUid ? 'UID ' : ''}MOVE completed`);
+    }
+
+    const db = getDb();
+    const ids = matched.map(m => m.message_id);
+    const sourceDocs = await db.collection(this.selectedFolder.collection)
+      .find({ _id: { $in: ids } })
+      .toArray();
+    const docMap = new Map(sourceDocs.map(d => [d._id.toHexString(), d]));
+    const now = new Date();
+
+    if (sameFolder) {
+      const copyDocs = matched
+        .map(msg => this._buildCopyDoc(docMap.get(msg.message_id.toHexString()), destFolder.name, now))
+        .filter(Boolean);
+      if (copyDocs.length > 0) {
+        const result = await db.collection(destFolder.collection).insertMany(copyDocs);
+        await getOrAssignUids(this.user.address, destFolder.name, Object.values(result.insertedIds));
+      }
+    } else if (isMove && destFolder.name === 'Trash' && this.selectedFolder.collection === 'messages') {
+      await db.collection('messages').updateMany(
+        { _id: { $in: ids } },
+        { $set: { is_deleted: true, updated_at: now } },
+      );
+    } else if (isMove && this.selectedFolder.name === 'Trash' && destFolder.name === 'INBOX') {
+      await db.collection('messages').updateMany(
+        { _id: { $in: ids } },
+        { $set: { is_deleted: false, updated_at: now } },
+      );
+    } else if (isMove) {
+      return this.send(`${tag} NO Cannot move messages between these mailboxes`);
+    } else {
+      const copyDocs = matched
+        .map(msg => this._buildCopyDoc(docMap.get(msg.message_id.toHexString()), destFolder.name, now))
+        .filter(Boolean);
+      if (copyDocs.length > 0) {
+        const result = await db.collection(destFolder.collection).insertMany(copyDocs);
+        await getOrAssignUids(this.user.address, destFolder.name, Object.values(result.insertedIds));
+      }
+    }
+
+    if (isMove) {
+      const expungedSeqs = matched.map(m => m.seq).sort((a, b) => b - a);
+      for (const seq of expungedSeqs) this.send(`* ${seq} EXPUNGE`);
+      const movedIds = new Set(ids.map(id => id.toHexString()));
+      this.messages = this.messages.filter(m => !movedIds.has(m.message_id.toHexString()));
+      this.messages.forEach((m, i) => m.seq = i + 1);
+    }
+
+    this.send(`${tag} OK ${isUid ? 'UID ' : ''}${isMove ? 'MOVE' : 'COPY'} completed`);
+  }
+
+  _matchMessages(seqSet, isUid) {
+    const ranges = parseSequenceSet(seqSet);
+    const maxVal = isUid ? Math.max(...this.messages.map(m => m.uid), 0) : this.messages.length;
+    return this.messages.filter(m => {
+      const val = isUid ? m.uid : m.seq;
+      return isInSequenceSet(val, ranges.map(r => ({
+        start: r.start === Infinity ? maxVal : r.start,
+        end: r.end === Infinity ? maxVal : r.end,
+      })));
+    });
+  }
+
+  _buildCopyDoc(doc, destFolderName, now) {
+    if (!doc) return null;
+    const copy = { ...doc };
+    delete copy._id;
+
+    copy.to_addresses = this._ensureAddressList(copy.to_addresses, this.user.address);
+    if (!copy.from && copy.from_address) copy.from = { address: copy.from_address, name: '' };
+    if (!copy.to && Array.isArray(copy.to_addresses)) {
+      copy.to = copy.to_addresses.map(address => ({ address, name: '' }));
+    }
+    copy.is_deleted = destFolderName === 'Trash';
+    copy.updated_at = now;
+    if (copy.seen === undefined) copy.seen = false;
+    copy.created_at = copy.created_at || now;
+    return copy;
+  }
+
+  _ensureAddressList(value, address) {
+    if (Array.isArray(value) && value.length > 0) return value;
+    if (typeof value === 'string' && value) return [value];
+    return [address];
+  }
+
   // ---- EXPUNGE ----
 
   async cmdExpunge(tag) {
@@ -733,6 +864,8 @@ class ImapConnection {
       case 'FETCH': return this.cmdFetch(tag, subArgs, true);
       case 'STORE': return this.cmdStore(tag, subArgs, true);
       case 'SEARCH': return this.cmdSearch(tag, subArgs, true);
+      case 'COPY': return this.cmdCopy(tag, subArgs, true, false);
+      case 'MOVE': return this.cmdCopy(tag, subArgs, true, true);
       default: return this.send(`${tag} BAD Unknown UID subcommand`);
     }
   }

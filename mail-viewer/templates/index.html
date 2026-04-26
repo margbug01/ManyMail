@@ -479,6 +479,9 @@
                             <button type="button" class="btn btn-outline-secondary" id="tab-sent" onclick="switchTab('sent')">
                                 <i class="bi bi-send me-1"></i><span data-i18n="sent">已发送</span>
                             </button>
+                            <button type="button" class="btn btn-outline-secondary" id="tab-trash" onclick="switchTab('trash')">
+                                <i class="bi bi-trash me-1"></i><span data-i18n="trash">回收站</span>
+                            </button>
                             <button type="button" class="btn btn-outline-secondary" id="tab-imap" onclick="switchTab('imap')">
                                 <i class="bi bi-diagram-3 me-1"></i>IMAP
                             </button>
@@ -615,6 +618,15 @@
                 domainTip: '输入前缀即可查询邮件，邮箱不存在会自动创建。',
                 inbox: '收件箱',
                 sent: '已发送',
+                trash: '回收站',
+                attachments: '附件',
+                download: '下载',
+                restore: '恢复',
+                permanentDelete: '彻底删除',
+                noTrashMail: '回收站为空',
+                attachmentUnavailable: '附件下载接口不可用',
+                confirmRestore: '确定要恢复这封邮件吗？',
+                confirmPermanentDelete: '确定要彻底删除这封邮件吗？此操作不可恢复。',
                 auto: '自动',
                 searchPlaceholder: '搜索发件人/主题/内容...',
                 selectAll: '全选',
@@ -686,6 +698,15 @@
                 domainTip: 'Enter prefix to query. Mailbox auto-created if not exists.',
                 inbox: 'Inbox',
                 sent: 'Sent',
+                trash: 'Trash',
+                attachments: 'Attachments',
+                download: 'Download',
+                restore: 'Restore',
+                permanentDelete: 'Delete forever',
+                noTrashMail: 'Trash is empty',
+                attachmentUnavailable: 'Attachment download API unavailable',
+                confirmRestore: 'Restore this email?',
+                confirmPermanentDelete: 'Permanently delete this email? This cannot be undone.',
                 auto: 'Auto',
                 searchPlaceholder: 'Search sender / subject / content...',
                 selectAll: 'All',
@@ -783,15 +804,19 @@
             // re-render dynamic content
             if (currentMessages.length > 0 && currentTab === 'inbox') renderMessages(currentMessages);
             if (currentSentMessages.length > 0 && currentTab === 'sent') renderSentMessages(currentSentMessages);
+            if (currentTrashMessages.length > 0 && currentTab === 'trash') renderTrashMessages(currentTrashMessages);
             if (!currentEmail) resetMailDetail();
         }
 
         let currentEmail = '';
         let currentMessages = [];
         let currentSentMessages = [];
+        let currentTrashMessages = [];
         let activeDomains = [];
         let currentOffset = 0;
         let currentTotal = 0;
+        let currentSentTotal = 0;
+        let currentTrashTotal = 0;
         let imapLoaded = false;
         const PAGE_SIZE = 30;
 
@@ -855,6 +880,32 @@
             } else {
                 badge.style.display = 'none';
             }
+        }
+
+        function _attachmentId(att, index) {
+            return encodeURIComponent(String(att.id || (att.index ?? index)));
+        }
+
+        function _formatSize(bytes) {
+            const n = Number(bytes) || 0;
+            if (!n) return '';
+            return n >= 1024 * 1024 ? (n / 1024 / 1024).toFixed(1) + ' MB' : (n / 1024).toFixed(1) + ' KB';
+        }
+
+        function _renderAttachments(messageId, attachments) {
+            if (!attachments || attachments.length === 0) return '';
+            return `
+                <div class="mb-3">
+                    <strong><i class="bi bi-paperclip me-1"></i>${t('attachments')}:</strong>
+                    <div class="mt-2 d-flex flex-wrap gap-2">
+                        ${attachments.map((att, index) => {
+                            const filename = att.filename || `attachment_${index}`;
+                            const size = _formatSize(att.size);
+                            const url = `/api/inbox/attachment/${encodeURIComponent(messageId)}/${_attachmentId(att, index)}?email=${encodeURIComponent(currentEmail)}&filename=${encodeURIComponent(filename)}`;
+                            return `<a class="btn btn-sm btn-outline-secondary" href="${url}" download title="${t('download')}"><i class="bi bi-download me-1"></i>${_escapeHtml(filename)}${size ? ` <span class="text-muted">(${size})</span>` : ''}</a>`;
+                        }).join('')}
+                    </div>
+                </div>`;
         }
 
         // 域名选择联动
@@ -1013,6 +1064,7 @@
             currentTab = tab;
             const tabInbox = document.getElementById('tab-inbox');
             const tabSent = document.getElementById('tab-sent');
+            const tabTrash = document.getElementById('tab-trash');
             const tabImap = document.getElementById('tab-imap');
             const searchBar = document.getElementById('search-bar');
             const batchBar = document.getElementById('batch-bar');
@@ -1024,6 +1076,7 @@
             if (tab === 'inbox') {
                 tabInbox.className = 'btn btn-primary';
                 tabSent.className = 'btn btn-outline-secondary';
+                tabTrash.className = 'btn btn-outline-secondary';
                 tabImap.className = 'btn btn-outline-secondary';
                 leftColumn.style.display = '';
                 listColumn.style.display = '';
@@ -1041,21 +1094,23 @@
                 tabInbox.className = 'btn btn-outline-secondary';
                 searchBar.style.display = 'none';
                 batchBar.style.display = 'none';
-                if (tab === 'sent') {
-                    tabSent.className = 'btn btn-primary';
+                if (tab === 'sent' || tab === 'trash') {
+                    tabSent.className = tab === 'sent' ? 'btn btn-primary' : 'btn btn-outline-secondary';
+                    tabTrash.className = tab === 'trash' ? 'btn btn-primary' : 'btn btn-outline-secondary';
                     tabImap.className = 'btn btn-outline-secondary';
                     leftColumn.style.display = '';
                     listColumn.style.display = '';
                     detailColumn.style.display = '';
                     imapPanel.style.display = 'none';
                     if (currentEmail) {
-                        querySent();
+                        tab === 'sent' ? querySent() : queryTrash();
                     } else {
                         document.getElementById('mail-list').innerHTML = `<div class="text-center text-muted py-4"><i class="bi bi-arrow-left me-2"></i>${t('queryFirst')}</div>`;
                     }
                     resetMailDetail();
                 } else {
                     tabSent.className = 'btn btn-outline-secondary';
+                    tabTrash.className = 'btn btn-outline-secondary';
                     tabImap.className = 'btn btn-primary';
                     if (autoRefreshTimer) {
                         clearInterval(autoRefreshTimer);
@@ -1074,26 +1129,29 @@
         function refreshCurrentTab() {
             if (currentTab === 'inbox') queryInbox();
             else if (currentTab === 'sent') querySent();
+            else if (currentTab === 'trash') queryTrash();
             else reloadImapFrame();
         }
 
-        async function querySent() {
+        async function querySent(append = false) {
             if (!currentEmail) return;
             const mailList = document.getElementById('mail-list');
-            mailList.innerHTML = `<div class="text-center py-3"><span class="spinner-border spinner-border-sm"></span> ${t('loading')}</div>`;
+            const offset = append ? currentSentMessages.length : 0;
+            if (!append) mailList.innerHTML = `<div class="text-center py-3"><span class="spinner-border spinner-border-sm"></span> ${t('loading')}</div>`;
 
             try {
                 const resp = await fetch('/api/sent/query', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ email: currentEmail })
+                    body: JSON.stringify({ email: currentEmail, offset, limit: PAGE_SIZE })
                 });
                 const data = await resp.json();
                 if (!data.success) {
                     mailList.innerHTML = `<div class="error-state"><p>${_escapeHtml(data.message || t('loadFailed'))}</p></div>`;
                     return;
                 }
-                renderSentMessages(data.messages);
+                currentSentTotal = data.total || data.messages.length;
+                renderSentMessages(append ? currentSentMessages.concat(data.messages) : data.messages);
             } catch (e) {
                 mailList.innerHTML = `<div class="error-state"><p>${t('loadFailed')}: ${_escapeHtml(e.message)}</p></div>`;
             }
@@ -1120,12 +1178,28 @@
                         </div>
                     </div>`;
             }).join('');
+            if (currentSentTotal > currentSentMessages.length) {
+                mailList.insertAdjacentHTML('beforeend', `<div class="text-center py-3"><button class="btn btn-outline-primary btn-sm" onclick="querySent(true)"><i class="bi bi-arrow-down-circle me-1"></i>${t('loadMore')} (${currentSentMessages.length}/${currentSentTotal})</button></div>`);
+            }
         }
 
-        function viewSentDetailById(messageId, element) {
+        async function viewSentDetailById(messageId, element) {
             const msg = currentSentMessages.find(item => item.id === messageId);
             if (!msg) return;
-            viewSentDetail(element, msg);
+            document.querySelectorAll('.mail-item').forEach(el => el.classList.remove('active'));
+            if (element) element.classList.add('active');
+            document.getElementById('mail-detail-content').innerHTML = `<div class="text-center py-3"><span class="spinner-border spinner-border-sm"></span> ${t('loading')}</div>`;
+            try {
+                const resp = await fetch('/api/sent/detail', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email: currentEmail, message_id: messageId })
+                });
+                const data = await resp.json();
+                viewSentDetail(element, data.success ? data.detail : msg);
+            } catch (e) {
+                viewSentDetail(element, msg);
+            }
         }
 
         function viewSentDetail(element, msg) {
@@ -1134,6 +1208,7 @@
             const detailContent = document.getElementById('mail-detail-content');
             const toStr = _escapeHtml((msg.to || []).join(', '));
             detailContent.innerHTML = `
+                <div class="mb-3"><strong>${t('from')}:</strong> ${_escapeHtml(msg.from_address || currentEmail)}</div>
                 <div class="mb-3"><strong>${t('to')}:</strong> ${toStr}</div>
                 <div class="mb-3"><strong>${t('subject')}:</strong> ${_escapeHtml(msg.subject || t('noSubject'))}</div>
                 <div class="mb-3"><strong>${t('time')}:</strong> ${new Date(msg.createdAt).toLocaleString(currentLang === 'zh' ? 'zh-CN' : 'en-US')}</div>
@@ -1145,6 +1220,54 @@
             const iframe = document.getElementById('sent-body-frame');
             const mailContent = msg.html || _escapeHtml(msg.text || '').replace(/\n/g, '<br>') || `<i style="color:#6c757d;">${t('emptyContent')}</i>`;
             _renderMailBodyIframe(iframe, mailContent);
+        }
+
+        async function queryTrash(append = false) {
+            if (!currentEmail) return;
+            const mailList = document.getElementById('mail-list');
+            const offset = append ? currentTrashMessages.length : 0;
+            if (!append) mailList.innerHTML = `<div class="text-center py-3"><span class="spinner-border spinner-border-sm"></span> ${t('loading')}</div>`;
+
+            try {
+                const resp = await fetch('/api/trash/query', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email: currentEmail, offset, limit: PAGE_SIZE })
+                });
+                const data = await resp.json();
+                if (!data.success) {
+                    mailList.innerHTML = `<div class="error-state"><p>${_escapeHtml(data.message || t('loadFailed'))}</p></div>`;
+                    return;
+                }
+                currentTrashTotal = data.total || data.messages.length;
+                renderTrashMessages(append ? currentTrashMessages.concat(data.messages) : data.messages);
+            } catch (e) {
+                mailList.innerHTML = `<div class="error-state"><p>${t('loadFailed')}: ${_escapeHtml(e.message)}</p></div>`;
+            }
+        }
+
+        function renderTrashMessages(messages) {
+            currentTrashMessages = messages;
+            const mailList = document.getElementById('mail-list');
+            if (messages.length === 0) {
+                mailList.innerHTML = `<div class="empty-state"><i class="bi bi-trash d-block"></i><p>${t('noTrashMail')}</p></div>`;
+                return;
+            }
+            mailList.innerHTML = messages.map(msg => `
+                <div class="card mb-2 mail-item" data-msg-id="${msg.id}" onclick="viewMailDetail('${msg.id}', this, true)">
+                    <div class="card-body py-2">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <span class="mail-sender text-truncate me-2"><span class="mail-copy">${_escapeHtml(msg.from?.name || msg.from?.address || t('unknownSender'))}</span></span>
+                            <small class="text-muted">${new Date(msg.createdAt).toLocaleString(currentLang === 'zh' ? 'zh-CN' : 'en-US')}</small>
+                        </div>
+                        <div class="mail-subject text-truncate"><span class="mail-copy">${_escapeHtml(msg.subject || t('noSubject'))}</span></div>
+                        <small class="mail-intro text-muted text-truncate d-block"><span class="mail-copy">${_escapeHtml(msg.intro || '')}</span></small>
+                    </div>
+                </div>
+            `).join('');
+            if (currentTrashTotal > currentTrashMessages.length) {
+                mailList.insertAdjacentHTML('beforeend', `<div class="text-center py-3"><button class="btn btn-outline-primary btn-sm" onclick="queryTrash(true)"><i class="bi bi-arrow-down-circle me-1"></i>${t('loadMore')} (${currentTrashMessages.length}/${currentTrashTotal})</button></div>`);
+            }
         }
 
         function resetMailDetail() {
@@ -1235,6 +1358,8 @@
                 }
                 
                 document.getElementById('btn-refresh-mail').disabled = false;
+                currentSentMessages = [];
+                currentTrashMessages = [];
                 if (currentTab === 'inbox') {
                     document.getElementById('search-bar').style.display = 'flex';
                 }
@@ -1380,7 +1505,7 @@
             }
         }
 
-        async function viewMailDetail(messageId, element) {
+        async function viewMailDetail(messageId, element, isTrash = false) {
             if (!currentEmail) return;
             
             document.querySelectorAll('.mail-item').forEach(el => el.classList.remove('active'));
@@ -1424,25 +1549,31 @@
                 window._currentDetailMsg = msg;
                 // 同步已读状态：更新 currentMessages 并移除未读样式
                 const idx = currentMessages.findIndex(m => m.id === messageId);
-                if (idx !== -1) currentMessages[idx].seen = true;
-                if (element) element.classList.remove('mail-unread');
+                if (!isTrash && idx !== -1) currentMessages[idx].seen = true;
+                if (!isTrash && element) element.classList.remove('mail-unread');
                 _updateUnreadBadge();
                 const escapedSubject = _escapeHtml(msg.subject || t('noSubject'));
                 const escapedFromName = _escapeHtml(msg.from?.name || '');
                 const escapedFromAddr = _escapeHtml(msg.from?.address || '');
-                detailContent.innerHTML = `
-                    <div class="d-flex justify-content-between align-items-start mb-3">
-                        <div>
-                            <strong>${t('from')}:</strong> ${escapedFromName} &lt;${escapedFromAddr}&gt;
-                        </div>
-                        <div>
+                const actionButtons = isTrash ? `
+                            <button class="btn btn-sm btn-outline-primary me-1" onclick="restoreEmail('${messageId}')">
+                                <i class="bi bi-arrow-counterclockwise me-1"></i>${t('restore')}
+                            </button>
+                            <button class="btn btn-sm btn-outline-danger" onclick="permanentDeleteEmail('${messageId}')">
+                                <i class="bi bi-x-circle me-1"></i>${t('permanentDelete')}
+                            </button>` : `
                             <button class="btn btn-sm btn-outline-primary me-1" onclick="openReply()">
                                 <i class="bi bi-reply me-1"></i>${t('reply')}
                             </button>
                             <button class="btn btn-sm btn-outline-danger" onclick="deleteEmail('${messageId}')">
                                 <i class="bi bi-trash me-1"></i>${t('delete')}
-                            </button>
+                            </button>`;
+                detailContent.innerHTML = `
+                    <div class="d-flex justify-content-between align-items-start mb-3">
+                        <div>
+                            <strong>${t('from')}:</strong> ${escapedFromName} &lt;${escapedFromAddr}&gt;
                         </div>
+                        <div>${actionButtons}</div>
                     </div>
                     <div class="mb-3">
                         <strong>${t('subject')}:</strong> ${escapedSubject}
@@ -1450,6 +1581,7 @@
                     <div class="mb-3">
                         <strong>${t('time')}:</strong> ${new Date(msg.createdAt).toLocaleString(currentLang === 'zh' ? 'zh-CN' : 'en-US')}
                     </div>
+                    ${_renderAttachments(messageId, msg.attachments)}
                     <hr>
                     <div class="mail-body-container" style="background:#f8f9fa; padding:0; border-radius:8px; overflow:hidden;">
                         <iframe id="mail-body-frame" sandbox="allow-same-origin allow-popups allow-popups-to-escape-sandbox" referrerpolicy="no-referrer" style="width:100%;border:none;min-height:200px;"></iframe>
@@ -1738,6 +1870,36 @@
                     resetMailDetail();
                 } else {
                     alert(data.message || t('deleteFailed'));
+                }
+            } catch (e) {
+                alert(t('networkError') + ': ' + e.message);
+            }
+        }
+
+        async function restoreEmail(messageId) {
+            if (!currentEmail || !confirm(t('confirmRestore'))) return;
+            await trashAction('/api/inbox/restore', messageId, t('restore'));
+        }
+
+        async function permanentDeleteEmail(messageId) {
+            if (!currentEmail || !confirm(t('confirmPermanentDelete'))) return;
+            await trashAction('/api/inbox/permanent-delete', messageId, t('permanentDelete'));
+        }
+
+        async function trashAction(url, messageId, label) {
+            try {
+                const resp = await fetch(url, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email: currentEmail, message_id: messageId })
+                });
+                const data = await resp.json();
+                if (data.success) {
+                    currentTrashMessages = currentTrashMessages.filter(m => m.id !== messageId);
+                    renderTrashMessages(currentTrashMessages);
+                    resetMailDetail();
+                } else {
+                    alert(data.message || `${label}失败`);
                 }
             } catch (e) {
                 alert(t('networkError') + ': ' + e.message);

@@ -19,9 +19,21 @@ os.environ.update({
 })
 
 import pytest
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 import mongomock
 from fastapi.testclient import TestClient
+
+
+def _mongomock_client(*args, **kwargs):
+    """Accept any pymongo-style URI/options and return an in-memory client."""
+    return mongomock.MongoClient()
+
+
+@pytest.fixture(scope="session", autouse=True)
+def patch_mongo_client_for_import():
+    """Patch pymongo before app import; recent pymongo rejects mongomock:// URIs."""
+    with patch("pymongo.MongoClient", _mongomock_client):
+        yield
 
 
 @pytest.fixture(autouse=True)
