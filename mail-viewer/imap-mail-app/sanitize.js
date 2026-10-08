@@ -71,7 +71,7 @@ function sanitizeCss(raw) {
     const value = decl.substring(colonIdx + 1).trim();
     if (!prop || !value) continue;
     if (!ALLOWED_CSS_PROPS.has(prop)) continue;
-    if (DANGEROUS_CSS_RE.test(value)) continue;
+    if (DANGEROUS_CSS_RE.test(value) || value.includes(String.fromCharCode(92)) || value.includes('/*') || /image-set\s*\(/i.test(value)) continue;
     safe.push(`${prop}:${value}`);
   }
   return safe.join(';');
@@ -188,8 +188,8 @@ function sanitizeEmailHtml(html) {
 }
 
 /**
- * Rewrite remote image URLs to go through the Flask image proxy.
- * Preserves data: and cid: URLs.
+ * Store remote images as inert attributes pending per-message consent.
+ * Preserve raster data images; mailparser resolves embedded CID images beforehand.
  */
 function rewriteImageUrls(html) {
   if (!html || !/<img/i.test(html)) return html;
@@ -198,10 +198,12 @@ function rewriteImageUrls(html) {
     /(<img\b[^>]*?\bsrc\s*=\s*["'])([^"']+)(["'])/gi,
     (match, prefix, src, suffix) => {
       const trimmed = src.trim();
-      // Only proxy http/https URLs
-      if (!/^https?:\/\//i.test(trimmed)) return match;
-      const proxied = '/api/image-proxy?url=' + encodeURIComponent(trimmed);
-      return prefix + proxied + suffix;
+      const normalized = trimmed.startsWith('//') ? 'https:' + trimmed : trimmed;
+      if (/^https?:\/\//i.test(normalized)) {
+        return prefix.slice(0, -5) + 'data-remote-src=' + prefix.slice(-1) + normalized + suffix;
+      }
+      if (/^data:image\/(png|gif|jpeg|webp);base64,/i.test(trimmed)) return match;
+      return prefix.slice(0, -5);
     }
   );
 }

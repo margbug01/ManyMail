@@ -68,6 +68,7 @@ test('sanitize strips script, events, dangerous css, and rewrites images', () =>
   assert.match(html, /color:red/);
 
   const prepared = prepareHtmlForRender('<img src="https://example.com/a.png"><img src="cid:abc">');
-  assert.match(prepared, /\/api\/image-proxy\?url=https%3A%2F%2Fexample.com%2Fa.png/);
-  assert.match(prepared, /cid:abc/);
+  assert.match(prepared, /data-remote-src="https:\/\/example.com\/a.png"/);
+  assert.doesNotMatch(prepared, /<img src="https:/);
+  assert.doesNotMatch(prepared, /cid:abc/);
 });

@@ -13,7 +13,7 @@ import requests
 import bleach
 from bleach.css_sanitizer import CSSSanitizer
 from urllib.parse import urlparse, urljoin, quote
-from flask import Flask, render_template, jsonify, request, session, redirect, url_for, Response, stream_with_context
+from flask import Flask, render_template, jsonify, request, session, redirect, url_for, Response, stream_with_context, send_from_directory
 
 app = Flask(__name__)
 app.secret_key = os.getenv("SECRET_KEY", "mail-viewer-secret-key-change-me")
@@ -103,7 +103,17 @@ _EMAIL_ALLOWED_CSS_PROPERTIES = [
     "padding-top", "text-align", "text-decoration", "text-transform",
     "vertical-align", "visibility", "white-space", "width", "word-break",
 ]
-_EMAIL_CSS_SANITIZER = CSSSanitizer(allowed_css_properties=_EMAIL_ALLOWED_CSS_PROPERTIES)
+class _EmailCSSSanitizer(CSSSanitizer):
+    def sanitize_css(self, style):
+        return _sanitize_css_declarations(super().sanitize_css(style))
+
+
+_EMAIL_CSS_SANITIZER = _EmailCSSSanitizer(allowed_css_properties=_EMAIL_ALLOWED_CSS_PROPERTIES)
+
+
+@app.get("/email-privacy.js")
+def email_privacy_script():
+    return send_from_directory(os.path.join(app.root_path, "imap-mail-app", "public"), "email-privacy.js")
 
 
 def _require_production_value(name: str, value: str, disallowed: set[str] | None = None):
@@ -253,7 +263,7 @@ def _sanitize_css_declarations(body: str) -> str:
             continue
         if prop not in _EMAIL_ALLOWED_CSS_PROPERTIES:
             continue
-        if _CSS_FORBIDDEN_RE.search(value) or "<" in value:
+        if _CSS_FORBIDDEN_RE.search(value) or "<" in value or chr(92) in value or "/*" in value:
             continue
         kept.append(f"{prop}:{value}")
     return ";".join(kept)
@@ -399,10 +409,16 @@ def _rewrite_html_images(html: str) -> str:
     def _replace(match):
         prefix, src, suffix = match.groups()
         normalized = _normalize_remote_url(src)
-        if not _is_proxyable_image_url(normalized):
+        try:
+            parsed = urlparse(normalized)
+            is_remote = parsed.scheme in {"http", "https"} and bool(parsed.hostname)
+        except ValueError:
+            is_remote = False
+        if is_remote:
+            return f'{prefix[:-5]}data-remote-src={prefix[-1]}{normalized}{suffix}'
+        if re.match(r"^data:image/(?:png|gif|jpeg|webp);base64,", normalized, re.IGNORECASE):
             return match.group(0)
-        proxied = url_for("image_proxy", url=normalized)
-        return f"{prefix}{proxied}{suffix}"
+        return prefix[:-5]
 
     return re.sub(r'(<img\b[^>]*?\bsrc=["\'])([^"\']+)(["\'])', _replace, html, flags=re.IGNORECASE)
 

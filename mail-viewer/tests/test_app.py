@@ -228,6 +228,40 @@ def test_sanitize_email_html_keeps_inline_styles(viewer):
     assert "kept" in cleaned
 
 
+@pytest.mark.parametrize("source", ["https://tracker.test/pixel", "//tracker.test/pixel", "http://127.0.0.1/pixel"])
+def test_render_blocks_remote_images_without_dns(viewer, monkeypatch, source):
+    resolver = Mock(side_effect=AssertionError("render must not resolve remote hosts"))
+    monkeypatch.setattr(viewer.socket, "getaddrinfo", resolver)
+    result = viewer._prepare_html_for_render(f'<img src="{source}" srcset="https://tracker.test/other 2x">')
+    assert 'data-remote-src="' in result
+    assert '<img src=' not in result
+    assert 'srcset=' not in result
+    resolver.assert_not_called()
+
+
+@pytest.mark.parametrize("source", ["/api/image-proxy?url=https://tracker.test/pixel", "javascript:alert(1)", "data:image/svg+xml;base64,PHN2Zz4=", "file:///secret"])
+def test_render_removes_unsafe_image_sources(viewer, source):
+    result = viewer._prepare_html_for_render(f'<img src="{source}">')
+    assert source not in result
+
+
+def test_render_keeps_inline_raster_image(viewer):
+    source = 'data:image/png;base64,aGVsbG8='
+    assert source in viewer._prepare_html_for_render(f'<img src="{source}">')
+
+
+def test_render_blocks_inline_css_tracking(viewer):
+    result = viewer._prepare_html_for_render('<p style="background:url(https://tracker.test/pixel);color:red">hello</p>')
+    assert 'tracker.test' not in result
+    assert 'color:red' in result
+
+
+def test_privacy_script_is_available(client):
+    response = client.get('/email-privacy.js')
+    assert response.status_code == 200
+    assert b'Content-Security-Policy' in response.data
+
+
 def test_extract_code_finds_six_digits(viewer):
     assert viewer._extract_code("您的验证码是 123456，5 分钟内有效") == "123456"
     assert viewer._extract_code("Subject", "", "code: 987654") == "987654"

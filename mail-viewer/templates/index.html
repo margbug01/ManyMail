@@ -687,6 +687,7 @@
             background: #fff;
         }
     </style>
+    <script src="/email-privacy.js"></script>
 </head>
 <body>
     <nav class="navbar navbar-light sticky-top">
@@ -1487,7 +1488,10 @@
             return Math.max(available / (natural + 12), 0.4);
         }
 
-        function _renderMailBodyIframe(iframe, mailContent) {
+        function _renderMailBodyIframe(iframe, mailContent, allowImages = false) {
+            iframe = EmailPrivacy.freshFrame(iframe);
+            EmailPrivacy.control(iframe, mailContent, allowImages, allowed => _renderMailBodyIframe(iframe, mailContent, allowed));
+            const protectedContent = EmailPrivacy.prepare(mailContent, allowImages);
             const iframeDoc = iframe.contentDocument || iframe.contentWindow.document;
             iframe.setAttribute('scrolling', 'no');
             iframe.style.overflow = 'hidden';
@@ -1495,7 +1499,7 @@
             iframeDoc.open();
             // color-scheme 锁 light：详情区是浅色底，放任邮件的 prefers-color-scheme: dark
             // 规则生效会变成白字浅底，读不了
-            iframeDoc.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="color-scheme" content="light"><base target="_blank"><style>:root{color-scheme:light;}html,body{margin:0;padding:0;background:transparent;box-sizing:border-box;}body{font-family:"Noto Sans SC",system-ui,sans-serif;font-size:14px;color:#1a2421;padding:12px;word-break:break-word;overflow-wrap:anywhere;}img{max-width:100%;height:auto;}table{max-width:100%!important;}a{color:#4a7c9b;}</style></head><body>${mailContent}</body></html>`);
+            iframeDoc.write(`<!DOCTYPE html><html><head>${EmailPrivacy.head(allowImages)}<meta charset="UTF-8"><meta name="color-scheme" content="light"><base target="_blank"><style>:root{color-scheme:light;}html,body{margin:0;padding:0;background:transparent;box-sizing:border-box;}body{font-family:"Noto Sans SC",system-ui,sans-serif;font-size:14px;color:#1a2421;padding:12px;word-break:break-word;overflow-wrap:anywhere;}img{max-width:100%;height:auto;}table{max-width:100%!important;}a{color:#4a7c9b;}</style></head><body>${protectedContent}</body></html>`);
             iframeDoc.close();
 
             // 强制所有链接在新标签页打开（覆盖邮件中显式设置的 target）

@@ -1049,6 +1049,7 @@ html.embedded-mode .detail-back:hover {
   border-color: var(--embed-primary);
 }
 </style>
+<script src="email-privacy.js"></script>
 </head>
 <body>
 <script>
@@ -1611,10 +1612,14 @@ async function readMail(index) {
       '<div class="detail-body"><div class="mail-body-container">' + bodyHtml + '</div></div>';
     if (data.html) {
       var iframe = document.getElementById('mail-iframe');
-      iframe.onload = function() {
+      var renderProtectedBody = function(allowImages) {
+        iframe = EmailPrivacy.freshFrame(iframe);
+        iframe.onload = null;
+        iframe.setAttribute('referrerpolicy', 'no-referrer');
+        EmailPrivacy.control(iframe, data.html, allowImages, renderProtectedBody);
         var doc = iframe.contentDocument;
         doc.open();
-        doc.write('<!DOCTYPE html><html><head><base target="_blank"><style>img{max-width:100%;height:auto;}</style></head><body>' + data.html + '</body></html>');
+        doc.write('<!DOCTYPE html><html><head>' + EmailPrivacy.head(allowImages) + '<style>img{max-width:100%;height:auto;}</style></head><body>' + EmailPrivacy.prepare(data.html, allowImages) + '</body></html>');
         doc.close();
         doc.querySelectorAll('a[href]').forEach(function(a) {
           a.setAttribute('target', '_blank');
@@ -1631,6 +1636,7 @@ async function readMail(index) {
         setTimeout(recalc, 200);
         setTimeout(recalc, 800);
       };
+      iframe.onload = function() { renderProtectedBody(false); };
       iframe.src = 'about:blank';
     }
     mail.seen = true;
