@@ -37,6 +37,17 @@ const privacy = fs.readFileSync(path.join(root, 'mail-viewer/imap-mail-app/publi
         assert.ok(geometry.y + geometry.height <= viewport.height + 1);
         assert.equal(await page.locator('.sidebar').isVisible(), false);
         assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth && document.documentElement.scrollHeight <= innerHeight + 1), true);
+        const typography = await page.locator('.mail-row').first().evaluate(row => {
+          const sender = getComputedStyle(row.querySelector('.mail-from'));
+          const subject = getComputedStyle(row.querySelector('.mail-subject'));
+          return { senderSize: sender.fontSize, subjectSize: subject.fontSize, wrap: subject.whiteSpace, height: row.querySelector('.mail-subject').getBoundingClientRect().height };
+        });
+        assert.equal(typography.senderSize, '14px');
+        assert.equal(typography.subjectSize, '14px');
+        assert.equal(typography.wrap, 'nowrap');
+        assert.equal(typography.height, 22);
+        assert.match(await page.locator('.mail-date').first().textContent(), /^\d{2}:\d{2}$/);
+        if (process.env.MOBILE_SCREENSHOT && viewport.width === 390) await page.screenshot({ path: process.env.MOBILE_SCREENSHOT });
         await page.locator('#mobile-nav-toggle').click();
         assert.equal(await page.locator('.sidebar').isVisible(), true);
         await page.locator('.folder-item').first().click();

@@ -1119,6 +1119,22 @@ html.embedded-mode .detail-back:hover {
   .detail-back { min-height: 44px; }
   .batch-bar { flex-wrap: wrap; flex: 0 0 auto; }
   .modal { max-height: calc(100dvh - 24px); overflow-y: auto; }
+  body { font-size: 14px; line-height: 1.5; -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+  .embedded-title, .account-item, .folder-item, .sidebar-buttons .btn { font-size: 14px; line-height: 1.5; }
+  .mobile-mail-nav button { font-size: 14px; white-space: nowrap; }
+  .toolbar { grid-template-columns: 68px 68px 40px minmax(0, 1fr); }
+  .toolbar button, .toolbar select { font-family: inherit; font-size: 13px; line-height: 20px; white-space: nowrap; padding: 6px; }
+  .toolbar input[type="text"] { font-family: inherit; font-size: 14px; line-height: 20px; }
+  .toolbar .mail-info { font-size: 12px; line-height: 20px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .mail-row { padding: 12px 10px; margin: 0 4px 6px; gap: 8px; border-left: 3px solid transparent; }
+  .mail-row-top { align-items: center; margin-bottom: 4px; gap: 12px; }
+  .mail-from { display: block; font-size: 14px; line-height: 22px; white-space: nowrap; text-overflow: ellipsis; }
+  .mail-subject { display: block; font-size: 14px; line-height: 22px; white-space: nowrap; text-overflow: ellipsis; }
+  .mail-row .mail-from, .mail-row.active .mail-from { font-weight: 500; color: var(--embed-text); }
+  .mail-row.unread .mail-from { font-weight: 600; }
+  .mail-row .mail-subject, .mail-row.active .mail-subject, .mail-row.unread .mail-subject { font-weight: 400; color: var(--embed-text); }
+  .mail-date { font-size: 12px; line-height: 22px; opacity: 1; font-variant-numeric: tabular-nums; }
+  .mail-star { line-height: 22px; }
 }
 </style>
 <script src="email-privacy.js"></script>
@@ -1643,7 +1659,15 @@ function renderMailList(mails) {
   el.innerHTML = mails.map(function(m, i) {
     var fromDisplay = m.from.name ? esc(m.from.name) + ' ' : '';
     var addr = m.from.address || '';
-    var date = formatDate(m.date);
+    var fullDate = formatDate(m.date);
+    var timestamp = new Date(m.date);
+    var today = new Date();
+    var date = fullDate;
+    if (isMobileLayout() && !Number.isNaN(timestamp.getTime())) {
+      date = timestamp.toDateString() === today.toDateString()
+        ? timestamp.toLocaleTimeString(currentLang === 'zh' ? 'zh-CN' : 'en-GB', { hour: '2-digit', minute: '2-digit', hour12: false })
+        : timestamp.toLocaleDateString(currentLang === 'zh' ? 'zh-CN' : 'en-GB', { month: '2-digit', day: '2-digit', ...(timestamp.getFullYear() !== today.getFullYear() ? { year: 'numeric' } : {}) });
+    }
     var checkbox = selectMode ? '<input type="checkbox" class="mail-checkbox" ' + (selectedUids.has(String(m.uid)) ? 'checked' : '') + ' onclick="toggleMailSelect(event, \'' + m.uid + '\')">' : '';
     var starCls = m.flagged ? 'mail-star active' : 'mail-star';
     var starIcon = m.flagged ? '<i class="bi bi-star-fill"></i>' : '<i class="bi bi-star"></i>';
@@ -1653,7 +1677,7 @@ function renderMailList(mails) {
       '<div class="mail-col">' +
         '<div class="mail-row-top">' +
           '<span class="mail-from">' + (m.from.name ? esc(m.from.name) : esc(addr)) + '</span>' +
-          '<span class="mail-date">' + date + '</span>' +
+          '<span class="mail-date" title="' + esc(fullDate) + '">' + esc(date) + '</span>' +
         '</div>' +
         '<div class="mail-subject">' + esc(m.subject) + '</div>' +
       '</div>' +
