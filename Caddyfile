@@ -1,0 +1,3 @@
+{$MAIL_WEB_HOST:localhost} {
+    reverse_proxy mail-viewer:5000
+}

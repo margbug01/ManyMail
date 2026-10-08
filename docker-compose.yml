@@ -47,15 +47,18 @@ services:
       - SMTP_MAX_ADDRESS_LENGTH=${SMTP_MAX_ADDRESS_LENGTH:-320}
       - SMTP_BLACKLIST_IPS=${SMTP_BLACKLIST_IPS:-}
       - SMTP_BLACKLIST_SENDERS=${SMTP_BLACKLIST_SENDERS:-}
+      - SMTP_SPAM_TRASH_ENABLED=${SMTP_SPAM_TRASH_ENABLED:-0}
+      - SMTP_SPAM_TRASH_SENDERS=${SMTP_SPAM_TRASH_SENDERS:-}
+      - SMTP_SPAM_TRASH_SUBJECT_PHRASES=${SMTP_SPAM_TRASH_SUBJECT_PHRASES:-}
+      - SMTP_SPAM_TRASH_BODY_PHRASES=${SMTP_SPAM_TRASH_BODY_PHRASES:-}
+      - SMTP_SPAM_TRASH_LINK_DOMAINS=${SMTP_SPAM_TRASH_LINK_DOMAINS:-}
       - SMTP_GREYLIST_ENABLED=${SMTP_GREYLIST_ENABLED:-0}
       - SMTP_GREYLIST_DELAY_SECONDS=${SMTP_GREYLIST_DELAY_SECONDS:-60}
       - SMTP_GREYLIST_TTL_SECONDS=${SMTP_GREYLIST_TTL_SECONDS:-3600}
       - SMTP_TLS_CERT=${SMTP_TLS_CERT:-}
       - SMTP_TLS_KEY=${SMTP_TLS_KEY:-}
-    # Uncomment to mount TLS certificates for STARTTLS:
-    # volumes:
-    #   - /etc/letsencrypt/live/mail.yourdomain.com/fullchain.pem:/certs/fullchain.pem:ro
-    #   - /etc/letsencrypt/live/mail.yourdomain.com/privkey.pem:/certs/privkey.pem:ro
+    volumes:
+      - ./certs:/opt/ManyMail/certs:ro
     depends_on:
       mongodb:
         condition: service_healthy
@@ -83,11 +86,13 @@ services:
       - SECRET_KEY=${SECRET_KEY}
       - UNIFIED_PASSWORD=${UNIFIED_PASSWORD}
       - MAX_IMAGE_PROXY_BYTES=${MAX_IMAGE_PROXY_BYTES:-5242880}
-      - AUTO_CREATE_ACCOUNTS=${AUTO_CREATE_ACCOUNTS:-0}
+      - AUTO_CREATE_ACCOUNTS=${AUTO_CREATE_ACCOUNTS:-1}
       - LOGIN_RATE_LIMIT_WINDOW=${LOGIN_RATE_LIMIT_WINDOW:-300}
       - LOGIN_RATE_LIMIT_MAX=${LOGIN_RATE_LIMIT_MAX:-10}
       - SENSITIVE_RATE_LIMIT_WINDOW=${SENSITIVE_RATE_LIMIT_WINDOW:-60}
       - SENSITIVE_RATE_LIMIT_MAX=${SENSITIVE_RATE_LIMIT_MAX:-20}
+      - RESEND_API_KEY=${RESEND_API_KEY:-}
+      - RESEND_API_KEY_CNHEALTHTOURISM=${RESEND_API_KEY_CNHEALTHTOURISM:-}
       - IMAP_MAIL_BASE_URL=http://imap-mail:3939
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:5000/login', timeout=5).read()"]
@@ -126,36 +131,74 @@ services:
     networks:
       - mail-net
 
-  # ---- IMAP Server (Node.js) ----
-  imap-server:
-    build: ./imap-server
-    container_name: mail-imap-server
+  # ---- Forward selected hosted mail to an external inbox ----
+  mail-forwarder:
+    profiles: [forwarding]
+    build: ./forwarder
+    container_name: mail-forwarder
     restart: unless-stopped
-    ports:
-      - "993:993"
+    env_file:
+      - .env
     environment:
       - MONGO_URL=mongodb://mongodb:27017
-      - DB_NAME=mailserver
-      - IMAP_PORT=993
-      - TLS_CERT=/certs/fullchain.pem
-      - TLS_KEY=/certs/privkey.pem
-    volumes:
-      - ${IMAP_CERTS_PATH:-./certs}:/certs:ro
+      - DB_NAME=${DB_NAME:-mailserver}
+      - FORWARD_POLL_SECONDS=${FORWARD_POLL_SECONDS:-5}
+      - FORWARD_RETRY_SECONDS=${FORWARD_RETRY_SECONDS:-60}
+      - RESEND_API_KEY=${FORWARD_RESEND_API_KEY:-}
     depends_on:
       mongodb:
         condition: service_healthy
-    healthcheck:
-      test: ["CMD", "node", "-e", "const n=require('net');const c=n.connect(993,'127.0.0.1',()=>{c.destroy();process.exit(0)});c.on('error',()=>process.exit(1))"]
-      interval: 30s
-      timeout: 5s
-      retries: 3
-      start_period: 20s
+    networks:
+      - mail-net
+
+  # ---- Forward the PayPal mailbox to the accounting inbox ----
+  mail-paypal-forwarder:
+    profiles: [paypal-forwarding]
+    build: ./forwarder
+    container_name: mail-paypal-forwarder
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      - MONGO_URL=mongodb://mongodb:27017
+      - DB_NAME=${DB_NAME:-mailserver}
+      - FORWARD_SOURCE_ADDRESS=${PAYPAL_FORWARD_SOURCE_ADDRESS:-}
+      - FORWARD_TO_ADDRESS=${PAYPAL_FORWARD_TO_ADDRESS:-}
+      - FORWARD_FROM=${PAYPAL_FORWARD_FROM:-}
+      - FORWARD_POLL_SECONDS=5
+      - FORWARD_RETRY_SECONDS=60
+      - RESEND_API_KEY=${PAYPAL_FORWARD_RESEND_API_KEY:-}
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    networks:
+      - mail-net
+
+  # ---- Caddy (Reverse Proxy + Auto HTTPS) ----
+  caddy:
+    image: caddy:2-alpine
+    container_name: mail-caddy
+    environment:
+      - MAIL_WEB_HOST=${MAIL_WEB_HOST:-localhost}
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "${CADDY_HTTPS_BIND:-443}:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      mail-viewer:
+        condition: service_started
     networks:
       - mail-net
 
 volumes:
   mongo_data:
   imap_mail_data:
+  caddy_data:
+  caddy_config:
 
 networks:
   mail-net:
