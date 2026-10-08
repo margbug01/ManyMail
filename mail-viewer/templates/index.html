@@ -1752,7 +1752,25 @@
             }
         });
 
+        function fitMobileImapFrame() {
+            const frame = document.getElementById('imap-frame');
+            if (!frame || !frame.getClientRects().length) return;
+            if (window.matchMedia('(max-width: 991.98px)').matches) {
+                const viewport = window.visualViewport;
+                const bottom = viewport ? viewport.height + viewport.offsetTop : window.innerHeight;
+                const height = Math.max(180, bottom - frame.getBoundingClientRect().top - 8);
+                frame.style.height = height + 'px';
+                frame.style.minHeight = '0';
+            } else {
+                frame.style.removeProperty('height');
+                frame.style.removeProperty('min-height');
+            }
+        }
+        window.addEventListener('resize', fitMobileImapFrame);
+        if (window.visualViewport) window.visualViewport.addEventListener('resize', fitMobileImapFrame);
+
         function ensureImapLoaded() {
+            requestAnimationFrame(fitMobileImapFrame);
             const frame = document.getElementById('imap-frame');
             if (!imapLoaded) {
                 frame.src = '/imap/?embedded=1';

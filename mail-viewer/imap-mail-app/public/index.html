@@ -1048,6 +1048,78 @@ html.embedded-mode .detail-back:hover {
   background: var(--embed-bg);
   border-color: var(--embed-primary);
 }
+
+.mobile-mail-nav, .mobile-nav-backdrop, .mobile-nav-close { display: none; }
+
+@media (max-width: 991.98px) {
+  html, body { height: 100%; overflow: hidden; }
+  .embedded-shell, html.embedded-mode .embedded-shell {
+    height: 100dvh;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+  }
+  html.embedded-mode .embedded-topbar { flex: 0 0 auto; padding: 6px 10px; }
+  .app, html.embedded-mode .app {
+    height: auto;
+    min-height: 0;
+    flex: 1;
+    padding: 6px;
+    gap: 6px;
+    overflow: hidden;
+  }
+  .mobile-mail-nav {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex: 0 0 44px;
+    min-width: 0;
+  }
+  .mobile-mail-nav button, .mobile-nav-close {
+    min-height: 44px;
+    padding: 8px 12px;
+    border: 1px solid var(--embed-border);
+    border-radius: var(--embed-radius-sm);
+    background: var(--embed-surface);
+    color: var(--embed-text);
+    font: inherit;
+    cursor: pointer;
+  }
+  #mobile-mail-context { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-size: 13px; }
+  .app .sidebar {
+    display: none;
+    position: fixed;
+    inset: 0 auto 0 0;
+    width: min(340px, 88vw);
+    z-index: 31;
+    overflow-y: auto;
+    border-radius: 0;
+    background: var(--embed-surface);
+  }
+  .app.mobile-nav-open .sidebar { display: block; }
+  .mobile-nav-close { display: block; margin: 8px 10px 8px auto; }
+  .app.mobile-nav-open .mobile-nav-backdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 30;
+    border: 0;
+    background: rgba(20,40,32,.35);
+  }
+  .main { flex: 1; min-height: 0; overflow: hidden; }
+  .toolbar { display: grid; grid-template-columns: 76px minmax(0, 1fr) auto auto; gap: 6px; padding: 8px; flex: 0 0 auto; }
+  .toolbar input[type="text"] { grid-column: 2 / -1; width: 100%; min-width: 0; }
+  .toolbar select, .toolbar button, .toolbar input[type="text"] { min-height: 40px; margin: 0; }
+  .toolbar .mail-info { grid-column: 4; font-size: 11px; white-space: normal; margin: 0; }
+  .mail-list-container { flex: 1; min-height: 0; overflow: hidden; }
+  .mail-list-pane { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
+  .mail-from, .mail-subject { overflow: hidden; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
+  .app.mobile-view-detail .mobile-mail-nav { display: none; }
+  .app.mobile-view-detail .mail-detail { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
+  .detail-back { min-height: 44px; }
+  .batch-bar { flex-wrap: wrap; flex: 0 0 auto; }
+  .modal { max-height: calc(100dvh - 24px); overflow-y: auto; }
+}
 </style>
 <script src="email-privacy.js"></script>
 </head>
@@ -1067,7 +1139,13 @@ if (new URLSearchParams(window.location.search).get('embedded') === '1') {
     </div>
   </div>
 <div class="app">
-  <div class="sidebar">
+  <div class="mobile-mail-nav">
+    <button type="button" id="mobile-nav-toggle" onclick="setMobileNavigation(true)" aria-expanded="false" aria-controls="mail-navigation">☰ <span data-i18n="folderSection">文件夹</span></button>
+    <span id="mobile-mail-context"></span>
+  </div>
+  <button type="button" class="mobile-nav-backdrop" onclick="setMobileNavigation(false)" aria-label="Close navigation" tabindex="-1"></button>
+  <div class="sidebar" id="mail-navigation">
+    <button type="button" class="mobile-nav-close" onclick="setMobileNavigation(false)" aria-label="Close navigation">✕</button>
     <div class="sidebar-header" data-i18n="brandTitle">ManyMail</div>
     <div class="sidebar-section">
       <div class="sidebar-section-title" data-i18n="accountSection">邮箱账户</div>
@@ -1414,6 +1492,7 @@ async function loadAccounts() {
       <button class="account-remove" onclick="event.stopPropagation();removeAccount(${a.id})" title="${esc(t('disconnectTitle'))}">x</button>
     </div>
   `).join('');
+  updateMobileContext();
 }
 
 async function selectAccount(id) {
@@ -1480,11 +1559,35 @@ function isMobileLayout() {
   return window.matchMedia('(max-width: 991.98px)').matches;
 }
 
+function setMobileNavigation(open) {
+  const app = document.querySelector('.app');
+  const expanded = Boolean(open && isMobileLayout());
+  const wasOpen = app.classList.contains('mobile-nav-open');
+  app.classList.toggle('mobile-nav-open', expanded);
+  document.getElementById('mobile-nav-toggle').setAttribute('aria-expanded', String(expanded));
+  document.querySelector('.main').inert = expanded;
+  if (expanded) document.querySelector('.mobile-nav-close').focus();
+  else if (wasOpen && isMobileLayout() && !detailVisible) document.getElementById('mobile-nav-toggle').focus({ preventScroll: true });
+}
+
+document.addEventListener('keydown', event => {
+  if (event.key === 'Escape') setMobileNavigation(false);
+});
+
 function syncResponsiveView() {
   const app = document.querySelector('.app');
   if (!app) return;
   app.classList.toggle('mobile-view-detail', isMobileLayout() && detailVisible);
   app.classList.toggle('mobile-view-list', isMobileLayout() && !detailVisible);
+  setMobileNavigation(false);
+  updateMobileContext();
+}
+
+function updateMobileContext() {
+  const selectedAccount = document.querySelector('.account-item.active .account-name');
+  document.getElementById('mobile-mail-context').textContent =
+    translateFolder(activeFolder || 'INBOX') +
+    (selectedAccount ? ' · ' + selectedAccount.textContent.trim() : '');
 }
 
 function resetMailDetail(message) {
