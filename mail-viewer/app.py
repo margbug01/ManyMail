@@ -40,9 +40,6 @@ IMAP_MAIL_BASE_URL = os.getenv("IMAP_MAIL_BASE_URL", "http://imap-mail:3939")
 
 # Resend 发信配置
 RESEND_API_KEY = os.getenv("RESEND_API_KEY", "")
-RESEND_DOMAIN_KEYS = {
-    "cnhealthtourism.com": os.getenv("RESEND_API_KEY_CNHEALTHTOURISM", "").strip(),
-}
 MAX_IMAGE_PROXY_BYTES = int(os.getenv("MAX_IMAGE_PROXY_BYTES", str(5 * 1024 * 1024)))
 
 # 发信附件限制（base64 前的原始字节数）
@@ -1322,6 +1319,9 @@ def send_email():
     """通过 Resend API 发送邮件"""
     if _check_viewer_rate_limit("send_email", SENSITIVE_RATE_LIMIT_WINDOW, SENSITIVE_RATE_LIMIT_MAX):
         return _rate_limited_json()
+    if not RESEND_API_KEY:
+        return jsonify({"success": False, "message": "未配置 Resend API Key，无法发信"})
+
     data = request.json or {}
     from_email = data.get("from_email", "").strip()
     from_name = data.get("from_name", "").strip()
@@ -1343,12 +1343,6 @@ def send_email():
         return jsonify({"success": False, "message": "请填写邮件主题"})
     if not html and not text:
         return jsonify({"success": False, "message": "请填写邮件正文"})
-
-    # 按发件域名选择对应的 Resend API Key
-    from_domain = from_email.rsplit("@", 1)[-1].lower() if "@" in from_email else ""
-    resend_key = RESEND_DOMAIN_KEYS.get(from_domain) or RESEND_API_KEY
-    if not resend_key:
-        return jsonify({"success": False, "message": f"域名 {from_domain} 未配置 Resend API Key，无法发信"})
 
     # 构造发件人字段
     sender = f"{from_name} <{from_email}>" if from_name else from_email
@@ -1377,7 +1371,7 @@ def send_email():
             "https://api.resend.com/emails",
             json=payload,
             headers={
-                "Authorization": f"Bearer {resend_key}",
+                "Authorization": f"Bearer {RESEND_API_KEY}",
                 "Content-Type": "application/json",
             },
             timeout=30,

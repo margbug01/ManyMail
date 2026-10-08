@@ -100,37 +100,9 @@ _SMTP_MAX_MESSAGE_BYTES = int(os.getenv("SMTP_MAX_MESSAGE_BYTES", str(1024 * 102
 _SMTP_MAX_ADDRESS_LENGTH = int(os.getenv("SMTP_MAX_ADDRESS_LENGTH", "320"))
 _SMTP_BLACKLIST_IPS = {item.strip() for item in os.getenv("SMTP_BLACKLIST_IPS", "").split(",") if item.strip()}
 _SMTP_BLACKLIST_SENDERS = {item.strip().lower() for item in os.getenv("SMTP_BLACKLIST_SENDERS", "").split(",") if item.strip()}
-
-
-def _split_pipe_env(name: str) -> tuple[str, ...]:
-    return tuple(
-        item.strip().lower()
-        for item in os.getenv(name, "").split("|")
-        if item.strip()
-    )
-
-
-_SMTP_SPAM_TRASH_ENABLED = _env_flag("SMTP_SPAM_TRASH_ENABLED", default=False)
-_SMTP_SPAM_TRASH_SENDERS = set(_split_pipe_env("SMTP_SPAM_TRASH_SENDERS"))
-_SMTP_SPAM_TRASH_SUBJECT_PHRASES = _split_pipe_env("SMTP_SPAM_TRASH_SUBJECT_PHRASES")
-_SMTP_SPAM_TRASH_BODY_PHRASES = _split_pipe_env("SMTP_SPAM_TRASH_BODY_PHRASES")
-_SMTP_SPAM_TRASH_LINK_DOMAINS = _split_pipe_env("SMTP_SPAM_TRASH_LINK_DOMAINS")
 _SMTP_GREYLIST_ENABLED = _env_flag("SMTP_GREYLIST_ENABLED", default=False)
 _SMTP_GREYLIST_DELAY_SECONDS = int(os.getenv("SMTP_GREYLIST_DELAY_SECONDS", "60"))
 _SMTP_GREYLIST_TTL_SECONDS = int(os.getenv("SMTP_GREYLIST_TTL_SECONDS", "3600"))
-
-# 回环防护:外发转发的目标邮箱(如 QQ/Gmail)若开了自动回复,它们发回的
-# auto-reply 会投递回本站收件域;识别并丢弃,避免"转发->自动回复->再转发"死循环。
-_LOOPBACK_SENDERS = {
-    a.strip().lower()
-    for a in (
-        os.getenv("FORWARD_TO_ADDRESS", "")
-        + ","
-        + os.getenv("PAYPAL_FORWARD_TO_ADDRESS", "")
-    ).split(",")
-    if a.strip() and "@" in a
-}
-
 _smtp_rcpt_rate_store: dict = defaultdict(list)
 _smtp_data_rate_store: dict = defaultdict(list)
 _smtp_greylist_store: dict = {}
@@ -218,68 +190,6 @@ def _check_smtp_blacklist(client_ip: str, mail_from: str) -> str | None:
     if _is_blacklisted_sender(mail_from):
         return "554 5.7.1 Sender blocked"
     return None
-
-
-def _part_text(part, _fallback_default="utf-8"):
-    """Decode a message part to str, always.
-
-    part.get_content() can return bytes instead of str, and that single
-    difference used to abort handle_DATA with
-    "cannot use a string pattern on a bytes-like object" - the mail was then
-    rejected with 451 and lost (this is what dropped every Google DMARC
-    aggregate report). It can also raise LookupError for an unknown charset.
-
-    Returns "" instead of raising, so one odd part can never take down delivery
-    of the whole message.
-    """
-    try:
-        value = part.get_content()
-    except Exception:
-        return ""
-    if isinstance(value, bytes):
-        charset = None
-        try:
-            charset = part.get_content_charset()
-        except Exception:
-            charset = None
-        for candidate in (charset, _fallback_default):
-            if not candidate:
-                continue
-            try:
-                return value.decode(candidate, errors="replace")
-            except (LookupError, TypeError):
-                continue
-        return value.decode("utf-8", errors="replace")
-    if value is None:
-        return ""
-    return str(value)
-
-
-def _detect_spam(from_address: str, subject: str, text_body: str, html_body: str) -> str:
-    """Return a conservative spam reason; matched mail is stored in Trash."""
-    if not _SMTP_SPAM_TRASH_ENABLED:
-        return ""
-
-    sender = (from_address or "").strip().lower()
-    sender_domain = sender.split("@", 1)[1] if "@" in sender else sender
-    if sender in _SMTP_SPAM_TRASH_SENDERS or sender_domain in _SMTP_SPAM_TRASH_SENDERS:
-        return f"blocked sender: {sender or '(empty)'}"
-
-    normalized_subject = re.sub(r"\s+", " ", subject or "").strip().lower()
-    normalized_body = re.sub(
-        r"\s+", " ", f"{text_body or ''} {html_body or ''}"
-    ).strip().lower()
-
-    for phrase in _SMTP_SPAM_TRASH_SUBJECT_PHRASES:
-        if phrase in normalized_subject:
-            return f"subject phrase: {phrase}"
-    for phrase in _SMTP_SPAM_TRASH_BODY_PHRASES:
-        if phrase in normalized_body:
-            return f"body phrase: {phrase}"
-    for domain in _SMTP_SPAM_TRASH_LINK_DOMAINS:
-        if domain in normalized_body:
-            return f"suspicious link domain: {domain}"
-    return ""
 
 
 def _check_smtp_greylist(client_ip: str, mail_from: str, rcpt_to: str) -> str | None:
@@ -1051,6 +961,44 @@ async def get_sent_message(message_id: str, account=Depends(get_current_account)
     return _format_sent_message(doc)
 
 
+def _part_text(part):
+    """Decode a message part to str, always.
+
+    Two failure modes are handled here because both used to abort handle_DATA
+    and lose the whole message:
+
+      * part.get_content() can return bytes instead of str. That single
+        difference made
+            re.sub(r"\\s+", " ", (text_body or ""))
+        raise "cannot use a string pattern on a bytes-like object".
+      * It can raise LookupError for a charset this build does not know.
+
+    Returns "" instead of raising, so one odd part can never take down
+    delivery of the entire message.
+    """
+    try:
+        value = part.get_content()
+    except Exception:
+        return ""
+    if isinstance(value, bytes):
+        charset = None
+        try:
+            charset = part.get_content_charset()
+        except Exception:
+            charset = None
+        for candidate in (charset, "utf-8"):
+            if not candidate:
+                continue
+            try:
+                return value.decode(candidate, errors="replace")
+            except (LookupError, TypeError):
+                continue
+        return value.decode("utf-8", errors="replace")
+    if value is None:
+        return ""
+    return str(value)
+
+
 # ---------------------------------------------------------------------------
 # SMTP Server (aiosmtpd)
 # ---------------------------------------------------------------------------
@@ -1122,18 +1070,6 @@ class MailHandler:
                 from_email = from_header.strip().lower()
 
             # 提取收件人
-            # 回环防护:转发目标邮箱的自动回复/自动生成邮件直接吞掉,不入库不转发
-            auto_submitted = (msg.get("Auto-Submitted", "") or "").lower()
-            if (
-                from_email in _LOOPBACK_SENDERS
-                or "auto-replied" in auto_submitted
-                or "auto-generated" in auto_submitted
-            ):
-                logger.info(
-                    f"Loop-back/auto-reply dropped: {from_email} -> {envelope.rcpt_tos}"
-                )
-                return "250 Message accepted"
-
             to_addresses = [a.lower() for a in envelope.rcpt_tos]
             to_list = [{"address": a, "name": ""} for a in to_addresses]
 
@@ -1169,40 +1105,13 @@ class MailHandler:
                         decoded = _part_text(part)
                         if decoded:
                             html_body = decoded
-                    elif not ct.startswith("text/"):
-                        # Non-text part without attachment markers (e.g. DMARC report files sent
-                        # without Content-Disposition) used to be silently dropped. Keep it as
-                        # an attachment instead of losing it.
-                        payload = part.get_payload(decode=True) or b""
-                        if payload:
-                            attachments.append({
-                                "id": str(ObjectId()),
-                                "filename": filename or f"attachment-{len(attachments) + 1}",
-                                "content_type": ct or "application/octet-stream",
-                                "size": len(payload),
-                                "content": payload,
-                            })
             else:
                 ct = msg.get_content_type()
-                if ct.startswith("text/"):
-                    content = _part_text(msg)
-                    if ct == "text/html":
-                        html_body = content
-                    else:
-                        text_body = content
+                content = _part_text(msg)
+                if ct == "text/html":
+                    html_body = content
                 else:
-                    # Single-part non-text message (Google DMARC reports are a bare zip):
-                    # store the payload as an attachment instead of decoding binary
-                    # garbage into the text body and forwarding that to the user.
-                    payload = msg.get_payload(decode=True) or b""
-                    if payload:
-                        attachments.append({
-                            "id": str(ObjectId()),
-                            "filename": msg.get_filename() or f"attachment-{len(attachments) + 1}",
-                            "content_type": ct or "application/octet-stream",
-                            "size": len(payload),
-                            "content": payload,
-                        })
+                    text_body = content
 
             has_attachments = bool(attachments)
             subject = msg.get("Subject", "")
@@ -1211,7 +1120,6 @@ class MailHandler:
             if not any([subject.strip(), text_body.strip(), html_body.strip()]):
                 return "554 5.6.0 Empty message rejected"
 
-            spam_reason = _detect_spam(from_email, subject, text_body, html_body)
             now = datetime.now(timezone.utc)
             doc = {
                 "to_addresses": to_addresses,
@@ -1224,24 +1132,16 @@ class MailHandler:
                 "has_attachments": has_attachments,
                 "attachments": attachments,
                 "seen": False,
-                "is_deleted": bool(spam_reason),
-                "is_spam": bool(spam_reason),
-                "spam_reason": spam_reason,
+                "is_deleted": False,
                 "size": len(raw),
                 "created_at": now,
                 "updated_at": now,
             }
 
             db.messages.insert_one(doc)
-            if spam_reason:
-                logger.warning(
-                    f"Email moved to trash: {from_email} -> {to_addresses} | "
-                    f"{subject[:50]} | {spam_reason}"
-                )
-            else:
-                logger.info(
-                    f"Email stored: {from_email} -> {to_addresses} | {subject[:50]}"
-                )
+            logger.info(
+                f"Email stored: {from_email} -> {to_addresses} | {subject[:50]}"
+            )
             session.rcpt_count = 0
             return "250 Message accepted for delivery"
 

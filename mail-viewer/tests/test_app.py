@@ -21,7 +21,6 @@ def load_app(monkeypatch, **env):
         "IMAP_MAIL_BASE_URL": "http://imap-mail.test",
         "AUTO_CREATE_ACCOUNTS": "0",
         "RESEND_API_KEY": "",
-        "RESEND_API_KEY_CNHEALTHTOURISM": "",
         "LOGIN_RATE_LIMIT_MAX": "2",
         "LOGIN_RATE_LIMIT_WINDOW": "300",
         "SENSITIVE_RATE_LIMIT_MAX": "2",
@@ -119,36 +118,10 @@ def test_inbox_query_auto_create_enabled(monkeypatch):
 
 def test_send_requires_resend_key(client):
     login(client)
-    resp = client.post("/api/send", json={
-        "from_email": "sender@example.test",
-        "to": "recipient@example.test",
-        "subject": "Test",
-        "text": "Test body",
-    })
+    resp = client.post("/api/send", json={})
     assert resp.status_code == 200
     assert resp.get_json()["success"] is False
     assert "Resend" in resp.get_json()["message"]
-
-
-@pytest.mark.parametrize("from_email, expected_key", [
-    ("sender@cnhealthtourism.com", "domain-test-key"),
-    ("sender@example.test", "fallback-test-key"),
-])
-def test_send_selects_domain_key(monkeypatch, from_email, expected_key):
-    module = load_app(monkeypatch, RESEND_API_KEY="fallback-test-key",
-                      RESEND_API_KEY_CNHEALTHTOURISM="domain-test-key")
-    response = Mock(status_code=200)
-    response.json.return_value = {"id": "test-message-id"}
-    post = Mock(return_value=response)
-    monkeypatch.setattr(module.http_session, "post", post)
-    with module.app.test_client() as test_client:
-        login(test_client)
-        result = test_client.post("/api/send", json={
-            "from_email": from_email, "to": "recipient@example.test",
-            "subject": "Test", "text": "Test body",
-        })
-    assert result.get_json()["success"] is True
-    assert post.call_args_list[0].kwargs["headers"]["Authorization"] == f"Bearer {expected_key}"
 
 
 def test_sanitize_email_html_moves_style_into_one_clean_block(viewer):
