@@ -44,10 +44,6 @@ html.embedded-mode .sidebar-header {
   min-height: 100vh;
 }
 
-.embedded-topbar {
-  display: none;
-}
-
 .app {
   display: flex;
   height: 100vh;
@@ -122,23 +118,70 @@ html.embedded-mode .sidebar-header {
 .account-item:hover, .folder-item:hover { background: #edf5f2; }
 .account-item.active, .folder-item.active { background: #e7f2ee; border-left: 3px solid var(--embed-primary); padding-left: 13px; }
 
+.account-item { gap: 8px; padding-top: 7px; padding-bottom: 7px; }
+
+.account-avatar, .detail-avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: #dcebe5;
+  color: var(--embed-primary-hover);
+  font-size: 13px;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  text-transform: uppercase;
+}
+
 .account-name {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1;
+  line-height: 1.3;
+}
+
+.account-local, .account-domain {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  flex: 1;
 }
 
-.account-remove {
-  font-size: 12px;
+.account-domain { font-size: 12px; color: var(--embed-muted); }
+
+.account-actions {
+  display: none;
+  gap: 2px;
+}
+
+.account-item:hover .account-actions,
+.account-item:focus-within .account-actions { display: flex; }
+
+@media (hover: none) { .account-actions { display: flex; } }
+
+.account-action {
+  width: 26px;
+  height: 26px;
+  border: none;
+  border-radius: var(--embed-radius-sm);
+  background: none;
   color: var(--embed-muted);
   cursor: pointer;
-  border: none;
-  background: none;
-  padding: 0 4px;
+  font-size: 13px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
-.account-remove:hover { color: #c76b6b; }
+.account-action:hover { background: rgba(91,154,139,0.14); color: var(--embed-text); }
+.account-action.danger:hover { background: rgba(199,107,107,0.12); color: #c76b6b; }
+
+.folder-item { justify-content: flex-start; gap: 10px; }
+.folder-item .bi { color: var(--embed-muted); font-size: 14px; width: 16px; text-align: center; }
+.folder-item.active .bi { color: var(--embed-primary); }
+.folder-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 .sidebar-buttons {
   padding: 8px 16px;
@@ -175,7 +218,7 @@ html.embedded-mode .sidebar-header {
 }
 
 .toolbar {
-  padding: 10px 16px;
+  padding: 8px 12px;
   border-bottom: 1px solid var(--embed-border);
   display: flex;
   align-items: center;
@@ -198,7 +241,9 @@ html.embedded-mode .sidebar-header {
 .toolbar input[type="text"]:focus { border-color: var(--embed-primary); background: #fff; box-shadow: 0 0 0 2px rgba(91,154,139,0.12); }
 
 .toolbar button {
-  padding: 7px 12px;
+  padding: 7px 11px;
+  line-height: 1;
+  min-height: 34px;
   border: 1px solid var(--embed-border);
   background: var(--embed-surface);
   cursor: pointer;
@@ -227,59 +272,42 @@ html.embedded-mode .sidebar-header {
 }
 
 .mail-list-pane {
-  width: 320px;
-  min-width: 260px;
-  max-width: 400px;
+  width: clamp(280px, 34%, 400px);
   overflow-y: auto;
   border-right: 1px solid var(--embed-border);
   background: transparent;
   flex-shrink: 0;
-  padding-top: 8px;
 }
 
 .mail-row {
-  padding: 10px 14px;
-  margin: 0 8px 8px;
-  border: 1px solid var(--embed-border);
-  border-radius: var(--embed-radius-sm);
+  padding: 9px 14px 9px 12px;
+  border-bottom: 1px solid #e6efeb;
   cursor: pointer;
   display: flex;
-  gap: 10px;
-  transition: all 0.15s ease;
+  gap: 8px;
+  transition: background 0.12s ease;
   position: relative;
   align-items: flex-start;
-  background: var(--embed-surface);
 }
 
-.mail-row:hover { background: rgba(91,154,139,0.08); }
+.mail-row:hover { background: rgba(91,154,139,0.06); }
 .mail-row.active {
-  background: rgba(91,154,139,0.15);
-  border-left: 3px solid var(--embed-primary);
+  background: #e3f0eb;
+  box-shadow: inset 3px 0 0 var(--embed-primary);
 }
-.mail-row.unread {
-  border-left: 3px solid var(--embed-navy);
-  background: rgba(74,124,155,0.06);
-}
-.mail-row.unread .mail-from {
-  font-weight: 700;
-  color: var(--embed-text);
-}
-.mail-row.unread .mail-subject {
-  font-weight: 600;
-  color: var(--embed-text);
-}
-.mail-row:not(.unread) .mail-from {
-  font-weight: 400;
-  color: var(--embed-muted);
-}
-.mail-row:not(.unread) .mail-subject {
-  font-weight: 400;
-  color: var(--embed-muted);
-}
-.mail-row.active .mail-from,
-.mail-row.active .mail-subject {
-  font-weight: 700;
-  color: var(--embed-text);
+.mail-row .mail-from { font-weight: 400; color: var(--embed-text); }
+.mail-row .mail-subject { font-weight: 400; color: var(--embed-muted); }
+.mail-row.unread .mail-from { font-weight: 600; }
+.mail-row.unread .mail-subject { font-weight: 500; color: var(--embed-text); }
+.mail-row.unread .mail-from::before {
+  content: "";
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--embed-navy);
+  margin-right: 6px;
+  vertical-align: 2px;
 }
 
 .mail-col { min-width: 0; flex: 1; }
@@ -313,7 +341,7 @@ html.embedded-mode .sidebar-header {
   color: var(--embed-muted);
   white-space: nowrap;
   flex-shrink: 0;
-  opacity: 0.72;
+  font-variant-numeric: tabular-nums;
 }
 
 .mail-detail {
@@ -369,27 +397,31 @@ html.embedded-mode .sidebar-header {
 }
 
 .detail-header {
-  padding: 20px 20px 6px;
+  padding: 0 20px 12px;
 }
 
-.detail-top-row {
+.detail-subject {
+  font-size: 18px;
+  font-weight: 600;
+  line-height: 1.4;
+  margin: 14px 0 12px;
+  word-break: break-word;
+  color: var(--embed-text);
+}
+
+.detail-meta {
   display: flex;
-  justify-content: space-between;
   align-items: flex-start;
-  margin-bottom: 14px;
-  gap: 12px;
-}
-
-.detail-row {
-  margin-bottom: 14px;
-  font-size: 14px;
+  gap: 10px;
+  font-size: 13px;
   line-height: 1.5;
 }
 
-.detail-row strong,
-.detail-top-row strong {
-  color: var(--embed-text);
-}
+.detail-meta-main { flex: 1; min-width: 0; }
+.detail-from { font-size: 14px; font-weight: 600; overflow-wrap: anywhere; }
+.detail-recipients { color: var(--embed-muted); overflow-wrap: anywhere; }
+.detail-recipients .label { margin-right: 4px; }
+.detail-date { color: var(--embed-muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
 
 .detail-divider {
   border: none;
@@ -415,19 +447,18 @@ html.embedded-mode .sidebar-header {
 }
 
 .detail-body {
-  padding: 20px;
+  padding: 12px 20px 20px;
   line-height: 1.6;
 }
 
 .mail-body-container {
-  background: #f8f9fa;
+  background: #fff;
   padding: 0;
-  border-radius: 8px;
   overflow: hidden;
 }
 
 .mail-body-container pre {
-  padding: 16px 20px;
+  padding: 0;
   margin: 0;
 }
 
@@ -439,52 +470,67 @@ html.embedded-mode .sidebar-header {
 }
 
 .detail-attachments {
-  padding: 12px 20px;
-  font-size: 14px;
-  background: rgba(245,249,247,0.65);
-}
-
-.detail-attachments span {
-  display: inline-block;
-  margin-right: 16px;
-  color: var(--embed-muted);
+  padding: 12px 20px 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-size: 13px;
 }
 
 .detail-attachments a {
-  display: inline-block;
-  margin-right: 16px;
-  color: var(--embed-muted);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+  padding: 5px 10px;
+  border: 1px solid var(--embed-border);
+  border-radius: var(--embed-radius-sm);
+  background: var(--embed-bg);
+  color: var(--embed-text);
   text-decoration: none;
-  border-bottom: 1px dashed rgba(91,154,139,0.45);
-  transition: color 0.15s ease, border-color 0.15s ease;
+  transition: border-color 0.15s ease;
 }
 
-.detail-attachments a:hover {
-  color: var(--embed-primary);
-  border-bottom-color: var(--embed-primary);
-}
+.detail-attachments a .att-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.detail-attachments a .att-size { color: var(--embed-muted); flex-shrink: 0; }
+.detail-attachments a:hover { border-color: var(--embed-primary); }
 
 /* 操作栏 */
 .detail-actions {
+  position: sticky;
+  top: 0;
+  z-index: 2;
   display: flex;
   align-items: center;
   gap: 4px;
-  margin-top: 10px;
-  flex-wrap: wrap;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--embed-border);
+  background: rgba(255,255,255,0.97);
 }
 
 .detail-actions .action-btn {
-  border: 1px solid var(--embed-border);
-  background: var(--embed-surface);
+  border: 1px solid transparent;
+  background: none;
   color: var(--embed-muted);
   border-radius: var(--embed-radius-sm);
-  padding: 4px 10px;
-  font-size: 13px;
+  width: 32px;
+  height: 32px;
+  font-size: 15px;
   cursor: pointer;
   display: inline-flex;
   align-items: center;
-  gap: 4px;
+  justify-content: center;
   transition: all 0.15s ease;
+}
+
+.detail-actions .action-sep { width: 1px; height: 18px; background: var(--embed-border); margin: 0 4px; }
+.detail-actions .detail-back { margin-right: 4px; gap: 4px; }
+
+@media (max-width: 479.98px) {
+  .detail-actions .back-label { display: none; }
+  .detail-actions .action-select { max-width: 110px; }
+  .detail-meta { flex-wrap: wrap; }
+  .detail-date { order: 3; width: 100%; padding-left: 38px; }
 }
 
 .detail-actions .action-btn:hover { color: var(--embed-text); border-color: var(--embed-primary); background: var(--embed-bg); }
@@ -492,6 +538,7 @@ html.embedded-mode .sidebar-header {
 .detail-actions .action-btn .bi-star-fill { color: #e8a73d; }
 
 .detail-actions .action-select {
+  margin-left: auto;
   border: 1px solid var(--embed-border);
   background: var(--embed-surface);
   color: var(--embed-muted);
@@ -690,20 +737,21 @@ html.embedded-mode .sidebar-header {
 .copy-btn {
   display: inline-block;
   cursor: pointer;
-  margin-left: 6px;
-  padding: 0 4px;
-  font-size: 11px;
+  margin-left: 4px;
+  padding: 0 3px;
+  font-size: 12px;
+  font-weight: 400;
   color: var(--embed-muted);
-  border: 1px solid var(--embed-border);
+  border: 1px solid transparent;
   border-radius: 4px;
-  background: var(--embed-surface);
-  vertical-align: middle;
+  vertical-align: baseline;
   line-height: 17px;
   user-select: none;
+  opacity: 0.7;
   transition: all 0.15s ease;
 }
 
-.copy-btn:hover { color: var(--embed-text); border-color: var(--embed-primary); background: var(--embed-bg); }
+.copy-btn:hover { opacity: 1; color: var(--embed-text); border-color: var(--embed-border); background: var(--embed-bg); }
 
 .copy-toast {
   position: fixed;
@@ -818,22 +866,6 @@ html.embedded-mode .sidebar-header {
     min-height: 0;
   }
 
-  .toolbar {
-    flex-wrap: wrap;
-    padding: 10px 12px;
-  }
-
-  .toolbar input[type="text"] {
-    flex: 1 1 100%;
-    width: 100%;
-    border-radius: 4px;
-  }
-
-  .toolbar button:first-of-type {
-    border-left: 1px solid var(--embed-border);
-    border-radius: var(--embed-radius-sm);
-  }
-
   .mail-list-container {
     flex-direction: column;
   }
@@ -850,11 +882,6 @@ html.embedded-mode .sidebar-header {
   .mail-list-pane,
   .mail-detail {
     min-height: calc(100dvh - 280px);
-  }
-
-  .mail-row {
-    padding: 10px 12px;
-    margin: 0 6px 6px;
   }
 
   .mail-from,
@@ -895,63 +922,10 @@ html.embedded-mode .embedded-shell {
   min-height: 100vh;
 }
 
-html.embedded-mode .embedded-topbar {
-  display: flex;
-  align-items: center;
-  justify-content: flex-start;
-  padding: 8px 12px;
-  background: rgba(245,249,247,0.96);
-  border-bottom: 1px solid var(--embed-border);
-  position: sticky;
-  top: 0;
-  z-index: 10;
-}
-
-html.embedded-mode .embedded-topbar::after {
-  display: none;
-}
-
-html.embedded-mode .embedded-topbar-left {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-html.embedded-mode .embedded-title {
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--embed-text);
-}
-
-html.embedded-mode .embedded-subtitle {
-  display: none;
-}
-
-html.embedded-mode .embedded-home-btn {
-  border: 1px solid var(--embed-border);
-  background: var(--embed-surface);
-  color: var(--embed-primary);
-  border-radius: 4px;
-  min-width: 34px;
-  height: 30px;
-  padding: 0 8px;
-  font-size: 13px;
-  font-weight: 600;
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-}
-
-html.embedded-mode .embedded-home-btn:hover {
-  background: var(--embed-bg);
-  border-color: var(--embed-primary);
-}
-
 html.embedded-mode .app {
-  height: calc(100vh - 62px);
-  padding: 16px;
-  gap: 16px;
+  height: 100vh;
+  padding: 8px;
+  gap: 12px;
 }
 
 html.embedded-mode .sidebar {
@@ -1014,25 +988,18 @@ html.embedded-mode .modal-buttons button.primary:hover {
 }
 
 html.embedded-mode .account-item:hover,
-html.embedded-mode .folder-item:hover,
-html.embedded-mode .mail-row:hover,
-html.embedded-mode .mail-row.active {
+html.embedded-mode .folder-item:hover {
   background: #edf5f2;
 }
 
 html.embedded-mode .account-item.active,
-html.embedded-mode .folder-item.active,
-html.embedded-mode .mail-row.unread {
+html.embedded-mode .folder-item.active {
   border-left-color: var(--embed-primary);
 }
 
 html.embedded-mode .account-item.active,
 html.embedded-mode .folder-item.active {
   background: #e7f2ee;
-}
-
-html.embedded-mode .mail-row.unread .dot {
-  background: var(--embed-primary);
 }
 
 html.embedded-mode .copy-toast {
@@ -1059,7 +1026,6 @@ html.embedded-mode .detail-back:hover {
     display: flex;
     flex-direction: column;
   }
-  html.embedded-mode .embedded-topbar { flex: 0 0 auto; padding: 6px 10px; }
   .app, html.embedded-mode .app {
     height: auto;
     min-height: 0;
@@ -1107,32 +1073,36 @@ html.embedded-mode .detail-back:hover {
     background: rgba(20,40,32,.35);
   }
   .main { flex: 1; min-height: 0; overflow: hidden; }
-  .toolbar { display: grid; grid-template-columns: 76px minmax(0, 1fr) auto auto; gap: 6px; padding: 8px; flex: 0 0 auto; }
-  .toolbar input[type="text"] { grid-column: 2 / -1; width: 100%; min-width: 0; }
+  .toolbar { gap: 6px; padding: 8px; flex: 0 0 auto; }
+  .toolbar input[type="text"] { flex: 1; width: auto; min-width: 0; }
   .toolbar select, .toolbar button, .toolbar input[type="text"] { min-height: 40px; margin: 0; }
-  .toolbar .mail-info { grid-column: 4; font-size: 11px; white-space: normal; margin: 0; }
+  .toolbar .mail-info { display: none; }
+  #mobile-mail-info { margin-left: auto; flex-shrink: 0; font-size: 12px; color: var(--embed-muted); }
   .mail-list-container { flex: 1; min-height: 0; overflow: hidden; }
   .mail-list-pane { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
   .mail-from, .mail-subject { overflow: hidden; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
   .app.mobile-view-detail .mobile-mail-nav { display: none; }
   .app.mobile-view-detail .mail-detail { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
-  .detail-back { min-height: 44px; }
+  .detail-back { min-height: 40px; }
+  .detail-actions { padding: 6px 8px; }
+  .detail-actions .action-btn { width: 40px; height: 40px; }
+  .detail-header { padding: 0 14px 10px; }
+  .detail-body { padding: 10px 14px 16px; }
+  .detail-attachments { padding: 10px 14px 0; }
+  .detail-subject { font-size: 17px; margin: 10px 0; }
   .batch-bar { flex-wrap: wrap; flex: 0 0 auto; }
   .modal { max-height: calc(100dvh - 24px); overflow-y: auto; }
   body { font-size: 14px; line-height: 1.5; -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
-  .embedded-title, .account-item, .folder-item, .sidebar-buttons .btn { font-size: 14px; line-height: 1.5; }
+  .account-item, .folder-item, .sidebar-buttons .btn { font-size: 14px; line-height: 1.5; }
   .mobile-mail-nav button { font-size: 14px; white-space: nowrap; }
-  .toolbar { grid-template-columns: 68px 68px 40px minmax(0, 1fr); }
   .toolbar button, .toolbar select { font-family: inherit; font-size: 13px; line-height: 20px; white-space: nowrap; padding: 6px; }
+  .toolbar button { width: 40px; flex-shrink: 0; }
+  .toolbar select { width: 64px; flex-shrink: 0; }
   .toolbar input[type="text"] { font-family: inherit; font-size: 14px; line-height: 20px; }
-  .toolbar .mail-info { font-size: 12px; line-height: 20px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .mail-row { padding: 12px 10px; margin: 0 4px 6px; gap: 8px; border-left: 3px solid transparent; }
+  .mail-row { padding: 11px 12px; gap: 8px; }
   .mail-row-top { align-items: center; margin-bottom: 4px; gap: 12px; }
   .mail-from { display: block; font-size: 14px; line-height: 22px; white-space: nowrap; text-overflow: ellipsis; }
   .mail-subject { display: block; font-size: 14px; line-height: 22px; white-space: nowrap; text-overflow: ellipsis; }
-  .mail-row .mail-from, .mail-row.active .mail-from { font-weight: 500; color: var(--embed-text); }
-  .mail-row.unread .mail-from { font-weight: 600; }
-  .mail-row .mail-subject, .mail-row.active .mail-subject, .mail-row.unread .mail-subject { font-weight: 400; color: var(--embed-text); }
   .mail-date { font-size: 12px; line-height: 22px; opacity: 1; font-variant-numeric: tabular-nums; }
   .mail-star { line-height: 22px; }
 }
@@ -1148,16 +1118,11 @@ if (new URLSearchParams(window.location.search).get('embedded') === '1') {
 
 <div class="copy-toast" id="copy-toast">已复制</div>
 <div class="embedded-shell">
-  <div class="embedded-topbar">
-    <div class="embedded-topbar-left">
-      <button type="button" class="embedded-home-btn" onclick="goBackToMailboxHome()" aria-label="返回邮箱主页" title="返回邮箱主页">←</button>
-      <div class="embedded-title" data-i18n="embeddedTitle">ManyMail IMAP</div>
-    </div>
-  </div>
 <div class="app">
   <div class="mobile-mail-nav">
     <button type="button" id="mobile-nav-toggle" onclick="setMobileNavigation(true)" aria-expanded="false" aria-controls="mail-navigation">☰ <span data-i18n="folderSection">文件夹</span></button>
     <span id="mobile-mail-context"></span>
+    <span id="mobile-mail-info"></span>
   </div>
   <button type="button" class="mobile-nav-backdrop" onclick="setMobileNavigation(false)" aria-label="Close navigation" tabindex="-1"></button>
   <div class="sidebar" id="mail-navigation">
@@ -1186,9 +1151,9 @@ if (new URLSearchParams(window.location.search).get('embedded') === '1') {
         <option value="all" data-i18n="searchAll">全部</option>
       </select>
       <input type="text" id="search-input" data-i18n-ph="searchPlaceholder" placeholder="搜索发件人 / 主题...">
-      <button onclick="doSearch()" data-i18n="searchButton">搜索邮件</button>
-      <button onclick="refreshMails()" data-i18n="refreshButton">刷新列表</button>
-      <button onclick="toggleSelectMode()" id="select-mode-btn" title="Select"><i class="bi bi-check2-square"></i></button>
+      <button onclick="doSearch()" data-i18n-title="searchButton" title="搜索邮件" aria-label="搜索邮件"><i class="bi bi-search"></i></button>
+      <button onclick="refreshMails()" data-i18n-title="refreshButton" title="刷新列表" aria-label="刷新列表"><i class="bi bi-arrow-clockwise"></i></button>
+      <button onclick="toggleSelectMode()" id="select-mode-btn" data-i18n-title="selectMode" title="多选" aria-label="多选"><i class="bi bi-check2-square"></i></button>
       <span class="mail-info" id="mail-info"></span>
     </div>
     <div class="batch-bar" id="batch-bar" style="display:none;">
@@ -1273,9 +1238,10 @@ let detailVisible = false;
 let selectMode = false;
 let selectedUids = new Set();
 let folderCache = [];
+let folderUnseen = {};
+let accountCache = [];
 const LANGS = {
   zh: {
-    embeddedTitle: 'ManyMail IMAP',
     brandTitle: 'ManyMail',
     accountSection: '邮箱账户',
     folderSection: '文件夹',
@@ -1322,6 +1288,7 @@ const LANGS = {
     importing: '正在导入 {count} 个账户...',
     importDone: '导入完成：成功 {success} / 共 {total}',
     disconnectTitle: '断开',
+    disconnectConfirm: '确定断开 {email} 吗？之后需要重新添加才能查看。',
     copyEmailTitle: '复制邮箱',
     customPreset: '自定义',
     markRead: '标记已读',
@@ -1349,7 +1316,6 @@ const LANGS = {
     operationFailed: '操作失败',
   },
   en: {
-    embeddedTitle: 'ManyMail IMAP',
     brandTitle: 'ManyMail',
     accountSection: 'Accounts',
     folderSection: 'Folders',
@@ -1396,6 +1362,7 @@ const LANGS = {
     importing: 'Importing {count} accounts...',
     importDone: 'Import complete: {success} succeeded / {total} total',
     disconnectTitle: 'Disconnect',
+    disconnectConfirm: 'Disconnect {email}? You will need to add it again to read its mail.',
     copyEmailTitle: 'Copy email',
     customPreset: 'Custom',
     markRead: 'Mark read',
@@ -1446,6 +1413,10 @@ function refreshStaticText() {
   document.querySelectorAll('[data-i18n-ph]').forEach(function(el) {
     el.placeholder = t(el.dataset.i18nPh);
   });
+  document.querySelectorAll('[data-i18n-title]').forEach(function(el) {
+    el.title = t(el.dataset.i18nTitle);
+    el.setAttribute('aria-label', el.title);
+  });
   document.documentElement.lang = currentLang === 'zh' ? 'zh-CN' : 'en';
 }
 
@@ -1457,6 +1428,11 @@ function toggleLang() {
 
 function applyLang() {
   refreshStaticText();
+  if (activeAccountId) {
+    loadAccounts();
+    renderFolders();
+    updateMobileContext();
+  }
   if (!activeAccountId) {
     document.getElementById('mail-list').innerHTML = '<div class="detail-empty">' + richEmpty('emptyAccountsTitle', 'emptyAccountsDesc') + '</div>';
   } else if (mailCache.length === 0) {
@@ -1500,14 +1476,21 @@ async function loadAccounts() {
   const list = await api('GET', '/api/accounts');
   const el = document.getElementById('account-list');
   if (list.length === 0) { el.innerHTML = ''; return; }
-  el.innerHTML = list.map(a => `
-    <div class="account-item ${a.id === activeAccountId ? 'active' : ''}"
-         onclick="selectAccount(${a.id})">
-      <span class="account-name" title="${a.email}">${a.email}</span>
-      <span class="copy-btn" onclick="copyEmail('${a.email}', event)" title="${esc(t('copyEmailTitle'))}">&#x2398;</span>
-      <button class="account-remove" onclick="event.stopPropagation();removeAccount(${a.id})" title="${esc(t('disconnectTitle'))}">x</button>
-    </div>
-  `).join('');
+  accountCache = list;
+  el.innerHTML = list.map(function(a) {
+    var at = a.email.lastIndexOf('@');
+    var local = at > 0 ? a.email.slice(0, at) : a.email;
+    var domain = at > 0 ? a.email.slice(at) : '';
+    var id = Number(a.id);
+    return '<div class="account-item' + (a.id === activeAccountId ? ' active' : '') + '" data-email="' + esc(a.email) + '" title="' + esc(a.email) + '" onclick="selectAccount(' + id + ')">' +
+      '<span class="account-avatar">' + esc(local.charAt(0)) + '</span>' +
+      '<span class="account-name"><span class="account-local">' + esc(local) + '</span><span class="account-domain">' + esc(domain) + '</span></span>' +
+      '<span class="account-actions">' +
+        '<button type="button" class="account-action" onclick="copyAccountEmail(' + id + ', event)" title="' + esc(t('copyEmailTitle')) + '" aria-label="' + esc(t('copyEmailTitle')) + '"><i class="bi bi-clipboard"></i></button>' +
+        '<button type="button" class="account-action danger" onclick="event.stopPropagation();removeAccount(' + id + ')" title="' + esc(t('disconnectTitle')) + '" aria-label="' + esc(t('disconnectTitle')) + '"><i class="bi bi-box-arrow-right"></i></button>' +
+      '</span>' +
+    '</div>';
+  }).join('');
   updateMobileContext();
 }
 
@@ -1521,14 +1504,24 @@ async function selectAccount(id) {
   loadMails();
 }
 
+function accountEmail(id) {
+  var account = accountCache.find(function(a) { return a.id === id; });
+  return account ? account.email : '';
+}
+
+function copyAccountEmail(id, event) {
+  copyEmail(accountEmail(id), event);
+}
+
 async function removeAccount(id) {
+  if (!confirm(t('disconnectConfirm', { email: accountEmail(id) }))) return;
   await api('DELETE', '/api/accounts/' + id);
   if (activeAccountId === id) {
     activeAccountId = null;
     document.getElementById('folder-section').style.display = 'none';
     document.getElementById('mail-list').innerHTML = '<div class="detail-empty">' + richEmpty('emptyAccountsTitle', 'emptyAccountsDesc') + '</div>';
     resetMailDetail();
-    document.getElementById('mail-info').textContent = '';
+    setMailInfo('');
   }
   loadAccounts();
 }
@@ -1539,27 +1532,29 @@ async function loadFolders(id) {
   const selectable = folders.filter(f => !f.noselect);
   folderCache = selectable;
   document.getElementById('folder-section').style.display = 'block';
-  const el = document.getElementById('folder-list');
-  el.innerHTML = selectable.map(f => `
-    <div class="folder-item ${f.path === activeFolder ? 'active' : ''}"
-         onclick="selectFolder('${f.path}')">
-      ${translateFolder(f.name)}
-      <span class="folder-badge" id="badge-${f.path.replace(/[^a-zA-Z0-9]/g,'_')}" style="display:none"></span>
-    </div>
-  `).join('');
+  renderFolders();
   // Load unread counts in background
   loadFolderStatus(id);
+}
+
+function renderFolders() {
+  document.getElementById('folder-list').innerHTML = folderCache.map(function(f, i) {
+    var unseen = folderUnseen[f.path] || 0;
+    return '<div class="folder-item' + (f.path === activeFolder ? ' active' : '') + '" onclick="selectFolder(folderCache[' + i + '].path)">' +
+      '<i class="bi ' + folderIcon(f.name) + '"></i>' +
+      '<span class="folder-name">' + esc(translateFolder(f.name)) + '</span>' +
+      (unseen > 0 ? '<span class="folder-badge">' + unseen + '</span>' : '') +
+    '</div>';
+  }).join('');
 }
 
 async function loadFolderStatus(id) {
   try {
     var statuses = await api('GET', '/api/accounts/' + id + '/folders/status');
-    statuses.forEach(function(s) {
-      if (s.unseen > 0) {
-        var badge = document.getElementById('badge-' + s.path.replace(/[^a-zA-Z0-9]/g, '_'));
-        if (badge) { badge.textContent = s.unseen; badge.style.display = ''; }
-      }
-    });
+    if (id !== activeAccountId) return;
+    folderUnseen = {};
+    statuses.forEach(function(s) { folderUnseen[s.path] = s.unseen; });
+    renderFolders();
   } catch (e) {}
 }
 
@@ -1600,10 +1595,15 @@ function syncResponsiveView() {
 }
 
 function updateMobileContext() {
-  const selectedAccount = document.querySelector('.account-item.active .account-name');
+  const selectedAccount = document.querySelector('.account-item.active');
   document.getElementById('mobile-mail-context').textContent =
     translateFolder(activeFolder || 'INBOX') +
-    (selectedAccount ? ' · ' + selectedAccount.textContent.trim() : '');
+    (selectedAccount && selectedAccount.dataset.email ? ' · ' + selectedAccount.dataset.email : '');
+}
+
+function setMailInfo(text) {
+  document.getElementById('mail-info').textContent = text;
+  document.getElementById('mobile-mail-info').textContent = text;
 }
 
 function resetMailDetail(message) {
@@ -1617,16 +1617,6 @@ function showMailListView() {
   syncResponsiveView();
 }
 
-function goBackToMailboxHome() {
-  try {
-    if (window.parent && window.parent !== window && typeof window.parent.switchTab === 'function') {
-      window.parent.switchTab('inbox');
-      return;
-    }
-  } catch (e) {}
-  window.parent?.postMessage({ type: 'mail-viewer-switch-tab', tab: 'inbox' }, window.location.origin);
-}
-
 // === 邮件列表 ===
 async function loadMails() {
   if (!activeAccountId) return;
@@ -1638,13 +1628,10 @@ async function loadMails() {
     const data = await api('GET', '/api/accounts/' + activeAccountId + '/mails?folder=' + encodeURIComponent(activeFolder) + '&count=30');
     mailCache = data.mails || [];
     hasMore = data.hasMore;
-    document.getElementById('mail-info').textContent = t('infoSummary', { total: data.total, unseen: data.unseen });
+    selectedMailIndex = -1;
+    if (hasMore) oldestSeq = Math.min.apply(null, mailCache.map(function(m) { return m.seq; }));
+    setMailInfo(t('infoSummary', { total: data.total, unseen: data.unseen }));
     renderMailList(mailCache);
-    if (data.hasMore) {
-      oldestSeq = Math.min.apply(null, mailCache.map(function(m) { return m.seq; }));
-      document.getElementById('mail-list').insertAdjacentHTML('beforeend',
-        '<div id="load-more-btn" class="load-more-btn" onclick="loadMoreMails()">' + t('loadMore') + '</div>');
-    }
   } catch (err) {
     el.innerHTML = '<div class="detail-empty">' + err.message + '</div>';
   }
@@ -1657,17 +1644,10 @@ function renderMailList(mails) {
     return;
   }
   el.innerHTML = mails.map(function(m, i) {
-    var fromDisplay = m.from.name ? esc(m.from.name) + ' ' : '';
-    var addr = m.from.address || '';
+    var from = m.from || {};
+    var addr = from.address || '';
     var fullDate = formatDate(m.date);
-    var timestamp = new Date(m.date);
-    var today = new Date();
-    var date = fullDate;
-    if (isMobileLayout() && !Number.isNaN(timestamp.getTime())) {
-      date = timestamp.toDateString() === today.toDateString()
-        ? timestamp.toLocaleTimeString(currentLang === 'zh' ? 'zh-CN' : 'en-GB', { hour: '2-digit', minute: '2-digit', hour12: false })
-        : timestamp.toLocaleDateString(currentLang === 'zh' ? 'zh-CN' : 'en-GB', { month: '2-digit', day: '2-digit', ...(timestamp.getFullYear() !== today.getFullYear() ? { year: 'numeric' } : {}) });
-    }
+    var date = formatShortDate(m.date);
     var checkbox = selectMode ? '<input type="checkbox" class="mail-checkbox" ' + (selectedUids.has(String(m.uid)) ? 'checked' : '') + ' onclick="toggleMailSelect(event, \'' + m.uid + '\')">' : '';
     var starCls = m.flagged ? 'mail-star active' : 'mail-star';
     var starIcon = m.flagged ? '<i class="bi bi-star-fill"></i>' : '<i class="bi bi-star"></i>';
@@ -1676,13 +1656,14 @@ function renderMailList(mails) {
       '<span class="' + starCls + '" onclick="toggleStarInList(event, ' + i + ')" title="' + esc(t(m.flagged ? 'unstar' : 'star')) + '">' + starIcon + '</span>' +
       '<div class="mail-col">' +
         '<div class="mail-row-top">' +
-          '<span class="mail-from">' + (m.from.name ? esc(m.from.name) : esc(addr)) + '</span>' +
+          '<span class="mail-from" title="' + esc(addr) + '">' + esc(from.name || addr) + '</span>' +
           '<span class="mail-date" title="' + esc(fullDate) + '">' + esc(date) + '</span>' +
         '</div>' +
         '<div class="mail-subject">' + esc(m.subject) + '</div>' +
       '</div>' +
     '</div>';
-  }).join('');
+  }).join('') +
+  (hasMore ? '<div id="load-more-btn" class="load-more-btn" onclick="loadMoreMails()">' + t('loadMore') + '</div>' : '');
 }
 
 async function readMail(index) {
@@ -1696,43 +1677,52 @@ async function readMail(index) {
   el.innerHTML = '<div class="loading">' + t('loading') + '</div>';
   try {
     var data = await api('GET', '/api/accounts/' + activeAccountId + '/mails/' + mail.uid + '?folder=' + encodeURIComponent(activeFolder));
-    var date = data.date ? new Date(data.date).toLocaleString('zh-CN') : '';
     var bodyHtml = '';
     if (data.html) {
       bodyHtml = '<iframe id="mail-iframe" sandbox="allow-same-origin allow-popups allow-popups-to-escape-sandbox"></iframe>';
     } else {
       bodyHtml = '<pre style="white-space:pre-wrap;font-family:inherit;">' + esc(data.text) + '</pre>';
     }
+    var attachments = data.attachments || [];
     var attachHtml = '';
-    if (data.attachments.length > 0) {
-      attachHtml = '<div class="detail-attachments">' + t('attachments') + ': ' +
-        data.attachments.map(function(a) {
-          var dlUrl = '/api/accounts/' + activeAccountId + '/mails/' + mail.uid + '/attachments/' + a.index + '?folder=' + encodeURIComponent(activeFolder);
-          return '<a href="' + dlUrl + '" download>' + esc(a.filename) + ' (' + (a.size/1024).toFixed(1) + 'KB)</a>';
+    if (attachments.length > 0) {
+      attachHtml = '<div class="detail-attachments" aria-label="' + esc(t('attachments')) + '">' +
+        attachments.map(function(a) {
+          var dlUrl = '/api/accounts/' + activeAccountId + '/mails/' + encodeURIComponent(mail.uid) + '/attachments/' + encodeURIComponent(a.index) + '?folder=' + encodeURIComponent(activeFolder);
+          return '<a href="' + esc(dlUrl) + '" download title="' + esc(a.filename) + '"><i class="bi bi-paperclip"></i><span class="att-name">' + esc(a.filename) + '</span><span class="att-size">' + (a.size / 1024).toFixed(1) + ' KB</span></a>';
         }).join('') + '</div>';
     }
     var isSeen = mail.seen;
     var isFlagged = mail.flagged;
     var moveOptions = folderCache.filter(function(f) { return f.path !== activeFolder; })
       .map(function(f) { return '<option value="' + esc(f.path) + '">' + esc(translateFolder(f.name)) + '</option>'; }).join('');
+    var actionBtn = function(onclick, icon, key, extra) {
+      return '<button type="button" class="action-btn' + (extra || '') + '" onclick="' + onclick + '" title="' + esc(t(key)) + '" aria-label="' + esc(t(key)) + '"><i class="bi ' + icon + '"></i></button>';
+    };
+    var sender = mail.from || {};
+    var initial = (sender.name || sender.address || data.from || '?').trim().charAt(0);
 
     el.innerHTML =
+      '<div class="detail-actions">' +
+        '<button type="button" class="detail-back" onclick="showMailListView()" aria-label="' + esc(t('backToList')) + '"><i class="bi bi-chevron-left"></i><span class="back-label">' + esc(t('backToList')) + '</span></button>' +
+        actionBtn('toggleReadDetail()', isSeen ? 'bi-envelope' : 'bi-envelope-open', isSeen ? 'markUnread' : 'markRead') +
+        actionBtn('toggleStarDetail()', isFlagged ? 'bi-star-fill' : 'bi-star', isFlagged ? 'unstar' : 'star') +
+        '<span class="action-sep"></span>' +
+        actionBtn('moveMailDetail(\'Trash\')', 'bi-trash', 'moveToTrash') +
+        actionBtn('deleteMailDetail()', 'bi-x-circle', 'deleteButton', ' danger') +
+        '<select class="action-select" aria-label="' + esc(t('moveToFolder')) + '" onchange="moveMailDetail(this.value); this.selectedIndex=0;"><option value="">' + esc(t('moveToFolder')) + '</option>' + moveOptions + '</select>' +
+      '</div>' +
       '<div class="detail-header">' +
-        '<button type="button" class="detail-back" onclick="showMailListView()">' + t('backToList') + '</button>' +
-        '<div class="detail-top-row">' +
-          '<div><strong>' + t('from') + ':</strong> ' + makeCopyable(data.from) + '</div>' +
-          '<div class="detail-actions">' +
-            '<button class="action-btn" onclick="toggleReadDetail()" title="' + esc(t(isSeen ? 'markUnread' : 'markRead')) + '"><i class="bi bi-envelope' + (isSeen ? '-open' : '') + '"></i> ' + esc(t(isSeen ? 'markUnread' : 'markRead')) + '</button>' +
-            '<button class="action-btn" onclick="toggleStarDetail()" title="' + esc(t(isFlagged ? 'unstar' : 'star')) + '"><i class="bi bi-star' + (isFlagged ? '-fill' : '') + '"' + (isFlagged ? ' style="color:#e8a73d"' : '') + '></i> ' + esc(t(isFlagged ? 'unstar' : 'star')) + '</button>' +
-            '<button class="action-btn" onclick="moveMailDetail(\'Trash\')" title="' + esc(t('moveToTrash')) + '"><i class="bi bi-trash"></i> ' + esc(t('moveToTrash')) + '</button>' +
-            '<button class="action-btn danger" onclick="deleteMailDetail()" title="' + esc(t('deleteButton')) + '"><i class="bi bi-x-circle"></i> ' + esc(t('deleteButton')) + '</button>' +
-            '<select class="action-select" onchange="moveMailDetail(this.value); this.selectedIndex=0;"><option value="">' + esc(t('moveToFolder')) + '</option>' + moveOptions + '</select>' +
+        '<h2 class="detail-subject">' + esc(data.subject) + '</h2>' +
+        '<div class="detail-meta">' +
+          '<span class="detail-avatar">' + esc(initial) + '</span>' +
+          '<div class="detail-meta-main">' +
+            '<div class="detail-from">' + makeCopyable(data.from) + '</div>' +
+            '<div class="detail-recipients"><span class="label">' + esc(t('to')) + ':</span>' + makeCopyable(data.to) + '</div>' +
+            (data.cc ? '<div class="detail-recipients"><span class="label">' + esc(t('cc')) + ':</span>' + makeCopyable(data.cc) + '</div>' : '') +
           '</div>' +
+          '<span class="detail-date">' + esc(formatDate(data.date)) + '</span>' +
         '</div>' +
-        '<div class="detail-row"><strong>' + t('to') + ':</strong> ' + makeCopyable(data.to) + '</div>' +
-        (data.cc ? '<div class="detail-row"><strong>' + t('cc') + ':</strong> ' + makeCopyable(data.cc) + '</div>' : '') +
-        '<div class="detail-row"><strong>' + t('subject') + ':</strong> ' + esc(data.subject) + '</div>' +
-        '<div class="detail-row"><strong>' + t('date') + ':</strong> ' + date + '</div>' +
       '</div>' +
       '<hr class="detail-divider">' +
       attachHtml +
@@ -1795,10 +1785,6 @@ async function loadMoreMails() {
       oldestSeq = Math.min.apply(null, newMails.map(function(m) { return m.seq; }));
     }
     renderMailList(mailCache);
-    if (hasMore) {
-      document.getElementById('mail-list').insertAdjacentHTML('beforeend',
-        '<div id="load-more-btn" class="load-more-btn" onclick="loadMoreMails()">' + t('loadMore') + '</div>');
-    }
   } catch (err) {
     if (btn) btn.textContent = t('retryLoadMore');
   }
@@ -1816,7 +1802,9 @@ async function doSearch() {
     var field = document.getElementById('search-field').value || 'subject';
     var mails = await api('GET', '/api/accounts/' + activeAccountId + '/search?folder=' + encodeURIComponent(activeFolder) + '&q=' + encodeURIComponent(q) + '&field=' + field);
     mailCache = mails;
-    document.getElementById('mail-info').textContent = t('searchSummary', { count: mails.length });
+    hasMore = false;
+    selectedMailIndex = -1;
+    setMailInfo(t('searchSummary', { count: mails.length }));
     renderMailList(mails);
   } catch (err) {
     el.innerHTML = '<div class="detail-empty">' + err.message + '</div>';
@@ -2002,13 +1990,12 @@ function toggleSelectMode() {
   selectMode = !selectMode;
   selectedUids.clear();
   document.getElementById('batch-bar').style.display = selectMode ? 'flex' : 'none';
-  document.getElementById('select-mode-btn').title = t(selectMode ? 'exitSelectMode' : 'selectMode');
+  var selectBtn = document.getElementById('select-mode-btn');
+  selectBtn.dataset.i18nTitle = selectMode ? 'exitSelectMode' : 'selectMode';
+  selectBtn.title = t(selectBtn.dataset.i18nTitle);
+  selectBtn.setAttribute('aria-label', selectBtn.title);
   updateBatchCount();
   renderMailList(mailCache);
-  if (hasMore) {
-    document.getElementById('mail-list').insertAdjacentHTML('beforeend',
-      '<div id="load-more-btn" class="load-more-btn" onclick="loadMoreMails()">' + t('loadMore') + '</div>');
-  }
 }
 
 function toggleMailSelect(event, uid) {
@@ -2026,20 +2013,12 @@ function batchSelectAll() {
   mailCache.forEach(function(m) { selectedUids.add(String(m.uid)); });
   updateBatchCount();
   renderMailList(mailCache);
-  if (hasMore) {
-    document.getElementById('mail-list').insertAdjacentHTML('beforeend',
-      '<div id="load-more-btn" class="load-more-btn" onclick="loadMoreMails()">' + t('loadMore') + '</div>');
-  }
 }
 
 function batchDeselectAll() {
   selectedUids.clear();
   updateBatchCount();
   renderMailList(mailCache);
-  if (hasMore) {
-    document.getElementById('mail-list').insertAdjacentHTML('beforeend',
-      '<div id="load-more-btn" class="load-more-btn" onclick="loadMoreMails()">' + t('loadMore') + '</div>');
-  }
 }
 
 async function doBatchAction(action) {
@@ -2066,10 +2045,6 @@ async function doBatchAction(action) {
     } else if (action === 'unflag') {
       mailCache.forEach(function(m) { if (selectedUids.has(String(m.uid))) m.flagged = false; });
       renderMailList(mailCache);
-    }
-    if (hasMore) {
-      document.getElementById('mail-list').insertAdjacentHTML('beforeend',
-        '<div id="load-more-btn" class="load-more-btn" onclick="loadMoreMails()">' + t('loadMore') + '</div>');
     }
   } catch (err) {
     alert(t('operationFailed') + ': ' + err.message);
@@ -2114,33 +2089,67 @@ var FOLDER_ZH = {
   'Outbox': '发件箱',
 };
 
+var FOLDER_KEYS = {};
+Object.keys(FOLDER_ZH).forEach(function(k) { FOLDER_KEYS[k.toLowerCase()] = k; });
+
+// 大小写不敏感（GMX 的 OUTBOX、INBOX），并匹配 [Gmail]/Sent Mail 等带前缀的路径
+function folderKey(name) {
+  var n = String(name || '');
+  var base = n.replace(/^(\[.*?\]\/?)/, '');
+  return FOLDER_KEYS[n.toLowerCase()] || FOLDER_KEYS[base.toLowerCase()] || null;
+}
+
 function translateFolder(name) {
-  if (FOLDER_ZH[name]) return FOLDER_ZH[name];
-  // 尝试匹配 [Gmail]/已发送 等带前缀的路径
-  var base = name.replace(/^(\[.*?\]\/?)/, '');
-  if (FOLDER_ZH[base]) return FOLDER_ZH[base];
-  return name;
+  var key = folderKey(name);
+  if (!key) return name;
+  if (currentLang === 'zh') return FOLDER_ZH[key];
+  return key === 'INBOX' ? 'Inbox' : key;
+}
+
+var FOLDER_ICONS = {
+  '收件箱': 'bi-inbox', '已发送': 'bi-send', '草稿箱': 'bi-file-earmark-text', '回收站': 'bi-trash',
+  '已删除': 'bi-trash', '垃圾邮件': 'bi-exclamation-octagon', '归档': 'bi-archive', '所有邮件': 'bi-collection',
+  '星标邮件': 'bi-star', '重要': 'bi-bookmark', '备忘录': 'bi-journal-text', '发件箱': 'bi-box-arrow-up',
+};
+
+function folderIcon(name) {
+  var key = folderKey(name);
+  return (key && FOLDER_ICONS[FOLDER_ZH[key]]) || 'bi-folder';
 }
 
 // === 工具函数 ===
+// 同时用于文本和属性值，所以引号也要转义
 function esc(s) {
-  if (!s) return '';
-  var d = document.createElement('div');
-  d.textContent = s;
-  return d.innerHTML;
+  if (s === null || s === undefined || s === '') return '';
+  return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
 }
 
 // 将文本中的邮箱地址后面添加复制按钮
 function makeCopyable(text) {
   if (!text) return '';
   return esc(text).replace(/([a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,})/g, function(addr) {
-    return addr + ' <span class="copy-btn" onclick="copyEmail(\'' + addr + '\', event)" title="' + esc(t('copyEmailTitle')) + '">&#x2398;</span>';
+    return addr + ' <span class="copy-btn" onclick="copyEmail(\'' + addr + '\', event)" title="' + esc(t('copyEmailTitle')) + '"><i class="bi bi-clipboard"></i></span>';
   });
 }
 
 function formatDate(d) {
   if (!d) return '';
   return new Date(d).toLocaleString(currentLang === 'zh' ? 'zh-CN' : 'en-US');
+}
+
+// 列表里的短日期：今天只显示时间，今年显示月日，更早带年份
+function formatShortDate(d) {
+  var ts = new Date(d);
+  if (!d || Number.isNaN(ts.getTime())) return '';
+  var now = new Date();
+  var locale = currentLang === 'zh' ? 'zh-CN' : 'en-US';
+  if (ts.toDateString() === now.toDateString()) {
+    return ts.toLocaleTimeString(locale === 'zh-CN' ? 'zh-CN' : 'en-GB', { hour: '2-digit', minute: '2-digit', hour12: false });
+  }
+  var opts = currentLang === 'zh' ? { month: 'numeric', day: 'numeric' } : { month: 'short', day: 'numeric' };
+  if (ts.getFullYear() !== now.getFullYear()) opts.year = 'numeric';
+  return ts.toLocaleDateString(locale, opts);
 }
 
 // === 键盘快捷键 ===
