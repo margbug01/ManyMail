@@ -112,5 +112,7 @@ if [ -n "$SERVICES" ]; then
     exit 1
   fi
 fi
-echo "deploy OK. Rollback if needed: cd $DIR && sudo git reset -q --keep $OLD && sudo docker compose up -d --build$SERVICES"
+ROLLBACK="cd $DIR && sudo git reset -q --keep $OLD"
+[ -n "$SERVICES" ] && ROLLBACK="$ROLLBACK && sudo docker compose up -d --build$SERVICES"
+echo "deploy OK. Rollback if needed: $ROLLBACK"
 REMOTE_SCRIPT
