@@ -1,6 +1,6 @@
 # Oracle production synchronization
 
-Production source snapshot: oracle-a1 /opt/ManyMail, HEAD a8bf8dc5dca36a046910651ca64f8c9638dcf843 plus its working-tree changes, read after the rollback on 2026-10-08 (Asia/Shanghai). GitHub master before this synchronization: 3c504fc440a06816d80da16abecaa6981b738d81. The rolled-back production application source is authoritative. The UI/privacy and mobile-layout deployments after 18:00 remain reverted; this synchronization does not redeploy them. GitHub history and public documentation/tests are preserved. No production files, Git metadata, containers, configuration, or data are changed by this synchronization.
+Production source snapshot: oracle-a1 /opt/ManyMail, HEAD a8bf8dc5dca36a046910651ca64f8c9638dcf843 plus its working-tree changes, read after the rollback on 2026-10-08 (Asia/Shanghai). GitHub master before this synchronization: 3c504fc440a06816d80da16abecaa6981b738d81. The rolled-back production application source is authoritative. The UI/privacy and mobile-layout changes were later redeployed on 2026-10-08 around 23:05–23:55 (Asia/Shanghai); production application files match master be8836e by SHA-256 as of 2026-10-09. GitHub history and public documentation/tests are preserved. No production files, Git metadata, containers, configuration, or data are changed by this synchronization.
 
 ## Public deployment differences
 

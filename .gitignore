@@ -41,3 +41,12 @@ accounts.json
 # Tool cache
 .ace-tool/
 .gstack/
+.alma-snapshots
+
+# Server-local backups, certificates and host-specific scripts
+*.bak*
+*.before-*
+backups/
+certs/
+tools/refresh-mail-cert.sh
+tools/watch-google-dmarc.sh

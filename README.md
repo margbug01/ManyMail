@@ -251,8 +251,9 @@ ManyMail/
 ├── docker-compose.yml           # All 4 services orchestration
 ├── .env.example                 # Environment variable template
 ├── deploy.sh                    # Deployment script
-├── test_smtp.py                 # SMTP tests
-└── test_external_smtp.py        # External SMTP tests
+└── tools/                       # Ops and manual test scripts
+    ├── send_test_smtp.py        #   Send a test mail to local SMTP
+    └── send_test_external_smtp.py # Send a test mail via external SMTP
 ```
 
 <br>
