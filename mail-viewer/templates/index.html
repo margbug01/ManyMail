@@ -686,6 +686,62 @@
             border: 0;
             background: #fff;
         }
+
+        /* 邮件列表：扁平行 + 分隔线，不再卡片套卡片 */
+        .mail-list-scroll .mail-item.card {
+            border: 0;
+            border-bottom: 1px solid #e6efeb;
+            border-radius: 0;
+            box-shadow: none;
+            margin-bottom: 0 !important;
+            background: transparent;
+        }
+        .mail-list-scroll .mail-item.card > .card-body { padding: 10px 6px; }
+        .mail-list-scroll .mail-item:hover { background: rgba(91,154,139,0.06); }
+        .mail-list-scroll .mail-item.mail-unread { border-left: 0; background: transparent; }
+        .mail-list-scroll .mail-item.mail-unread .mail-sender::before {
+            content: "";
+            display: inline-block;
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+            background: var(--navy);
+            margin-right: 6px;
+            vertical-align: 2px;
+        }
+        .mail-list-scroll .mail-item.active {
+            border-left: 0;
+            background: #e3f0eb;
+            box-shadow: inset 3px 0 0 var(--primary-color);
+        }
+        .mail-time { font-variant-numeric: tabular-nums; }
+        .detail-actions .btn-label { margin-left: 0.25rem; }
+
+        @media (max-width: 991.98px) {
+            .mail-shell { padding: 8px !important; }
+            #mail-layout { --bs-gutter-x: 0; --bs-gutter-y: 8px; }
+            #mail-list-column > .card > .card-header,
+            #mail-detail-column > .card > .card-header { padding: 8px 12px; }
+            #mail-list-column > .card > .card-body { padding: 8px 8px 0; }
+            #mail-detail-column > .card > .card-body { padding: 10px 12px; }
+            .mail-list-scroll .mail-item.card > .card-body { padding: 10px 4px; }
+
+            /* 详情：操作按钮只留图标排一行，信息行收紧 */
+            .detail-actions { gap: 4px; flex-wrap: nowrap; overflow-x: auto; }
+            .detail-actions .btn { width: 40px; height: 36px; padding: 0; display: inline-flex; align-items: center; justify-content: center; flex: 0 0 auto; }
+            .detail-actions .btn-label { display: none; }
+            .detail-meta-row { margin-bottom: 4px; font-size: 0.85rem; gap: 4px; }
+            #mail-detail-content hr { margin: 10px 0; }
+
+            /* 抽屉：标题只留 offcanvas 自己那一个，里面不再套卡片 */
+            #mail-left-column .card { border: 0; box-shadow: none; background: transparent; border-radius: 0; }
+            #mail-left-column .mail-query-card > .card-header { display: none; }
+            #mail-left-column .card-body { padding: 0; }
+            #mail-left-column .mail-recent-card { border-top: 1px solid var(--border-color); padding-top: 12px; }
+            #mail-left-column .mail-recent-card > .card-header { background: transparent; border: 0; padding: 0 0 8px; }
+            #inbox-prefix { min-width: 0; }
+            #inbox-domain-display { display: block; max-width: 48%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        }
     </style>
     <script src="/email-privacy.js"></script>
 </head>
@@ -871,7 +927,7 @@
     <!-- 撰写/回复邮件 Modal（static backdrop：点遮罩和 Esc 都不会直接关掉草稿） -->
     <div class="modal fade" id="composeModal" tabindex="-1" aria-labelledby="composeModalLabel" aria-hidden="true"
          data-bs-backdrop="static" data-bs-keyboard="false">
-        <div class="modal-dialog modal-lg">
+        <div class="modal-dialog modal-lg modal-dialog-scrollable modal-fullscreen-md-down">
             <div class="modal-content">
                 <div class="modal-header" style="background:rgba(245,249,247,0.95);border-bottom:1px solid var(--border-color);">
                     <h5 class="modal-title" id="composeModalLabel"><i class="bi bi-pencil-square me-2"></i><span data-i18n="composeEmail">撰写邮件</span></h5>
@@ -1945,7 +2001,7 @@
                         <div class="card-body py-2">
                             <div class="d-flex justify-content-between align-items-start">
                                 <strong><i class="bi bi-arrow-right me-1 text-muted"></i><span class="mail-copy">${toStr}</span></strong>
-                                <small class="text-muted">${new Date(msg.createdAt).toLocaleString(currentLang === 'zh' ? 'zh-CN' : 'en-US')}</small>
+                                <small class="text-muted mail-time" title="${_fullDate(msg.createdAt)}">${_shortDate(msg.createdAt)}</small>
                             </div>
                             <div class="text-truncate"><span class="mail-copy">${subject}</span></div>
                         </div>
@@ -2032,7 +2088,7 @@
                     <div class="card-body py-2">
                         <div class="d-flex justify-content-between align-items-start">
                             <span class="mail-sender text-truncate me-2"><span class="mail-copy">${_escapeHtml(msg.from?.name || msg.from?.address || t('unknownSender'))}</span></span>
-                            <small class="text-muted">${new Date(msg.createdAt).toLocaleString(currentLang === 'zh' ? 'zh-CN' : 'en-US')}</small>
+                            <small class="text-muted mail-time" title="${_fullDate(msg.createdAt)}">${_shortDate(msg.createdAt)}</small>
                         </div>
                         <div class="mail-subject text-truncate"><span class="mail-copy">${_escapeHtml(msg.subject || t('noSubject'))}</span></div>
                         <small class="mail-intro text-muted text-truncate d-block"><span class="mail-copy">${_escapeHtml(msg.intro || '')}</span></small>
@@ -2229,7 +2285,7 @@
                                     <span class="mail-sender text-truncate me-2"><span class="mail-copy">${_escapeHtml(msg.from?.name || msg.from?.address || t('unknownSender'))}</span></span>
                                     <div class="mail-item-meta text-end ms-2">
                                         ${msg.extracted_code ? `<button type="button" class="badge bg-success me-1 code-badge" title="${t('copyCode')}" onclick="copyText('${msg.extracted_code}', event)"><i class="bi bi-clipboard me-1"></i>${msg.extracted_code}</button>` : ''}
-                                        <small class="text-muted">${new Date(msg.createdAt).toLocaleString(currentLang === 'zh' ? 'zh-CN' : 'en-US')}</small>
+                                        <small class="text-muted mail-time" title="${_fullDate(msg.createdAt)}">${_shortDate(msg.createdAt)}</small>
                                     </div>
                                 </div>
                                 <div class="mail-subject text-truncate"><span class="mail-copy">${_escapeHtml(msg.subject || t('noSubject'))}</span></div>
@@ -2312,6 +2368,25 @@
             }).join(', ');
         }
 
+        function _fullDate(value) {
+            const d = new Date(value);
+            return Number.isNaN(d.getTime()) ? '' : d.toLocaleString(currentLang === 'zh' ? 'zh-CN' : 'en-US');
+        }
+
+        // 列表里的短时间：今天只显示时:分，今年显示月/日，更早带年份
+        function _shortDate(value) {
+            const d = new Date(value);
+            if (Number.isNaN(d.getTime())) return '';
+            const now = new Date();
+            if (d.toDateString() === now.toDateString()) {
+                return d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', hour12: false });
+            }
+            const locale = currentLang === 'zh' ? 'zh-CN' : 'en-US';
+            const opts = currentLang === 'zh' ? { month: 'numeric', day: 'numeric' } : { month: 'short', day: 'numeric' };
+            if (d.getFullYear() !== now.getFullYear()) opts.year = 'numeric';
+            return d.toLocaleDateString(locale, opts);
+        }
+
         function _detailMetaRow(label, valueHtml) {
             if (!valueHtml) return '';
             return `<div class="detail-meta-row"><span class="detail-meta-label">${label}:</span><span class="detail-meta-value">${valueHtml}</span></div>`;
@@ -2320,31 +2395,31 @@
         function _detailActions(messageId, isTrash) {
             if (isTrash) {
                 return `
-                    <button class="btn btn-sm btn-outline-primary" onclick="restoreEmail('${messageId}')">
-                        <i class="bi bi-arrow-counterclockwise me-1"></i>${t('restore')}
+                    <button class="btn btn-sm btn-outline-primary" onclick="restoreEmail('${messageId}')" title="${t('restore')}" aria-label="${t('restore')}">
+                        <i class="bi bi-arrow-counterclockwise"></i><span class="btn-label">${t('restore')}</span>
                     </button>
-                    <button class="btn btn-sm btn-outline-danger" onclick="permanentDeleteEmail('${messageId}')">
-                        <i class="bi bi-x-circle me-1"></i>${t('permanentDelete')}
+                    <button class="btn btn-sm btn-outline-danger" onclick="permanentDeleteEmail('${messageId}')" title="${t('permanentDelete')}" aria-label="${t('permanentDelete')}">
+                        <i class="bi bi-x-circle"></i><span class="btn-label">${t('permanentDelete')}</span>
                     </button>`;
             }
             return `
-                <button class="btn btn-sm btn-outline-primary" onclick="openReply()">
-                    <i class="bi bi-reply me-1"></i>${t('reply')}
+                <button class="btn btn-sm btn-outline-primary" onclick="openReply()" title="${t('reply')}" aria-label="${t('reply')}">
+                    <i class="bi bi-reply"></i><span class="btn-label">${t('reply')}</span>
                 </button>
-                <button class="btn btn-sm btn-outline-primary" onclick="openReplyAll()">
-                    <i class="bi bi-reply-all me-1"></i>${t('replyAll')}
+                <button class="btn btn-sm btn-outline-primary" onclick="openReplyAll()" title="${t('replyAll')}" aria-label="${t('replyAll')}">
+                    <i class="bi bi-reply-all"></i><span class="btn-label">${t('replyAll')}</span>
                 </button>
-                <button class="btn btn-sm btn-outline-secondary" onclick="openForward()">
-                    <i class="bi bi-arrow-right-short me-1"></i>${t('forward')}
+                <button class="btn btn-sm btn-outline-secondary" onclick="openForward()" title="${t('forward')}" aria-label="${t('forward')}">
+                    <i class="bi bi-arrow-right-short"></i><span class="btn-label">${t('forward')}</span>
                 </button>
-                <button class="btn btn-sm btn-outline-secondary" id="btn-toggle-plain" onclick="togglePlainText()">
-                    <i class="bi bi-file-text me-1"></i>${t('viewPlain')}
+                <button class="btn btn-sm btn-outline-secondary" id="btn-toggle-plain" onclick="togglePlainText()" title="${t('viewPlain')}" aria-label="${t('viewPlain')}">
+                    <i class="bi bi-file-text"></i><span class="btn-label">${t('viewPlain')}</span>
                 </button>
-                <button class="btn btn-sm btn-outline-secondary" onclick="downloadEml('${messageId}')">
-                    <i class="bi bi-download me-1"></i>${t('downloadEml')}
+                <button class="btn btn-sm btn-outline-secondary" onclick="downloadEml('${messageId}')" title="${t('downloadEml')}" aria-label="${t('downloadEml')}">
+                    <i class="bi bi-download"></i><span class="btn-label">${t('downloadEml')}</span>
                 </button>
-                <button class="btn btn-sm btn-outline-danger" onclick="deleteEmail('${messageId}')">
-                    <i class="bi bi-trash me-1"></i>${t('delete')}
+                <button class="btn btn-sm btn-outline-danger" onclick="deleteEmail('${messageId}')" title="${t('delete')}" aria-label="${t('delete')}">
+                    <i class="bi bi-trash"></i><span class="btn-label">${t('delete')}</span>
                 </button>`;
         }
 
@@ -2357,9 +2432,10 @@
             plainBox.style.display = showPlain ? 'block' : 'none';
             htmlBox.style.display = showPlain ? 'none' : 'block';
             if (btn) {
-                btn.innerHTML = showPlain
-                    ? `<i class="bi bi-code-slash me-1"></i>${t('viewHtml')}`
-                    : `<i class="bi bi-file-text me-1"></i>${t('viewPlain')}`;
+                const key = showPlain ? 'viewHtml' : 'viewPlain';
+                btn.innerHTML = `<i class="bi ${showPlain ? 'bi-code-slash' : 'bi-file-text'}"></i><span class="btn-label">${t(key)}</span>`;
+                btn.title = t(key);
+                btn.setAttribute('aria-label', t(key));
             }
         }
 
@@ -2451,7 +2527,7 @@
                     ${codeHtml ? _detailMetaRow(t('verifyCode'), codeHtml) : ''}
                     ${_renderAttachments(messageId, msg.attachments)}
                     <hr>
-                    <div class="mail-body-container" id="mail-body-html" style="background:#f8f9fa; padding:0; border-radius:8px; overflow:hidden;">
+                    <div class="mail-body-container" id="mail-body-html" style="background:#fff; padding:0; overflow:hidden;">
                         <iframe id="mail-body-frame" sandbox="allow-same-origin allow-popups allow-popups-to-escape-sandbox" referrerpolicy="no-referrer" style="width:100%;border:none;min-height:200px;"></iframe>
                     </div>
                     <pre id="mail-body-plain" class="mail-plaintext" style="display:none;background:#f8f9fa;border-radius:8px;"></pre>
