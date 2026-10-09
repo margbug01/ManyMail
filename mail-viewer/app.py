@@ -1,5 +1,6 @@
 import base64
 import binascii
+import hashlib
 import hmac
 import ipaddress
 import os
@@ -7,7 +8,7 @@ import re
 import socket
 import time
 from collections import defaultdict
-from functools import wraps
+from functools import lru_cache, wraps
 
 import requests
 import bleach
@@ -109,6 +110,18 @@ class _EmailCSSSanitizer(CSSSanitizer):
 
 
 _EMAIL_CSS_SANITIZER = _EmailCSSSanitizer(allowed_css_properties=_EMAIL_ALLOWED_CSS_PROPERTIES)
+
+
+@lru_cache(maxsize=None)
+def _static_version(filename: str) -> str:
+    with open(os.path.join(app.static_folder, filename), "rb") as f:
+        return hashlib.sha256(f.read()).hexdigest()[:12]
+
+
+@app.context_processor
+def _inject_asset_url():
+    # 带内容哈希的静态资源地址：部署后文件一变，浏览器就会拿新版本
+    return {"asset_url": lambda filename: url_for("static", filename=filename, v=_static_version(filename))}
 
 
 @app.get("/email-privacy.js")

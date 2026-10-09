@@ -262,6 +262,15 @@ def test_privacy_script_is_available(client):
     assert b'Content-Security-Policy' in response.data
 
 
+def test_index_links_versioned_static_assets(client):
+    login(client)
+    html = client.get('/').get_data(as_text=True)
+    for asset in ('css/app.css', 'js/app.js'):
+        assert f'/static/{asset}?v=' in html
+        assert client.get(f'/static/{asset}').status_code == 200
+    assert '<style>' not in html
+
+
 def test_extract_code_finds_six_digits(viewer):
     assert viewer._extract_code("您的验证码是 123456，5 分钟内有效") == "123456"
     assert viewer._extract_code("Subject", "", "code: 987654") == "987654"
