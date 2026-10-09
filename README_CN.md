@@ -250,7 +250,6 @@ ManyMail/
 │
 ├── docker-compose.yml           # 统一编排 4 个服务
 ├── .env.example                 # 环境变量模板
-├── deploy.sh                    # 部署脚本
 └── tools/                       # 运维与手动测试脚本
     ├── send_test_smtp.py        #   向本地 SMTP 发测试邮件
     └── send_test_external_smtp.py # 通过外部 SMTP 发测试邮件
