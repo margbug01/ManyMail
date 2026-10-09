@@ -84,9 +84,10 @@ done <<< "$CHANGED"
 
 if [ -n "$WARN" ]; then
   echo "ABORT: upstream changed$WARN. Production keeps its own copies (skip-worktree)." >&2
-  echo "Merge the change into the server copy by hand, then:" >&2
-  echo "  sudo git update-index --no-skip-worktree <file> && sudo git merge --ff-only origin/master" >&2
-  echo "  sudo git update-index --skip-worktree <file>" >&2
+  echo "Apply the same edit to the server copy, then fast-forward around it:" >&2
+  echo "  sudo cp -a <file> /tmp/prod-<file> && sudo git update-index --no-skip-worktree <file>" >&2
+  echo "  sudo git checkout -- <file> && sudo git merge --ff-only origin/master" >&2
+  echo "  sudo cp -a /tmp/prod-<file> <file> && sudo git update-index --skip-worktree <file>" >&2
   exit 1
 fi
 echo "services to rebuild:${SERVICES:- (none)}"
