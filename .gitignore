@@ -50,3 +50,4 @@ backups/
 certs/
 tools/refresh-mail-cert.sh
 tools/watch-google-dmarc.sh
+.coverage

@@ -232,6 +232,15 @@ def _part_text(part, _fallback_default="utf-8"):
     Returns "" instead of raising, so one odd part can never take down delivery
     of the whole message.
     """
+    # No declared charset means us-ascii per RFC, but plenty of senders put raw
+    # UTF-8 into 8bit parts; get_content() would turn each of those bytes into U+FFFD.
+    try:
+        if part.get_content_maintype() == "text" and not part.get_param("charset"):
+            raw = part.get_payload(decode=True)
+            if isinstance(raw, bytes):
+                return raw.decode("utf-8")
+    except Exception:
+        pass
     try:
         value = part.get_content()
     except Exception:
@@ -253,6 +262,59 @@ def _part_text(part, _fallback_default="utf-8"):
     if value is None:
         return ""
     return str(value)
+
+
+def _iter_leaf_parts(part):
+    """Yield the leaf parts of a MIME tree without descending into attached messages.
+
+    msg.walk() also walks into message/rfc822 parts, so a forwarded or bounced mail
+    used to be flattened into the outer one: its HTML could replace the outer body and
+    the original message itself was never stored. Attached messages are leaves here.
+    """
+    if part.is_multipart() and part.get_content_maintype() == "multipart":
+        for sub in part.get_payload():
+            yield from _iter_leaf_parts(sub)
+    else:
+        yield part
+
+
+def _part_payload(part) -> bytes:
+    """Raw bytes of a leaf part; message/* parts (attached mail, delivery status) are re-serialised."""
+    if part.get_content_maintype() == "message" and part.is_multipart():
+        chunks = []
+        for sub in part.get_payload():
+            try:
+                chunks.append(sub.as_bytes())
+            except Exception:
+                chunks.append(sub.as_bytes(policy=policy.compat32))
+        return b"".join(chunks)
+    return part.get_payload(decode=True) or b""
+
+
+def _attached_message_body(msg) -> tuple[str, str]:
+    """Plain and HTML body of the first attached message.
+
+    For a wrapper without text of its own ("forward as attachment" with an empty
+    note) so the reader still sees the content; the .eml stays attached as well.
+    """
+    try:
+        for part in _iter_leaf_parts(msg):
+            if part.get_content_type() == "message/rfc822" and part.is_multipart():
+                inner = part.get_payload(0)
+                plain = inner.get_body(preferencelist=("plain",))
+                html = inner.get_body(preferencelist=("html",))
+                return (_part_text(plain) if plain is not None else "",
+                        _part_text(html) if html is not None else "")
+    except Exception:
+        pass
+    return "", ""
+
+
+def _default_attachment_name(content_type: str, index: int) -> str:
+    ext = {"message/rfc822": ".eml", "text/calendar": ".ics"}.get(content_type, "")
+    if not ext and content_type.startswith(("text/", "message/")):
+        ext = ".txt"
+    return f"attachment-{index}{ext}"
 
 
 def _detect_spam(from_address: str, subject: str, text_body: str, html_body: str) -> str:
@@ -1143,45 +1205,33 @@ class MailHandler:
             attachments = []
 
             if msg.is_multipart():
-                for part in msg.walk():
-                    if part.is_multipart():
-                        continue
+                for part in _iter_leaf_parts(msg):
                     ct = part.get_content_type()
                     cd = part.get("Content-Disposition", "")
                     filename = part.get_filename()
                     is_attachment = "attachment" in cd.lower() or bool(filename)
-                    if is_attachment:
-                        payload = part.get_payload(decode=True) or b""
-                        attachment_id = str(ObjectId())
+                    if not is_attachment and ct in ("text/plain", "text/html"):
+                        # The first plain and HTML parts are the body; further unnamed
+                        # body parts (list footers and the like) are not kept.
+                        if ct == "text/plain" and not text_body:
+                            text_body = _part_text(part)
+                        elif ct == "text/html" and not html_body:
+                            html_body = _part_text(part)
+                        continue
+                    # Everything else is kept as an attachment, including parts without
+                    # attachment markers: DMARC report files, calendar invites, attached
+                    # or bounced messages and delivery status reports.
+                    payload = _part_payload(part)
+                    if payload or is_attachment:
                         attachments.append({
-                            "id": attachment_id,
-                            "filename": filename or f"attachment-{len(attachments) + 1}",
+                            "id": str(ObjectId()),
+                            "filename": filename or _default_attachment_name(ct, len(attachments) + 1),
                             "content_type": ct or "application/octet-stream",
                             "size": len(payload),
                             "content": payload,
                         })
-                        continue
-                    if ct == "text/plain" and not text_body:
-                        decoded = _part_text(part)
-                        if decoded:
-                            text_body = decoded
-                    elif ct == "text/html" and not html_body:
-                        decoded = _part_text(part)
-                        if decoded:
-                            html_body = decoded
-                    elif not ct.startswith("text/"):
-                        # Non-text part without attachment markers (e.g. DMARC report files sent
-                        # without Content-Disposition) used to be silently dropped. Keep it as
-                        # an attachment instead of losing it.
-                        payload = part.get_payload(decode=True) or b""
-                        if payload:
-                            attachments.append({
-                                "id": str(ObjectId()),
-                                "filename": filename or f"attachment-{len(attachments) + 1}",
-                                "content_type": ct or "application/octet-stream",
-                                "size": len(payload),
-                                "content": payload,
-                            })
+                if not text_body and not html_body:
+                    text_body, html_body = _attached_message_body(msg)
             else:
                 ct = msg.get_content_type()
                 if ct.startswith("text/"):
@@ -1208,7 +1258,7 @@ class MailHandler:
             subject = msg.get("Subject", "")
             # 从纯文本中截取摘要
             intro = re.sub(r"\s+", " ", (text_body or "")).strip()[:200]
-            if not any([subject.strip(), text_body.strip(), html_body.strip()]):
+            if not attachments and not any([subject.strip(), text_body.strip(), html_body.strip()]):
                 return "554 5.6.0 Empty message rejected"
 
             spam_reason = _detect_spam(from_email, subject, text_body, html_body)

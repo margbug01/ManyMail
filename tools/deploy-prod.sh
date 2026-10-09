@@ -101,18 +101,18 @@ echo "server git now at $(git rev-parse --short HEAD)"
 
 if [ -n "$SERVICES" ]; then
   # shellcheck disable=SC2086
-  docker compose up -d --build $SERVICES
+  docker compose up -d --build --no-deps $SERVICES
   sleep 15
   docker compose ps --format '{{.Name}} {{.Status}}'
   BAD=$(docker compose ps --format '{{.Name}} {{.Status}}' | grep -Ei 'unhealthy|restarting|exited' || true)
   if [ -n "$BAD" ]; then
     echo "WARNING: unhealthy after deploy:" >&2
     echo "$BAD" >&2
-    echo "Rollback: cd $DIR && sudo git reset -q --keep $OLD && sudo docker compose up -d --build$SERVICES" >&2
+    echo "Rollback: cd $DIR && sudo git reset -q --keep $OLD && sudo docker compose up -d --build --no-deps$SERVICES" >&2
     exit 1
   fi
 fi
 ROLLBACK="cd $DIR && sudo git reset -q --keep $OLD"
-[ -n "$SERVICES" ] && ROLLBACK="$ROLLBACK && sudo docker compose up -d --build$SERVICES"
+[ -n "$SERVICES" ] && ROLLBACK="$ROLLBACK && sudo docker compose up -d --build --no-deps$SERVICES"
 echo "deploy OK. Rollback if needed: $ROLLBACK"
 REMOTE_SCRIPT
