@@ -1106,6 +1106,27 @@ html.embedded-mode .detail-back:hover {
   .mail-date { font-size: 12px; line-height: 22px; opacity: 1; font-variant-numeric: tabular-nums; }
   .mail-star { line-height: 22px; }
 }
+
+/* 内嵌时父页面的卡片就是唯一外框：里面不再套卡片，只留分隔线 */
+html.embedded-mode body { background: #fff; }
+html.embedded-mode .app { padding: 0; gap: 0; }
+html.embedded-mode .sidebar,
+html.embedded-mode .main {
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  backdrop-filter: none;
+}
+html.embedded-mode .sidebar { border-right: 1px solid var(--embed-border); background: #f7faf9; }
+html.embedded-mode .main { background: #fff; }
+html.embedded-mode .toolbar { background: #fff; }
+html.embedded-mode .sidebar-section:last-child { border-bottom: 0; }
+
+@media (max-width: 991.98px) {
+  html.embedded-mode .app { padding: 0; gap: 0; }
+  html.embedded-mode .sidebar { border-right: 0; background: var(--embed-surface); }
+  html.embedded-mode .mobile-mail-nav { padding: 6px 8px; border-bottom: 1px solid var(--embed-border); flex-basis: auto; }
+}
 </style>
 <script src="email-privacy.js"></script>
 </head>
