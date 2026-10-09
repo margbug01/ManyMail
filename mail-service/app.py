@@ -96,7 +96,8 @@ _SMTP_RCPT_RATE_MAX = int(os.getenv("SMTP_RCPT_RATE_MAX", "100"))
 _SMTP_DATA_RATE_WINDOW = int(os.getenv("SMTP_DATA_RATE_WINDOW", "60"))
 _SMTP_DATA_RATE_MAX = int(os.getenv("SMTP_DATA_RATE_MAX", "20"))
 _SMTP_MAX_RCPTS_PER_MESSAGE = int(os.getenv("SMTP_MAX_RCPTS_PER_MESSAGE", "20"))
-_SMTP_MAX_MESSAGE_BYTES = int(os.getenv("SMTP_MAX_MESSAGE_BYTES", str(1024 * 1024)))
+# Matches the aiosmtpd data_size_limit; decoded attachments stay under MongoDB's 16 MB document cap.
+_SMTP_MAX_MESSAGE_BYTES = int(os.getenv("SMTP_MAX_MESSAGE_BYTES", str(10 * 1024 * 1024)))
 _SMTP_MAX_ADDRESS_LENGTH = int(os.getenv("SMTP_MAX_ADDRESS_LENGTH", "320"))
 _SMTP_BLACKLIST_IPS = {item.strip() for item in os.getenv("SMTP_BLACKLIST_IPS", "").split(",") if item.strip()}
 _SMTP_BLACKLIST_SENDERS = {item.strip().lower() for item in os.getenv("SMTP_BLACKLIST_SENDERS", "").split(",") if item.strip()}
@@ -262,6 +263,22 @@ def _part_text(part, _fallback_default="utf-8"):
     if value is None:
         return ""
     return str(value)
+
+
+_AUTO_REPLY_SUBJECT_PREFIXES = ("自动回复", "auto:", "automatic reply", "auto-reply", "autoreply", "out of office")
+
+
+def _is_auto_reply(msg) -> bool:
+    """RFC 3834 markers plus the vendor headers and subject prefixes autoresponders use."""
+    auto_submitted = str(msg.get("Auto-Submitted", "") or "").strip().lower()
+    if auto_submitted and auto_submitted != "no":
+        return True
+    if msg.get("X-Autoreply") or msg.get("X-Autorespond"):
+        return True
+    if str(msg.get("Precedence", "") or "").strip().lower() == "auto_reply":
+        return True
+    subject = str(msg.get("Subject", "") or "").strip().lower()
+    return subject.startswith(_AUTO_REPLY_SUBJECT_PREFIXES)
 
 
 def _iter_leaf_parts(part):
@@ -1184,13 +1201,9 @@ class MailHandler:
                 from_email = from_header.strip().lower()
 
             # 提取收件人
-            # 回环防护:转发目标邮箱的自动回复/自动生成邮件直接吞掉,不入库不转发
-            auto_submitted = (msg.get("Auto-Submitted", "") or "").lower()
-            if (
-                from_email in _LOOPBACK_SENDERS
-                or "auto-replied" in auto_submitted
-                or "auto-generated" in auto_submitted
-            ):
+            # 回环防护:只吞转发目标邮箱发回来的自动回复,不入库不转发。
+            # 目标邮箱本人写的信、其他人的自动通知都照常收。
+            if from_email in _LOOPBACK_SENDERS and _is_auto_reply(msg):
                 logger.info(
                     f"Loop-back/auto-reply dropped: {from_email} -> {envelope.rcpt_tos}"
                 )

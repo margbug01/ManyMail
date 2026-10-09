@@ -34,7 +34,7 @@ The external IMAP bridge no longer writes plaintext account passwords. Persisten
 Legacy plaintext `accounts.json` files are refused. Remove them after migrating accounts.
 ## Mail retention, attachments, and backups
 `MESSAGE_TTL_DAYS=3` deletes old received messages through MongoDB TTL. Set `MESSAGE_TTL_DAYS=0` or `forever` only when you have storage monitoring and backups.
-Attachments are stored inside MongoDB message documents. Keep `SMTP_MAX_MESSAGE_BYTES` conservative and move to GridFS/object storage before accepting large or long-retention attachments.
+Attachments are stored inside MongoDB message documents. `SMTP_MAX_MESSAGE_BYTES` defaults to 10 MB, the same as the SMTP server's own data limit; decoded attachments then stay below MongoDB's 16 MB document cap. Do not raise it further without moving attachments to GridFS/object storage, and watch disk usage when `MESSAGE_TTL_DAYS=0` keeps mail forever.
 Back up:
 - MongoDB volume `mongo_data`.
 - IMAP bridge encrypted account volume `imap_mail_data` when persistence is enabled.

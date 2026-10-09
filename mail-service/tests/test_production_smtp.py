@@ -52,12 +52,43 @@ def test_matching_spam_is_stored_in_trash(test_account, mock_mongo, monkeypatch)
     assert stored["is_spam"] is True
 
 
-def test_production_auto_generated_policy_drops_without_storage(test_account, mock_mongo):
+def _mail(to, sender, subject, **headers):
     mail = EmailMessage()
-    mail["From"] = "sender@example.test"
-    mail["To"] = test_account[0]
-    mail["Subject"] = "Automated notification"
-    mail["Auto-Submitted"] = "auto-generated"
-    mail.set_content("Legitimate automated content")
+    mail["From"] = sender
+    mail["To"] = to
+    mail["Subject"] = subject
+    for name, value in headers.items():
+        mail[name.replace("_", "-")] = value
+    mail.set_content("content")
+    return mail
+
+
+def test_automated_notifications_from_others_are_stored(test_account, mock_mongo):
+    mail = _mail(test_account[0], "notifications@github.example", "New issue", Auto_Submitted="auto-generated")
+    assert deliver(mail, test_account[0]) == "250 Message accepted for delivery"
+    assert mock_mongo.messages.count_documents({}) == 1
+
+
+@pytest.mark.parametrize("subject, headers", [
+    ("Re: hello", {"Auto_Submitted": "auto-replied"}),
+    ("Re: hello", {"X_Autoreply": "yes"}),
+    ("Re: hello", {"Precedence": "auto_reply"}),
+    ("自动回复: hello", {}),
+    ("Automatic reply: hello", {}),
+])
+def test_auto_replies_from_forward_target_are_dropped(test_account, mock_mongo, monkeypatch, subject, headers):
+    import app
+
+    monkeypatch.setattr(app, "_LOOPBACK_SENDERS", {"owner@gmail.example"})
+    mail = _mail(test_account[0], "Owner <Owner@gmail.example>", subject, **headers)
     assert deliver(mail, test_account[0]) == "250 Message accepted"
     assert mock_mongo.messages.count_documents({}) == 0
+
+
+def test_ordinary_mail_from_forward_target_is_stored(test_account, mock_mongo, monkeypatch):
+    import app
+
+    monkeypatch.setattr(app, "_LOOPBACK_SENDERS", {"owner@gmail.example"})
+    mail = _mail(test_account[0], "Owner <owner@gmail.example>", "hello from my gmail", Auto_Submitted="no")
+    assert deliver(mail, test_account[0]) == "250 Message accepted for delivery"
+    assert mock_mongo.messages.count_documents({}) == 1

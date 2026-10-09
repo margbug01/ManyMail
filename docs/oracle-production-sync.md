@@ -13,8 +13,8 @@ Production source snapshot: oracle-a1 /opt/ManyMail, HEAD a8bf8dc5dca36a04691065
 
 ## Known production risks retained
 
-- The SMTP loop guard acknowledges and discards every message marked `Auto-Submitted: auto-generated` or `auto-replied`, and messages from a configured forwarding target. Legitimate automated notifications/reports can therefore be dropped without storage. This synchronization does not change that production policy.
-- Attachment-only mail with no subject or readable body still meets the empty-message rejection condition, even if an attachment was extracted.
+- Resolved 2026-10-09: the SMTP loop guard now discards only auto-replies (RFC 3834 `Auto-Submitted`, `X-Autoreply`/`X-Autorespond`, `Precedence: auto_reply`, or an auto-reply subject prefix) sent from a configured forwarding target. Ordinary mail from those addresses and automated notifications from anyone else are stored.
+- Resolved 2026-10-09: attachment-only mail with no subject or readable body is accepted.
 - Forwarding state and idempotency keys are per message rather than per forwarding destination; overlapping forwarding rules are not independent.
 - Production Compose contained a hardcoded API credential. It is not committed here; the owner should rotate it and remove it from the server configuration separately. No credential rotation or server edits were performed.
 
