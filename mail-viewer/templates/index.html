@@ -29,17 +29,12 @@
                 </a>
             </div>
 
-            <div class="btn-group btn-group-sm nav-tabs-group flex-shrink-1 overflow-auto" role="group">
-                <button type="button" class="btn btn-primary" id="tab-inbox" onclick="switchTab('inbox')">
-                    <i class="bi bi-envelope-open me-1"></i><span class="nav-tab-label" data-i18n="inbox">收件箱</span><span id="unread-badge" class="badge ms-1" style="display:none;background:var(--navy);font-size:0.7em;"></span>
+            <!-- navbar 只切模式：邮件 / IMAP；文件夹切换放到列表头上 -->
+            <div class="btn-group btn-group-sm nav-tabs-group mode-group flex-shrink-1" role="group">
+                <button type="button" class="btn btn-primary" id="tab-mail" aria-pressed="true" onclick="switchTab(lastFolderTab)">
+                    <i class="bi bi-envelope me-1"></i><span class="nav-tab-label" data-i18n="mail">邮件</span>
                 </button>
-                <button type="button" class="btn btn-outline-secondary" id="tab-sent" onclick="switchTab('sent')">
-                    <i class="bi bi-send me-1"></i><span class="nav-tab-label" data-i18n="sent">已发送</span>
-                </button>
-                <button type="button" class="btn btn-outline-secondary" id="tab-trash" onclick="switchTab('trash')">
-                    <i class="bi bi-trash me-1"></i><span class="nav-tab-label" data-i18n="trash">回收站</span>
-                </button>
-                <button type="button" class="btn btn-outline-secondary" id="tab-imap" onclick="switchTab('imap')">
+                <button type="button" class="btn btn-outline-secondary" id="tab-imap" aria-pressed="false" onclick="switchTab('imap')">
                     <i class="bi bi-diagram-3 me-1"></i><span class="nav-tab-label">IMAP</span>
                 </button>
             </div>
@@ -114,12 +109,19 @@
             <!-- 第2栏：收件箱列表 -->
             <div class="col-12 col-lg-4 mail-col" id="mail-list-column">
                 <div class="card h-100">
-                    <div class="card-header d-flex justify-content-between align-items-center">
-                        <span class="text-truncate me-2" id="mail-list-title">
-                            <i class="bi bi-envelope-open me-2"></i><span id="mail-list-title-text" data-i18n="inbox">收件箱</span>
-                            <small class="text-muted ms-1" id="mail-list-mailbox"></small>
-                        </span>
-                        <div class="d-flex align-items-center gap-2 flex-shrink-0">
+                    <div class="card-header mail-list-header d-flex flex-wrap justify-content-between align-items-center gap-2">
+                        <div class="btn-group btn-group-sm nav-tabs-group" id="folder-seg" role="group">
+                            <button type="button" class="btn btn-primary" id="tab-inbox" aria-pressed="true" onclick="switchTab('inbox')">
+                                <i class="bi bi-envelope-open me-1"></i><span data-i18n="inbox">收件箱</span><span id="unread-badge" class="badge ms-1" style="display:none;background:var(--navy);font-size:0.7em;"></span>
+                            </button>
+                            <button type="button" class="btn btn-outline-secondary" id="tab-sent" aria-pressed="false" onclick="switchTab('sent')">
+                                <i class="bi bi-send me-1"></i><span data-i18n="sent">已发送</span>
+                            </button>
+                            <button type="button" class="btn btn-outline-secondary" id="tab-trash" aria-pressed="false" onclick="switchTab('trash')">
+                                <i class="bi bi-trash me-1"></i><span data-i18n="trash">回收站</span>
+                            </button>
+                        </div>
+                        <div class="d-flex align-items-center gap-2 flex-shrink-0 ms-auto">
                             <div class="form-check form-switch mb-0" data-i18n-title="autoRefreshTitle" title="每 15 秒自动刷新">
                                 <input class="form-check-input" type="checkbox" id="auto-refresh-toggle" onchange="toggleAutoRefresh(this.checked)">
                                 <label class="form-check-label small" for="auto-refresh-toggle" data-i18n="auto">自动</label>
@@ -130,6 +132,7 @@
                         </div>
                     </div>
                     <div class="card-body mail-list-body">
+                        <div class="mail-list-mailbox text-truncate" id="mail-list-mailbox"></div>
                         <div class="mail-list-toolbar">
                             <div class="input-group input-group-sm" id="search-bar" style="display:none;">
                                 <input type="text" class="form-control" id="search-input" data-i18n-ph="searchPlaceholder" placeholder="搜索邮件..." data-i18n-title="searchHint" title="搜索发件人 / 主题 / 内容" onkeydown="if(event.key==='Enter') searchMail()">

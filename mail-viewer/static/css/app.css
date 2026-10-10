@@ -57,10 +57,18 @@ body {
     margin-right: 0;
 }
 
-/* navbar 主导航 Tab：始终可见，不随分栏隐藏 */
+/* 主导航 / 文件夹按钮组：沿用 Bootstrap btn-group-sm 原样 */
 .nav-tabs-group .btn {
     white-space: nowrap;
 }
+.mode-group { margin: 0 auto; }
+.mail-list-header { padding-top: 10px; padding-bottom: 10px; }
+.mail-list-mailbox {
+    font-size: 0.8rem;
+    color: var(--muted-text);
+    padding: 0 2px 8px;
+}
+.mail-list-mailbox:empty { display: none; }
 @media (max-width: 767.98px) {
     .navbar-brand {
         font-size: 1.35rem;
@@ -70,12 +78,9 @@ body {
         padding: 4px 8px;
         font-size: 0.78rem;
     }
-    .nav-tabs-group .btn .nav-tab-label {
-        display: none;
-    }
-    .nav-tabs-group .btn i {
-        margin-right: 0 !important;
-    }
+    /* 窄屏只有顶部模式切换收成图标，文件夹按钮保留文字 */
+    .mode-group .btn .nav-tab-label { display: none; }
+    .mode-group .btn i { margin-right: 0 !important; }
 }
 
 .card {
@@ -671,7 +676,12 @@ body {
 #imap-panel {
     display: none;
 }
+/* iframe 里自己画两张卡片，外层卡片只保留结构、去掉外观 */
 #imap-panel .card {
+    background: transparent;
+    border: 0;
+    box-shadow: none;
+    border-radius: 0;
     overflow: hidden;
 }
 #imap-panel .card-body {
@@ -681,7 +691,7 @@ body {
     width: 100%;
     min-height: calc(100vh - 180px);
     border: 0;
-    background: #fff;
+    background: transparent;
 }
 
 /* 邮件列表：扁平行 + 分隔线，不再卡片套卡片 */

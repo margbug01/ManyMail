@@ -1127,6 +1127,126 @@ html.embedded-mode .sidebar-section:last-child { border-bottom: 0; }
   html.embedded-mode .sidebar { border-right: 0; background: var(--embed-surface); }
   html.embedded-mode .mobile-mail-nav { padding: 6px 8px; border-bottom: 1px solid var(--embed-border); flex-basis: auto; }
 }
+
+/* ===== 两栏卡片：左账户卡 + 右邮件卡，和收件箱视图的卡片同一套外观 ===== */
+.sidebar-section-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px;
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--embed-text);
+  background: rgba(245,249,247,0.95);
+  border-bottom: 1px solid var(--embed-border);
+}
+.sidebar-section { padding: 0; }
+#account-list { padding: 8px 0; }
+.sidebar-buttons { padding: 4px 16px 16px; gap: 8px; }
+.sidebar-buttons .btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 7px 0;
+  border-radius: var(--embed-radius-sm);
+}
+.sidebar-buttons .btn-add { background: var(--embed-primary); border-color: var(--embed-primary); color: #fff; }
+.sidebar-buttons .btn-add:hover { background: var(--embed-primary-hover); border-color: var(--embed-primary-hover); }
+
+/* 中间栏：文件夹按钮组 + 可滚动列表 */
+.mail-list-pane { display: flex; flex-direction: column; overflow: hidden; }
+@media (min-width: 992px) {
+  html.embedded-mode .mail-list-pane { width: clamp(300px, 44%, 560px); }
+}
+.mail-list-scroll { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
+.folder-bar {
+  flex: 0 0 auto;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--embed-border);
+  background: rgba(245,249,247,0.95);
+  overflow-x: auto;
+  overflow-y: hidden;
+  scrollbar-width: thin;
+}
+.folder-bar::-webkit-scrollbar { height: 4px; }
+/* 照抄 Bootstrap btn-group-sm + btn-outline-secondary / btn-primary */
+.folder-group { display: inline-flex; vertical-align: middle; }
+html .folder-bar .folder-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex: none;
+  padding: 4px 8px;
+  font: inherit;
+  font-size: 14px;
+  line-height: 1.5;
+  white-space: nowrap;
+  color: #6c757d;
+  background: transparent;
+  border: 1px solid #6c757d;
+  border-radius: 0;
+  cursor: pointer;
+  transition: color .15s, background-color .15s, border-color .15s;
+}
+html .folder-bar .folder-item + .folder-item { margin-left: -1px; }
+html .folder-bar .folder-item:first-child { border-radius: 4px 0 0 4px; }
+html .folder-bar .folder-item:last-child { border-radius: 0 4px 4px 0; }
+html .folder-bar .folder-item:only-child { border-radius: 4px; }
+html .folder-bar .folder-item:hover { color: #fff; background: #6c757d; position: relative; z-index: 1; }
+html .folder-bar .folder-item.active,
+html html .folder-bar .folder-item.active:hover {
+  color: #fff;
+  background: var(--embed-primary);
+  border-color: var(--embed-primary);
+  padding-left: 8px;
+  box-shadow: none;
+  position: relative;
+  z-index: 2;
+}
+html .folder-bar .folder-item .bi,
+html html .folder-bar .folder-item:hover .bi,
+html html .folder-bar .folder-item.active .bi { color: inherit; width: auto; font-size: 14px; }
+.folder-bar .folder-name { flex: none; overflow: visible; }
+.folder-bar .folder-badge {
+  float: none;
+  margin-left: 2px;
+  font-size: 0.7em;
+  font-weight: 700;
+  line-height: 1;
+  padding: .35em .65em;
+  min-width: 0;
+  border-radius: 6px;
+  background: var(--embed-navy);
+}
+
+/* 内嵌：外层不再包卡片，iframe 里自己画两张卡，间距与收件箱视图 g-4 对齐 */
+html.embedded-mode, html.embedded-mode body { background: transparent; }
+html.embedded-mode .app { padding: 0; gap: 24px; width: 100%; }
+html.embedded-mode .sidebar,
+html.embedded-mode .main {
+  border: 1px solid var(--embed-border);
+  border-radius: var(--embed-radius);
+  box-shadow: var(--embed-shadow);
+  background: #fff;
+}
+/* 与 col-lg-3 等宽：(100% + 24px gutter) * 3/12 - 24px */
+html.embedded-mode .sidebar {
+  width: calc((100% + 24px) * 0.25 - 24px);
+  min-width: 220px;
+  align-self: flex-start;
+  max-height: 100%;
+}
+html.embedded-mode .sidebar-section:last-child { border-bottom: 0; }
+
+@media (max-width: 991.98px) {
+  html.embedded-mode .app { gap: 0; }
+  html.embedded-mode .app .sidebar { width: min(340px, 88vw); min-width: 0; max-height: none; border-radius: 0; box-shadow: none; }
+  html.embedded-mode .main { border: 0; border-radius: 0; box-shadow: none; }
+  .mail-list-pane { flex: 1; min-height: 0; overflow: hidden; }
+}
 </style>
 <script src="email-privacy.js"></script>
 </head>
@@ -1141,7 +1261,7 @@ if (new URLSearchParams(window.location.search).get('embedded') === '1') {
 <div class="embedded-shell">
 <div class="app">
   <div class="mobile-mail-nav">
-    <button type="button" id="mobile-nav-toggle" onclick="setMobileNavigation(true)" aria-expanded="false" aria-controls="mail-navigation">☰ <span data-i18n="folderSection">文件夹</span></button>
+    <button type="button" id="mobile-nav-toggle" onclick="setMobileNavigation(true)" aria-expanded="false" aria-controls="mail-navigation">☰ <span data-i18n="accountSection">邮箱账户</span></button>
     <span id="mobile-mail-context"></span>
     <span id="mobile-mail-info"></span>
   </div>
@@ -1150,16 +1270,12 @@ if (new URLSearchParams(window.location.search).get('embedded') === '1') {
     <button type="button" class="mobile-nav-close" onclick="setMobileNavigation(false)" aria-label="Close navigation">✕</button>
     <div class="sidebar-header" data-i18n="brandTitle">ManyMail</div>
     <div class="sidebar-section">
-      <div class="sidebar-section-title" data-i18n="accountSection">邮箱账户</div>
+      <div class="sidebar-section-title"><i class="bi bi-person-lines-fill"></i><span data-i18n="accountSection">邮箱账户</span></div>
       <div id="account-list"></div>
       <div class="sidebar-buttons">
-        <div class="btn" onclick="showAddModal('single')" data-i18n="addAccount">添加邮箱</div>
-        <div class="btn" onclick="showAddModal('batch')" data-i18n="batchImport">批量导入</div>
+        <div class="btn btn-add" onclick="showAddModal('single')"><i class="bi bi-plus-lg"></i><span data-i18n="addAccount">添加邮箱</span></div>
+        <div class="btn" onclick="showAddModal('batch')"><i class="bi bi-box-arrow-in-down"></i><span data-i18n="batchImport">批量导入</span></div>
       </div>
-    </div>
-    <div class="sidebar-section" id="folder-section" style="display:none">
-      <div class="sidebar-section-title" data-i18n="folderSection">文件夹</div>
-      <div id="folder-list"></div>
     </div>
   </div>
 
@@ -1187,8 +1303,13 @@ if (new URLSearchParams(window.location.search).get('embedded') === '1') {
       <button class="danger" onclick="doBatchAction('delete')" data-i18n="batchDelete">删除</button>
     </div>
     <div class="mail-list-container">
-      <div class="mail-list-pane" id="mail-list">
-        <div class="detail-empty"><strong>还没有连接邮箱</strong><span>添加一个 IMAP 邮箱后，即可在 ManyMail 中统一浏览邮件。</span></div>
+      <div class="mail-list-pane">
+        <div class="folder-bar" id="folder-section" style="display:none">
+          <div class="folder-group" id="folder-list" role="group"></div>
+        </div>
+        <div class="mail-list-scroll" id="mail-list">
+          <div class="detail-empty"><strong>还没有连接邮箱</strong><span>添加一个 IMAP 邮箱后，即可在 ManyMail 中统一浏览邮件。</span></div>
+        </div>
       </div>
       <div class="mail-detail" id="mail-detail">
         <div class="detail-empty"><strong>请选择一封邮件</strong><span>在左侧选择邮件后，可在这里查看正文、附件与收发件信息。</span></div>
@@ -1558,14 +1679,26 @@ async function loadFolders(id) {
   loadFolderStatus(id);
 }
 
+// 文件夹按钮放不下时，竖向滚轮直接横向滚动
+document.addEventListener('DOMContentLoaded', function() {
+  var bar = document.getElementById('folder-section');
+  if (!bar) return;
+  bar.addEventListener('wheel', function(e) {
+    if (bar.scrollWidth <= bar.clientWidth || Math.abs(e.deltaX) > Math.abs(e.deltaY)) return;
+    bar.scrollLeft += e.deltaY;
+    e.preventDefault();
+  }, { passive: false });
+});
+
 function renderFolders() {
   document.getElementById('folder-list').innerHTML = folderCache.map(function(f, i) {
     var unseen = folderUnseen[f.path] || 0;
-    return '<div class="folder-item' + (f.path === activeFolder ? ' active' : '') + '" onclick="selectFolder(folderCache[' + i + '].path)">' +
+    var on = f.path === activeFolder;
+    return '<button type="button" class="folder-item' + (on ? ' active' : '') + '" aria-pressed="' + on + '" onclick="selectFolder(folderCache[' + i + '].path)">' +
       '<i class="bi ' + folderIcon(f.name) + '"></i>' +
       '<span class="folder-name">' + esc(translateFolder(f.name)) + '</span>' +
       (unseen > 0 ? '<span class="folder-badge">' + unseen + '</span>' : '') +
-    '</div>';
+    '</button>';
   }).join('');
 }
 

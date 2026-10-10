@@ -12,6 +12,7 @@ const LANGS = {
         domainMgmt: '域名管理',
         enterDomain: '输入新域名，如 example.com',
         domainTip: '输入前缀即可查询邮件，邮箱不存在会自动创建。',
+        mail: '邮件',
         inbox: '收件箱',
         sent: '已发送',
         trash: '回收站',
@@ -823,28 +824,28 @@ function toggleAutoRefresh(enabled) {
 // ---- 收件箱 / 已发送 切换 ----
 let currentTab = 'inbox';
 
-const TAB_META = {
-    inbox: { key: 'inbox', icon: 'bi-envelope-open' },
-    sent: { key: 'sent', icon: 'bi-send' },
-    trash: { key: 'trash', icon: 'bi-trash' },
-    imap: { key: null, icon: 'bi-diagram-3' },
-};
+// 记住上次停在哪个文件夹，从 IMAP 切回「邮件」时回到原处
+let lastFolderTab = 'inbox';
+const FOLDER_TABS = ['inbox', 'sent', 'trash'];
 
+// 顶部模式切换 + 列表头文件夹分段控件的选中态都在这里同步
 function _syncListHeader(tab) {
-    const meta = TAB_META[tab] || TAB_META.inbox;
-    const titleText = document.getElementById('mail-list-title-text');
-    const icon = document.querySelector('#mail-list-title i');
-    titleText.textContent = meta.key ? t(meta.key) : 'IMAP';
-    if (icon) icon.className = `bi ${meta.icon} me-2`;
+    const isImap = tab === 'imap';
+    const setActive = (el, on) => {
+        if (!el) return;
+        el.classList.toggle('btn-primary', on);
+        el.classList.toggle('btn-outline-secondary', !on);
+        el.setAttribute('aria-pressed', on ? 'true' : 'false');
+    };
+    setActive(document.getElementById('tab-mail'), !isImap);
+    setActive(document.getElementById('tab-imap'), isImap);
+    FOLDER_TABS.forEach(f => setActive(document.getElementById(`tab-${f}`), f === tab));
     document.getElementById('mail-list-mailbox').textContent = currentEmail || '';
 }
 
 function switchTab(tab) {
     currentTab = tab;
-    const tabInbox = document.getElementById('tab-inbox');
-    const tabSent = document.getElementById('tab-sent');
-    const tabTrash = document.getElementById('tab-trash');
-    const tabImap = document.getElementById('tab-imap');
+    if (FOLDER_TABS.includes(tab)) lastFolderTab = tab;
     const searchBar = document.getElementById('search-bar');
     const batchBar = document.getElementById('batch-bar');
     const leftColumn = document.getElementById('mail-left-column');
@@ -865,10 +866,6 @@ function switchTab(tab) {
     document.getElementById('btn-left-drawer').classList.toggle('d-none', tab === 'imap');
 
     if (tab === 'inbox') {
-        tabInbox.className = 'btn btn-primary';
-        tabSent.className = 'btn btn-outline-secondary';
-        tabTrash.className = 'btn btn-outline-secondary';
-        tabImap.className = 'btn btn-outline-secondary';
         leftColumn.style.display = '';
         listColumn.style.display = '';
         detailColumn.style.display = '';
@@ -882,14 +879,10 @@ function switchTab(tab) {
         }
         resetMailDetail();
     } else {
-        tabInbox.className = 'btn btn-outline-secondary';
         searchBar.style.display = 'none';
         document.getElementById('search-input').value = '';
         batchBar.style.display = 'none';
         if (tab === 'sent' || tab === 'trash') {
-            tabSent.className = tab === 'sent' ? 'btn btn-primary' : 'btn btn-outline-secondary';
-            tabTrash.className = tab === 'trash' ? 'btn btn-primary' : 'btn btn-outline-secondary';
-            tabImap.className = 'btn btn-outline-secondary';
             leftColumn.style.display = '';
             listColumn.style.display = '';
             detailColumn.style.display = '';
@@ -901,9 +894,6 @@ function switchTab(tab) {
             }
             resetMailDetail();
         } else {
-            tabSent.className = 'btn btn-outline-secondary';
-            tabTrash.className = 'btn btn-outline-secondary';
-            tabImap.className = 'btn btn-primary';
             leftColumn.style.display = 'none';
             listColumn.style.display = 'none';
             detailColumn.style.display = 'none';
