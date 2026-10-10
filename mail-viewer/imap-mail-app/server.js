@@ -5,6 +5,9 @@ const MailClient = require('./client');
 const { fromPreset, PRESETS, autoDetect } = require('./config');
 const { prepareHtmlForRender } = require('./sanitize');
 const { createAccountStore } = require('./accountStore');
+const { createDiscoverer } = require('./discover');
+
+const discoverImap = createDiscoverer();
 
 const app = express();
 app.use(express.json());
@@ -54,6 +57,17 @@ app.get('/api/presets', (req, res) => {
   res.json(Object.keys(PRESETS));
 });
 
+// 按邮箱自动识别 IMAP 服务器：内置预设 → Thunderbird ISPDB → MX 记录 → 握手探测
+app.get('/api/discover', async (req, res) => {
+  try {
+    const found = await discoverImap(req.query.email);
+    if (!found) return res.status(404).json({ error: '没能自动识别服务器，请手动填写' });
+    res.json(found);
+  } catch (e) {
+    res.status(400).json({ error: e.message });
+  }
+});
+
 // 添加账户
 app.post('/api/accounts', async (req, res) => {
   const { preset, host, port, email, password } = req.body;
@@ -62,7 +76,11 @@ app.post('/api/accounts', async (req, res) => {
   }
 
   let account;
-  if (preset && preset !== 'custom') {
+  if ((!preset || preset === 'auto') && !host) {
+    const found = await discoverImap(email).catch(() => null);
+    if (!found) return res.status(400).json({ error: '没能自动识别服务器，请选择「自定义」手动填写' });
+    account = { name: found.provider || email.split('@')[1], host: found.host, port: found.port, secure: found.secure, auth: { user: email, pass: password } };
+  } else if (preset && preset !== 'custom' && preset !== 'auto') {
     try {
       account = fromPreset(preset, email, password);
     } catch (e) {
@@ -70,11 +88,13 @@ app.post('/api/accounts', async (req, res) => {
     }
   } else {
     if (!host) return res.status(400).json({ error: '自定义配置需要填写服务器地址' });
+    const portNum = parseInt(port, 10) || 993;
     account = {
       name: email.split('@')[1] || 'custom',
       host,
-      port: parseInt(port, 10) || 993,
-      secure: true,
+      port: portNum,
+      // 143 走 STARTTLS（imapflow 会自动升级），其余按隐式 TLS
+      secure: portNum !== 143,
       auth: { user: email, pass: password },
     };
   }
@@ -519,7 +539,10 @@ app.post('/api/accounts/batch', async (req, res) => {
     if (alreadyExists) continue;
 
     try {
-      const account = autoDetect(email, password);
+      const found = await discoverImap(email).catch(() => null);
+      const account = found
+        ? { name: found.provider || email.split('@')[1], host: found.host, port: found.port, secure: found.secure, auth: { user: email, pass: password } }
+        : autoDetect(email, password);
       const client = new MailClient(account);
       await client.connect();
       const id = ++clientId;

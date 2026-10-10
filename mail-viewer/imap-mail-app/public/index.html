@@ -716,6 +716,24 @@ html.embedded-mode .sidebar-header {
 .modal-buttons button.primary:hover { background: var(--embed-primary-hover); border-color: var(--embed-primary-hover); }
 
 .custom-fields { display: none; }
+.detect-status { display: none; align-items: center; gap: 6px; margin: -4px 0 10px; font-size: 13px; color: var(--embed-muted); }
+.detect-status.busy, .detect-status.ok, .detect-status.fail { display: flex; }
+.detect-status.ok { color: #3d7266; }
+.detect-status.ok .bi { color: var(--embed-primary); }
+.detect-status.fail { color: #a8742c; }
+.detect-status.busy .bi { animation: detect-spin 1s linear infinite; }
+@keyframes detect-spin { to { transform: rotate(360deg); } }
+.detect-status .detect-edit {
+  margin-left: auto;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--embed-navy);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+  text-decoration: underline;
+}
 
 .error-msg {
   color: #c76b6b;
@@ -1383,9 +1401,12 @@ if (new URLSearchParams(window.location.search).get('embedded') === '1') {
     <!-- 单个添加 -->
     <div class="tab-content active" id="tab-single">
       <div class="error-msg" id="modal-error"></div>
+      <label data-i18n="emailLabel">邮箱地址</label>
+      <input id="m-email" type="email" placeholder="you@example.com" oninput="scheduleDiscover()" onblur="runDiscover()">
+      <div class="detect-status" id="detect-status"></div>
       <label data-i18n="presetLabel">邮箱类型</label>
       <select id="m-preset" onchange="onPresetChange()">
-        <option value="" data-i18n="loading">加载中...</option>
+        <option value="auto" data-i18n="autoPreset">自动识别（推荐）</option>
       </select>
       <div class="custom-fields" id="custom-fields">
         <label data-i18n="hostLabel">IMAP 服务器</label>
@@ -1393,8 +1414,6 @@ if (new URLSearchParams(window.location.search).get('embedded') === '1') {
         <label data-i18n="portLabel">端口</label>
         <input id="m-port" value="993">
       </div>
-      <label data-i18n="emailLabel">邮箱地址</label>
-      <input id="m-email" type="email" placeholder="you@example.com">
       <label data-i18n="passwordLabel">密码 / 应用专用密码</label>
       <input id="m-pass" type="password" data-i18n-ph="passwordPlaceholder" placeholder="密码">
       <div class="modal-buttons">
@@ -1457,7 +1476,12 @@ const LANGS = {
     cancel: '取消',
     connectButton: '连接邮箱',
     batchLabel: '账户列表（每行一个，格式: 邮箱:密码）',
-    batchHint: '支持自动识别: Gmail, GMX, Outlook, QQ, 163, Yahoo 等邮箱的 IMAP 服务器',
+    batchHint: '每个邮箱都会自动识别 IMAP 服务器：常见邮箱、Thunderbird 服务商数据库、域名 MX 记录，最后再试 imap. / mail. 主机名',
+    autoPreset: '自动识别（推荐）',
+    detecting: '正在识别服务器...',
+    detected: '已识别：{host}:{port}',
+    detectFailed: '没能自动识别，请填写 IMAP 服务器',
+    editServer: '修改',
     startImport: '开始导入',
     emptyAccountsTitle: '还没有连接邮箱',
     emptyAccountsDesc: '添加一个 IMAP 邮箱后，即可在 ManyMail 中统一浏览邮件。',
@@ -1532,7 +1556,12 @@ const LANGS = {
     cancel: 'Cancel',
     connectButton: 'Connect mailbox',
     batchLabel: 'Accounts (one per line, format: email:password)',
-    batchHint: 'Auto-detects IMAP settings for Gmail, GMX, Outlook, QQ, 163, Yahoo, and more.',
+    batchHint: 'IMAP servers are detected for every address: known providers, the Thunderbird ISP database, domain MX records, then imap. / mail. host names.',
+    autoPreset: 'Auto-detect (recommended)',
+    detecting: 'Detecting server...',
+    detected: 'Detected: {host}:{port}',
+    detectFailed: 'Could not detect the server, please enter it',
+    editServer: 'Edit',
     startImport: 'Start import',
     emptyAccountsTitle: 'No mailbox connected yet',
     emptyAccountsDesc: 'Add an IMAP mailbox to browse everything inside ManyMail.',
@@ -2080,18 +2109,23 @@ function switchTab(tab) {
   document.getElementById('tab-batch').classList.toggle('active', tab === 'batch');
 }
 
+var PRESET_LABELS = { gmail: 'Gmail', gmx: 'GMX', outlook: 'Outlook', qq: 'QQ', '163': '163', yahoo: 'Yahoo', caramail: 'Caramail' };
+
 async function showAddModal(tab) {
   document.getElementById('add-modal').classList.add('show');
   document.getElementById('modal-error').textContent = '';
   document.getElementById('batch-error').textContent = '';
   document.getElementById('batch-results').classList.remove('show');
   switchTab(tab || 'single');
+  resetDiscover();
   try {
     var presets = await api('GET', '/api/presets');
     var sel = document.getElementById('m-preset');
-    sel.innerHTML = '<option value="" data-i18n="loading">' + t('loading') + '</option>' +
-      presets.map(function(p) { return '<option value="' + p + '">' + p + '</option>'; }).join('')
+    var current = sel.value || 'auto';
+    sel.innerHTML = '<option value="auto" data-i18n="autoPreset">' + t('autoPreset') + '</option>' +
+      presets.map(function(p) { return '<option value="' + esc(p) + '">' + esc(PRESET_LABELS[p] || p) + '</option>'; }).join('')
       + '<option value="custom">' + t('customPreset') + '</option>';
+    sel.value = current;
   } catch(e) {}
 }
 
@@ -2100,8 +2134,74 @@ function hideAddModal() {
 }
 
 function onPresetChange() {
-  document.getElementById('custom-fields').style.display =
-    document.getElementById('m-preset').value === 'custom' ? 'block' : 'none';
+  var preset = document.getElementById('m-preset').value;
+  document.getElementById('custom-fields').style.display = preset === 'custom' ? 'block' : 'none';
+  if (preset === 'auto') runDiscover();
+  else setDetectStatus('');
+}
+
+// === 自动识别 IMAP 服务器 ===
+var discoverTimer = null;
+var discoverSeq = 0;
+var discovered = null;
+
+function resetDiscover() {
+  clearTimeout(discoverTimer);
+  discoverSeq++;
+  discovered = null;
+  document.getElementById('m-preset').value = 'auto';
+  document.getElementById('custom-fields').style.display = 'none';
+  setDetectStatus('');
+}
+
+function setDetectStatus(kind, text) {
+  var el = document.getElementById('detect-status');
+  el.className = 'detect-status' + (kind ? ' ' + kind : '');
+  if (!kind) { el.innerHTML = ''; return; }
+  var icon = { busy: 'bi-arrow-repeat', ok: 'bi-check-circle', fail: 'bi-exclamation-circle' }[kind];
+  el.innerHTML = '<i class="bi ' + icon + '"></i><span>' + esc(text) + '</span>' +
+    (kind === 'ok' ? '<button type="button" class="detect-edit" onclick="editDetectedServer()">' + esc(t('editServer')) + '</button>' : '');
+}
+
+function scheduleDiscover() {
+  clearTimeout(discoverTimer);
+  discoverTimer = setTimeout(runDiscover, 600);
+}
+
+async function runDiscover() {
+  clearTimeout(discoverTimer);
+  if (document.getElementById('m-preset').value !== 'auto') return;
+  var email = document.getElementById('m-email').value.trim();
+  var domain = email.split('@')[1] || '';
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) { discovered = null; setDetectStatus(''); return; }
+  if (discovered && discovered.domain === domain.toLowerCase()) return;
+  var seq = ++discoverSeq;
+  discovered = null;
+  setDetectStatus('busy', t('detecting'));
+  try {
+    var r = await api('GET', '/api/discover?email=' + encodeURIComponent(email));
+    if (seq !== discoverSeq) return;
+    discovered = { domain: domain.toLowerCase(), host: r.host, port: r.port };
+    setDetectStatus('ok', t('detected', { host: r.host, port: r.port }));
+  } catch (err) {
+    if (seq !== discoverSeq) return;
+    // 识别不出来就直接切到自定义，并按最常见的写法预填
+    document.getElementById('m-preset').value = 'custom';
+    document.getElementById('custom-fields').style.display = 'block';
+    document.getElementById('m-host').value = 'imap.' + domain;
+    document.getElementById('m-port').value = '993';
+    setDetectStatus('fail', t('detectFailed'));
+  }
+}
+
+function editDetectedServer() {
+  if (!discovered) return;
+  document.getElementById('m-preset').value = 'custom';
+  document.getElementById('custom-fields').style.display = 'block';
+  document.getElementById('m-host').value = discovered.host;
+  document.getElementById('m-port').value = discovered.port;
+  setDetectStatus('');
+  document.getElementById('m-host').focus();
 }
 
 async function doAddAccount() {
@@ -2110,6 +2210,11 @@ async function doAddAccount() {
   var password = document.getElementById('m-pass').value;
   var host = document.getElementById('m-host').value.trim();
   var port = document.getElementById('m-port').value.trim();
+  if (preset === 'auto') {
+    var domain = (email.split('@')[1] || '').toLowerCase();
+    host = discovered && discovered.domain === domain ? discovered.host : '';
+    port = discovered && discovered.domain === domain ? String(discovered.port) : '';
+  }
   var errEl = document.getElementById('modal-error');
   if (!email || !password) { errEl.textContent = t('fillCredentials'); return; }
   errEl.textContent = '';
