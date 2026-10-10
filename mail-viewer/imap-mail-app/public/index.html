@@ -1162,18 +1162,13 @@ html.embedded-mode .sidebar-section:last-child { border-bottom: 0; }
   html.embedded-mode .mail-list-pane { width: clamp(300px, 44%, 560px); }
 }
 .mail-list-scroll { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
-.folder-bar {
-  flex: 0 0 auto;
-  padding: 10px 12px;
-  border-bottom: 1px solid var(--embed-border);
-  background: rgba(245,249,247,0.95);
-  overflow: visible;
-  position: relative;
-  z-index: 5;
-}
+/* 文件夹按钮组并进顶部工具栏：一整条白色横栏，下面不再多一条灰色带和横线 */
+.toolbar { flex-wrap: wrap; position: relative; z-index: 5; }
+.toolbar input[type="text"] { min-width: 160px; }
+.folder-bar { flex: 0 0 auto; display: flex; align-items: center; }
 /* 照抄 Bootstrap btn-group-sm + btn-outline-secondary / btn-primary */
 .folder-group { display: inline-flex; vertical-align: middle; }
-html .folder-bar .folder-item {
+html .toolbar .folder-bar .folder-item {
   display: inline-flex;
   align-items: center;
   gap: 4px;
@@ -1187,16 +1182,20 @@ html .folder-bar .folder-item {
   background: transparent;
   border: 1px solid #6c757d;
   border-radius: 0;
+  width: auto;
+  height: auto;
+  min-height: 34px;
+  margin: 0;
   cursor: pointer;
   transition: color .15s, background-color .15s, border-color .15s;
 }
-html .folder-bar .folder-item + .folder-item { margin-left: -1px; }
-html .folder-bar .folder-item:first-child { border-radius: 4px 0 0 4px; }
-html .folder-bar .folder-item:last-child { border-radius: 0 4px 4px 0; }
-html .folder-bar .folder-item:only-child { border-radius: 4px; }
-html .folder-bar .folder-item:hover { color: #fff; background: #6c757d; position: relative; z-index: 1; }
-html .folder-bar .folder-item.active,
-html .folder-bar .folder-item.active:hover {
+html .toolbar .folder-bar .folder-item + .folder-item { margin-left: -1px; }
+html .toolbar .folder-bar .folder-item:first-child { border-radius: 4px 0 0 4px; }
+html .toolbar .folder-bar .folder-item:last-child { border-radius: 0 4px 4px 0; }
+html .toolbar .folder-bar .folder-item:only-child { border-radius: 4px; }
+html .toolbar .folder-bar .folder-item:hover { color: #fff; background: #6c757d; position: relative; z-index: 1; }
+html .toolbar .folder-bar .folder-item.active,
+html .toolbar .folder-bar .folder-item.active:hover {
   color: #fff;
   background: var(--embed-primary);
   border-color: var(--embed-primary);
@@ -1205,11 +1204,11 @@ html .folder-bar .folder-item.active:hover {
   position: relative;
   z-index: 2;
 }
-html .folder-bar .folder-item .bi,
-html .folder-bar .folder-item:hover .bi,
-html .folder-bar .folder-item.active .bi { color: inherit; width: auto; font-size: 14px; }
-.folder-bar .folder-name { flex: none; overflow: visible; }
-.folder-bar .folder-badge {
+html .toolbar .folder-bar .folder-item .bi,
+html .toolbar .folder-bar .folder-item:hover .bi,
+html .toolbar .folder-bar .folder-item.active .bi { color: inherit; width: auto; font-size: 14px; }
+html .toolbar .folder-bar .folder-name { flex: none; overflow: visible; }
+html .toolbar .folder-bar .folder-badge {
   float: none;
   margin-left: 2px;
   font-size: 11px;
@@ -1221,11 +1220,11 @@ html .folder-bar .folder-item.active .bi { color: inherit; width: auto; font-siz
   background: var(--embed-navy);
   color: #fff;
 }
-html .folder-bar .folder-item.active .folder-badge { background: #fff; color: #3d7266; }
+html .toolbar .folder-bar .folder-item.active .folder-badge { background: #fff; color: #3d7266; }
 /* 「更多」下拉：主按钮组只放收件箱/已发送/回收站，其余进菜单，按钮组永远不溢出 */
 .folder-more { position: relative; display: inline-flex; margin-left: -1px; }
-html .folder-bar .folder-more > .folder-item { border-radius: 0 4px 4px 0; }
-html .folder-bar .folder-group > .folder-more:first-child > .folder-item { border-radius: 4px; }
+html .toolbar .folder-bar .folder-more > .folder-item { border-radius: 0 4px 4px 0; }
+html .toolbar .folder-bar .folder-group > .folder-more:first-child > .folder-item { border-radius: 4px; }
 .folder-more .bi-chevron-down { font-size: 11px !important; }
 .folder-menu {
   display: none;
@@ -1242,13 +1241,18 @@ html .folder-bar .folder-group > .folder-more:first-child > .folder-item { borde
   box-shadow: 0 6px 18px rgba(43,42,39,0.12);
 }
 .folder-more.open .folder-menu { display: block; }
-.folder-menu-item {
+html .toolbar .folder-bar .folder-menu-item {
   display: flex;
   align-items: center;
   gap: 8px;
   width: 100%;
+  height: auto;
+  min-height: 0;
+  margin: 0;
   padding: 7px 12px;
   border: 0;
+  border-radius: 0;
+  line-height: 1.5;
   background: transparent;
   font: inherit;
   font-size: 14px;
@@ -1257,12 +1261,18 @@ html .folder-bar .folder-group > .folder-more:first-child > .folder-item { borde
   white-space: nowrap;
   cursor: pointer;
 }
-.folder-menu-item .bi { color: var(--embed-muted); width: 16px; text-align: center; }
-.folder-menu-item .folder-name { flex: 1; }
-.folder-menu-item:hover { background: #edf5f2; }
-.folder-menu-item.active { background: #e3f0eb; color: #3d7266; font-weight: 600; box-shadow: inset 3px 0 0 var(--embed-primary); }
-.folder-menu-item.active .bi { color: var(--embed-primary); }
-.folder-menu-item .folder-badge { margin-left: auto; }
+html .toolbar .folder-bar .folder-menu-item .bi { color: var(--embed-muted); width: 16px; text-align: center; }
+html .toolbar .folder-bar .folder-menu-item .folder-name { flex: 1; }
+html .toolbar .folder-bar .folder-menu-item:hover { background: #edf5f2; }
+html .toolbar .folder-bar .folder-menu-item.active { background: #e3f0eb; color: #3d7266; font-weight: 600; box-shadow: inset 3px 0 0 var(--embed-primary); }
+html .toolbar .folder-bar .folder-menu-item.active .bi { color: var(--embed-primary); }
+html .toolbar .folder-bar .folder-menu-item .folder-badge { margin-left: auto; }
+/* 详情操作栏不画底线，靠留白和下面的标题分开 */
+html.embedded-mode .detail-actions { border-bottom: 0; padding-top: 10px; }
+@media (max-width: 991.98px) {
+  .toolbar .folder-bar { flex-basis: 100%; }
+  html .toolbar .folder-bar .folder-item { min-height: 40px; width: auto; padding: 6px 10px; }
+}
 
 /* 内嵌：外层不再包卡片，iframe 里自己画两张卡，间距与收件箱视图 g-4 对齐 */
 html.embedded-mode, html.embedded-mode body { background: transparent; }
@@ -1323,6 +1333,9 @@ if (new URLSearchParams(window.location.search).get('embedded') === '1') {
 
   <div class="main">
     <div class="toolbar">
+      <div class="folder-bar" id="folder-section" style="display:none">
+        <div class="folder-group" id="folder-list" role="group"></div>
+      </div>
       <select class="search-field-select" id="search-field">
         <option value="subject" data-i18n="searchSubject">主题</option>
         <option value="from" data-i18n="searchFrom">发件人</option>
@@ -1346,9 +1359,6 @@ if (new URLSearchParams(window.location.search).get('embedded') === '1') {
     </div>
     <div class="mail-list-container">
       <div class="mail-list-pane">
-        <div class="folder-bar" id="folder-section" style="display:none">
-          <div class="folder-group" id="folder-list" role="group"></div>
-        </div>
         <div class="mail-list-scroll" id="mail-list">
           <div class="detail-empty"><strong>还没有连接邮箱</strong><span>添加一个 IMAP 邮箱后，即可在 ManyMail 中统一浏览邮件。</span></div>
         </div>
@@ -1717,7 +1727,7 @@ async function loadFolders(id) {
   const folders = await api('GET', '/api/accounts/' + id + '/folders');
   const selectable = folders.filter(f => !f.noselect);
   folderCache = selectable;
-  document.getElementById('folder-section').style.display = 'block';
+  document.getElementById('folder-section').style.display = 'flex';
   renderFolders();
   // Load unread counts in background
   loadFolderStatus(id);
