@@ -1444,6 +1444,20 @@ user3@outlook.com:password3"></textarea>
 <script>
 let activeAccountId = null;
 let activeFolder = 'INBOX';
+
+// 刷新后回到原来的账号 / 文件夹 / 邮件（按标签页存，关了就清）
+var IMAP_VIEW_KEY = 'manymail-imap-view';
+function loadImapView() {
+  try {
+    var s = JSON.parse(sessionStorage.getItem(IMAP_VIEW_KEY) || '{}');
+    return s && typeof s === 'object' ? s : {};
+  } catch (e) { return {}; }
+}
+function saveImapView(patch) {
+  try { sessionStorage.setItem(IMAP_VIEW_KEY, JSON.stringify(Object.assign(loadImapView(), patch))); } catch (e) {}
+}
+// 必须在初始化前读出来：applyLang() 会同步调 resetMailDetail() 把 uid 清掉
+var pendingImapView = loadImapView();
 let mailCache = [];
 let hasMore = false;
 let oldestSeq = null;
@@ -1722,6 +1736,7 @@ async function loadAccounts() {
 async function selectAccount(id) {
   activeAccountId = id;
   activeFolder = 'INBOX';
+  saveImapView({ account: id, folder: 'INBOX', uid: null });
   detailVisible = false;
   syncResponsiveView();
   loadAccounts();
@@ -1743,6 +1758,7 @@ async function removeAccount(id) {
   await api('DELETE', '/api/accounts/' + id);
   if (activeAccountId === id) {
     activeAccountId = null;
+    saveImapView({ account: null, folder: 'INBOX', uid: null });
     document.getElementById('folder-section').style.display = 'none';
     document.getElementById('mail-list').innerHTML = '<div class="detail-empty">' + richEmpty('emptyAccountsTitle', 'emptyAccountsDesc') + '</div>';
     resetMailDetail();
@@ -1845,6 +1861,7 @@ async function loadFolderStatus(id) {
 
 function selectFolder(path) {
   activeFolder = path;
+  saveImapView({ folder: path, uid: null });
   detailVisible = false;
   syncResponsiveView();
   loadFolders(activeAccountId);
@@ -1893,12 +1910,14 @@ function setMailInfo(text) {
 
 function resetMailDetail(message) {
   detailVisible = false;
+  saveImapView({ uid: null });
   document.getElementById('mail-detail').innerHTML = '<div class="detail-empty">' + (message || richEmpty('emptyDetailTitle', 'emptyDetailDesc')) + '</div>';
   syncResponsiveView();
 }
 
 function showMailListView() {
   detailVisible = false;
+  saveImapView({ uid: null });
   syncResponsiveView();
 }
 
@@ -1955,6 +1974,7 @@ async function readMail(index) {
   var mail = mailCache[index];
   if (!mail) return;
   selectedMailIndex = index;
+  saveImapView({ uid: mail.uid });
   document.querySelectorAll('.mail-row').forEach(function(r, i) {
     r.classList.toggle('active', i === index);
   });
@@ -2223,6 +2243,7 @@ async function doAddAccount() {
     hideAddModal();
     activeAccountId = acc.id;
     activeFolder = 'INBOX';
+    saveImapView({ account: acc.id, folder: 'INBOX', uid: null });
     await loadAccounts();
     await loadFolders(acc.id);
     await loadMails();
@@ -2588,9 +2609,25 @@ function highlightMail(index) {
   if (rows[index]) rows[index].scrollIntoView({ block: 'nearest', behavior: 'smooth' });
 }
 
+async function restoreImapView(s) {
+  if (s.account == null || activeAccountId != null) return;
+  var account = accountCache.find(function(a) { return String(a.id) === String(s.account); });
+  if (!account) return;
+  activeAccountId = account.id;
+  activeFolder = s.folder || 'INBOX';
+  saveImapView({ account: activeAccountId, folder: activeFolder });
+  loadAccounts();
+  loadFolders(activeAccountId);
+  await loadMails();
+  if (s.uid == null || activeAccountId !== account.id) return;
+  // 只在首屏（最近 30 封）里找，找不到就停在列表
+  var index = mailCache.findIndex(function(m) { return String(m.uid) === String(s.uid); });
+  if (index >= 0) readMail(index);
+}
+
 window.addEventListener('resize', syncResponsiveView);
 syncResponsiveView();
-loadAccounts();
+loadAccounts().then(function() { return restoreImapView(pendingImapView); }).catch(function() {});
 applyLang();
 </script>
 
