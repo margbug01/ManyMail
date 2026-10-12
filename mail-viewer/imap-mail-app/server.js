@@ -37,22 +37,38 @@ async function restoreAccounts() {
   if (!Array.isArray(data) || data.length === 0) return;
 
   console.log(`正在恢复 ${data.length} 个已保存的账户...`);
-  for (const item of data) {
+  // 先按保存顺序登记（id 稳定），再并行登录：一个账号登录要两三秒，串行时 6 个账号要等十几秒才开始监听端口。
+  // 登录失败的账号也留着，不再从持久化里删掉——服务器偶尔抖一下就丢账号太亏；下次用到时 ensureConnected 会重连
+  const restored = data.map((item) => {
     const client = new MailClient(item.account);
+    clients.set(++clientId, client);
+    return client;
+  });
+  await Promise.all(restored.map(async (client) => {
+    const user = client.account.auth.user;
     try {
       await client.connect();
-      const id = ++clientId;
-      clients.set(id, client);
-      console.log(`  ✓ ${item.account.auth.user} 已恢复`);
-      // 后台预热文件夹缓存，第一次打开这个账号时不用再等 LIST
+      console.log(`  ✓ ${user} 已恢复`);
+      // 后台预热文件夹缓存、开始盯新邮件，第一次打开这个账号时不用再等 LIST
       client.folders().catch(() => {});
+      client.watchInbox();
     } catch (err) {
-      console.log(`  ✗ ${item.account.auth.user} 恢复失败: ${err.message}`);
+      console.log(`  ✗ ${user} 暂时连不上，保留账户，用到时再重连: ${err.message}`);
+      client.scheduleRewatch();
     }
-  }
-  // 重连后更新持久化（去掉连接失败的）
+  }));
   saveAccounts();
 }
+
+// 各账号收件箱的变化版本号：前端定时轮询，版本号变了才去拉列表。只读内存，不碰 IMAP
+app.get('/api/changes', (req, res) => {
+  const accounts = {};
+  clients.forEach((client, id) => {
+    accounts[id] = { inbox: client.inboxVersion, exists: client.inboxExists, watching: Boolean(client.statusClient && client.statusClient.usable) };
+  });
+  res.set('Cache-Control', 'no-store');
+  res.json({ accounts });
+});
 
 // 获取可用预设列表
 app.get('/api/presets', (req, res) => {
@@ -113,6 +129,7 @@ app.post('/api/accounts', async (req, res) => {
     await client.connect();
     const id = ++clientId;
     clients.set(id, client);
+    client.watchInbox();
     saveAccounts();
     res.json({ id, name: account.name, email: account.auth.user });
   } catch (err) {
@@ -567,6 +584,7 @@ app.post('/api/accounts/batch', async (req, res) => {
       await client.connect();
       const id = ++clientId;
       clients.set(id, client);
+      client.watchInbox();
       results.push({ id, email, ok: true });
     } catch (err) {
       results.push({ email, ok: false, error: err.message });

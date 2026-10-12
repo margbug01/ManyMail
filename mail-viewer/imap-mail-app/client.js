@@ -26,6 +26,12 @@ class MailClient {
     // 未读数统计走单独一条连接：imapflow 同一连接上命令串行，挤在主连接上会拖慢邮件列表
     this.statusClient = null;
     this.statusPromise = null;
+    // 统计连接同时选中 INBOX（只读）挂着 IDLE，服务器一推新邮件/删邮件就把版本号 +1；
+    // 前端轮询 /api/changes 比对版本号，变了才去拉列表（轮询本身不碰 IMAP）
+    this.inboxVersion = 0;
+    this.inboxExists = null;
+    this.closed = false;
+    this.rewatchTimer = null;
   }
 
   /** 连接到邮箱服务器 */
@@ -81,7 +87,7 @@ class MailClient {
     return this.folderPromise;
   }
 
-  /** 统计专用连接，断了就重建 */
+  /** 统计专用连接，断了就重建；顺带选中 INBOX 挂 IDLE 盯新邮件 */
   async statusConnection() {
     if (this.statusClient && this.statusClient.usable) return this.statusClient;
     if (!this.statusPromise) {
@@ -92,11 +98,26 @@ class MailClient {
           secure: this.account.secure,
           auth: this.account.auth,
           logger: false,
+          // 有的服务器 IDLE 挂久了会悄悄断，定期重发一次
+          maxIdleTime: 5 * 60 * 1000,
         });
         conn.on('error', (err) => {
           console.error(`[${this.account.name}] 统计连接错误: ${err.message}`);
         });
         await conn.connect();
+        try {
+          await conn.mailboxOpen('INBOX', { readOnly: true });
+          this.noteInboxExists(conn.mailbox.exists);
+          conn.on('exists', (e) => { if (e.path === 'INBOX') this.noteInboxExists(e.count); });
+          conn.on('expunge', () => { this.inboxVersion++; });
+        } catch (err) {
+          // 盯不了不影响统计，照常用
+          console.error(`[${this.account.name}] 无法监听收件箱: ${err.message}`);
+        }
+        conn.on('close', () => {
+          if (this.statusClient === conn) this.statusClient = null;
+          this.scheduleRewatch();
+        });
         this.statusClient = conn;
         return conn;
       })().finally(() => { this.statusPromise = null; });
@@ -104,8 +125,37 @@ class MailClient {
     return this.statusPromise;
   }
 
+  /** 收件箱邮件数变了（含断线期间的变化）就把版本号 +1 */
+  noteInboxExists(count) {
+    if (this.inboxExists !== null && count !== this.inboxExists) this.inboxVersion++;
+    this.inboxExists = count;
+  }
+
+  /** 开始盯收件箱：服务启动恢复账号、新添加账号时调用 */
+  watchInbox() {
+    return this.statusConnection().catch((err) => {
+      console.error(`[${this.account.name}] 统计连接建立失败: ${err.message}`);
+      this.scheduleRewatch();
+    });
+  }
+
+  /** 统计连接断了：过一会儿重连接着盯，连不上就逐次拉长间隔；账号删掉后不再管 */
+  scheduleRewatch(delay = 30 * 1000) {
+    if (this.closed || this.rewatchTimer) return;
+    this.rewatchTimer = setTimeout(() => {
+      this.rewatchTimer = null;
+      if (this.closed) return;
+      this.statusConnection().catch((err) => {
+        console.error(`[${this.account.name}] 统计连接重连失败: ${err.message}`);
+        this.scheduleRewatch(Math.min(delay * 2, 10 * 60 * 1000));
+      });
+    }, delay);
+  }
+
   /** 断开连接 */
   async disconnect() {
+    this.closed = true;
+    clearTimeout(this.rewatchTimer);
     if (this.statusClient) {
       try { await this.statusClient.logout(); } catch {}
       this.statusClient = null;

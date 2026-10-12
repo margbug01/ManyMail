@@ -389,7 +389,8 @@ def _proxy_imap_response(subpath: str = ""):
         key_lower = key.lower()
         if key_lower in {"host", "content-length", "cookie"}:
             continue
-        if key_lower in {"accept", "content-type", "x-requested-with"}:
+        # 条件请求头也带上：IMAP 页的 style.css / app.js 没改时回 304，不用每次整份重下
+        if key_lower in {"accept", "content-type", "x-requested-with", "if-none-match", "if-modified-since"}:
             headers[key] = value
     body = None if request.method in {"GET", "HEAD"} else request.get_data()
     resp = http_session.request(
@@ -406,7 +407,7 @@ def _proxy_imap_response(subpath: str = ""):
     if "text/html" in content_type:
         payload = _rewrite_imap_html(resp.text).encode(resp.encoding or "utf-8")
     proxied = Response(payload, status=resp.status_code, content_type=content_type or None)
-    for header in ["Content-Disposition", "Cache-Control", "Location"]:
+    for header in ["Content-Disposition", "Cache-Control", "Location", "ETag", "Last-Modified"]:
         if header in resp.headers:
             value = resp.headers[header]
             if header == "Location" and value.startswith("/"):

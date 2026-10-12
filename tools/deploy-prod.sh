@@ -3,8 +3,9 @@
 # commit + push first, then run this. The server only fast-forwards to
 # origin/master and rebuilds the services whose files changed.
 #
-#   tools/deploy-prod.sh            # deploy
-#   tools/deploy-prod.sh --dry-run  # show what would change, touch nothing
+#   tools/deploy-prod.sh               # run local tests (tools/test-ui.sh), then deploy
+#   tools/deploy-prod.sh --dry-run     # show what would change, touch nothing (no tests)
+#   tools/deploy-prod.sh --skip-tests  # emergency fix: deploy without running local tests
 #
 # Env: DEPLOY_HOST (default oracle-a1), DEPLOY_DIR (default /opt/ManyMail)
 set -euo pipefail
@@ -12,7 +13,14 @@ set -euo pipefail
 HOST="${DEPLOY_HOST:-oracle-a1}"
 DIR="${DEPLOY_DIR:-/opt/ManyMail}"
 DRY=0
-[ "${1:-}" = "--dry-run" ] && DRY=1
+SKIP_TESTS=0
+for arg in "$@"; do
+  case "$arg" in
+    --dry-run) DRY=1 ;;
+    --skip-tests) SKIP_TESTS=1 ;;
+    *) echo "unknown option: $arg" >&2; exit 2 ;;
+  esac
+done
 
 cd "$(git rev-parse --show-toplevel)"
 
@@ -30,6 +38,14 @@ if [ "$LOCAL" != "$REMOTE" ]; then
   exit 1
 fi
 echo "local = github = ${LOCAL:0:7}"
+
+# 1b. Local tests (stubbed APIs, ~30s). Tested code == pushed code, since the tree is clean.
+if [ "$DRY" = "1" ] || [ "$SKIP_TESTS" = "1" ]; then
+  echo "local tests skipped"
+elif ! tools/test-ui.sh; then
+  echo "ABORT: local tests failed. Fix them, or deploy anyway with --skip-tests." >&2
+  exit 1
+fi
 
 # 2. Server: refuse if hand-edited, fast-forward only, rebuild changed services.
 ssh "$HOST" "sudo bash -s -- '$DIR' '$REMOTE' '$DRY'" <<'REMOTE_SCRIPT'
@@ -112,6 +128,17 @@ if [ -n "$SERVICES" ]; then
     echo "Rollback: cd $DIR && sudo git reset -q --keep $OLD && sudo docker compose up -d --build --no-deps$SERVICES" >&2
     exit 1
   fi
+  # The IMAP bridge ships its unit tests in the image; run them against what was just built.
+  case " $SERVICES " in *" imap-mail "*)
+    if ! docker compose exec -T imap-mail npm test >/tmp/imap-mail-test.log 2>&1; then
+      tail -30 /tmp/imap-mail-test.log >&2
+      echo "WARNING: imap-mail unit tests failed after deploy." >&2
+      echo "Rollback: cd $DIR && sudo git reset -q --keep $OLD && sudo docker compose up -d --build --no-deps$SERVICES" >&2
+      exit 1
+    fi
+    echo "imap-mail unit tests: $(grep -E '^# (pass|fail)' /tmp/imap-mail-test.log | tr '\n' ' ')"
+    ;;
+  esac
 fi
 ROLLBACK="cd $DIR && sudo git reset -q --keep $OLD"
 [ -n "$SERVICES" ] && ROLLBACK="$ROLLBACK && sudo docker compose up -d --build --no-deps$SERVICES"

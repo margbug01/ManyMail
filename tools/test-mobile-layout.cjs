@@ -3,7 +3,10 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
 const root = path.resolve(__dirname, '..');
-const html = fs.readFileSync(path.join(root, 'mail-viewer/imap-mail-app/public/index.html'), 'utf8');
+const imapPublic = path.join(root, 'mail-viewer/imap-mail-app/public');
+const html = fs.readFileSync(path.join(imapPublic, 'index.html'), 'utf8');
+const imapCss = fs.readFileSync(path.join(imapPublic, 'style.css'), 'utf8');
+const imapJs = fs.readFileSync(path.join(imapPublic, 'app.js'), 'utf8');
 const hostTemplate = fs.readFileSync(path.join(root, 'mail-viewer/static/js/app.js'), 'utf8');
 const hostSizing = hostTemplate.slice(hostTemplate.indexOf('function fitMobileImapFrame()'), hostTemplate.indexOf('function ensureImapLoaded()'));
 const privacy = fs.readFileSync(path.join(root, 'mail-viewer/imap-mail-app/public/email-privacy.js'), 'utf8');
@@ -18,15 +21,15 @@ const privacy = fs.readFileSync(path.join(root, 'mail-viewer/imap-mail-app/publi
         if (url.hostname !== 'manymail.test') return route.abort();
         if (url.pathname === '/host') return route.fulfill({ contentType: 'text/html', body: '<!doctype html><style>body{margin:0}iframe{display:block;width:100%;border:0;min-height:80vh}</style><nav style="height:96px">Host navigation</nav><iframe id="imap-frame" src="/?embedded=1"></iframe><script>' + hostSizing + '; fitMobileImapFrame();</script>' });
         if (url.pathname.endsWith('email-privacy.js')) return route.fulfill({ contentType: 'text/javascript', body: privacy });
+        if (url.pathname.endsWith('/app.js')) return route.fulfill({ contentType: 'text/javascript', body: imapJs });
+        if (url.pathname.endsWith('/style.css')) return route.fulfill({ contentType: 'text/css', body: imapCss });
         if (url.pathname.includes('/api/')) return route.fulfill({ contentType: 'application/json', body: '[]' });
         return route.fulfill({ contentType: 'text/html', body: html });
       });
       await page.goto('http://manymail.test/?embedded=1');
       await page.waitForLoadState('networkidle');
       await page.evaluate(() => {
-        document.getElementById('account-list').innerHTML = '<div class="account-item active">personal@example.test</div><div class="account-item">work@example.test</div>';
-        document.getElementById('folder-section').style.display = 'block';
-        document.getElementById('folder-list').innerHTML = ['INBOX', 'Sent', 'Drafts', 'Spam', 'Trash'].map(name => '<div class="folder-item" onclick="selectFolder(\'' + name + '\')">' + name + '</div>').join('');
+        document.getElementById('account-list').innerHTML = '<div class="account-item active" onclick="selectAccount(1)">personal@example.test</div><div class="account-item" onclick="selectAccount(2)">work@example.test</div>';
         mailCache = Array.from({ length: 30 }, (_, index) => ({ uid: index + 1, from: { name: 'Sender ' + index, address: 'sender@example.test' }, subject: 'A readable message subject for mobile ' + index, date: new Date().toISOString(), seen: false }));
         renderMailList(mailCache);
         syncResponsiveView();
@@ -50,7 +53,7 @@ const privacy = fs.readFileSync(path.join(root, 'mail-viewer/imap-mail-app/publi
         if (process.env.MOBILE_SCREENSHOT && viewport.width === 390) await page.screenshot({ path: process.env.MOBILE_SCREENSHOT });
         await page.locator('#mobile-nav-toggle').click();
         assert.equal(await page.locator('.sidebar').isVisible(), true);
-        await page.locator('.folder-item').first().click();
+        await page.locator('.account-item').nth(1).click();
         assert.equal(await page.locator('.sidebar').isVisible(), false);
         await page.evaluate(() => {
           document.getElementById('mail-detail').innerHTML = '<button class="detail-back" onclick="showMailListView()">Back</button>' + '<p>Long mail body</p>'.repeat(100);
