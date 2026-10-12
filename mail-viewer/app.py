@@ -203,21 +203,28 @@ def _is_public_hostname(hostname: str) -> bool:
 
     has_public_ip = False
     for _, _, _, _, sockaddr in addr_infos:
-        try:
-            ip = ipaddress.ip_address(sockaddr[0])
-        except ValueError:
-            return False
-        if any([
-            ip.is_private,
-            ip.is_loopback,
-            ip.is_link_local,
-            ip.is_multicast,
-            ip.is_reserved,
-            ip.is_unspecified,
-        ]):
+        if not _is_public_ip(sockaddr[0]):
             return False
         has_public_ip = True
     return has_public_ip
+
+
+def _is_public_ip(value: str) -> bool:
+    try:
+        ip = ipaddress.ip_address(value)
+    except ValueError:
+        return False
+    # ::ffff:10.0.0.1 这类 IPv4 映射地址按里面的 IPv4 判断（老版本 Python 不会自动这么做）
+    if getattr(ip, "ipv4_mapped", None):
+        ip = ip.ipv4_mapped
+    return not any([
+        ip.is_private,
+        ip.is_loopback,
+        ip.is_link_local,
+        ip.is_multicast,
+        ip.is_reserved,
+        ip.is_unspecified,
+    ])
 
 
 def _is_proxyable_image_url(url: str) -> bool:
@@ -598,22 +605,14 @@ def image_proxy():
         return jsonify({"success": False, "message": "非法图片地址"}), 400
 
     try:
-        resp = http_session.get(
-            source_url,
-            timeout=30,
-            stream=True,
-            allow_redirects=True,
-            headers={
-                "User-Agent": "Mozilla/5.0 mail-viewer-image-proxy",
-                "Accept": "image/*,*/*;q=0.8",
-            },
-        )
+        resp = _fetch_public_image(source_url)
     except requests.RequestException as e:
         app.logger.error(f"图片代理请求失败: {e}", exc_info=True)
         return jsonify({"success": False, "message": "图片加载失败"}), 502
 
-    final_url = _normalize_remote_url(resp.url)
-    if not resp.ok or not _is_proxyable_image_url(final_url):
+    if resp is None:
+        return jsonify({"success": False, "message": "图片加载失败"}), 502
+    if not resp.ok:
         resp.close()
         return jsonify({"success": False, "message": "图片加载失败"}), 502
 
@@ -641,8 +640,45 @@ def image_proxy():
         resp.close()
 
     proxied_resp = Response(b"".join(chunks), mimetype=content_type)
-    proxied_resp.headers["Cache-Control"] = "public, max-age=3600"
+    # 要登录才能看，不让中间的共享缓存留副本
+    proxied_resp.headers["Cache-Control"] = "private, max-age=3600"
     return proxied_resp
+
+
+_MAX_IMAGE_PROXY_REDIRECTS = 5
+
+
+def _peer_ip(resp) -> str:
+    """这次请求实际连上的 IP；拿不到返回空串。"""
+    try:
+        return resp.raw.connection.sock.getpeername()[0]
+    except Exception:
+        return ""
+
+
+def _fetch_public_image(url: str):
+    """手动跟跳转：每一跳的地址都要是公网，实际连上的 IP 也要是公网。
+    requests 自动跟跳转时中间那几跳不经检查，302 到内网（如云元数据 169.254.169.254）照样会发出去；
+    只查域名解析也挡不住 DNS rebinding（检查时解析到公网，连接时解析到内网）。"""
+    headers = {
+        "User-Agent": "Mozilla/5.0 mail-viewer-image-proxy",
+        "Accept": "image/*,*/*;q=0.8",
+    }
+    for _ in range(_MAX_IMAGE_PROXY_REDIRECTS + 1):
+        if not _is_proxyable_image_url(url):
+            return None
+        resp = http_session.get(url, timeout=30, stream=True, allow_redirects=False, headers=headers)
+        # 走 HTTP 代理时连上的是代理本身，对端 IP 没有意义，只靠上面的逐跳地址检查
+        via_proxy = bool(requests.utils.get_environ_proxies(url))
+        if not via_proxy and not _is_public_ip(_peer_ip(resp)):
+            resp.close()
+            return None
+        if not resp.is_redirect:
+            return resp
+        location = resp.headers.get("Location", "")
+        resp.close()
+        url = _normalize_remote_url(urljoin(url, location))
+    return None
 
 
 @app.route("/api/inbox/query", methods=["POST"])

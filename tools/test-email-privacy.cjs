@@ -18,7 +18,8 @@ const fixture = '<p id="text">Readable message</p>' +
   '<p style="background:image-set(url(https://tracker.invalid/set) 1x)">CSS probe</p>' +
   '<img src="/api/image-proxy?url=https://tracker.invalid/injected">' +
   '<img src="data:image/svg+xml;base64,PHN2Zz48L3N2Zz4=">' +
-  '<a href="https://tracker.invalid/click" ping="https://tracker.invalid/ping">Link</a>' +
+  '<a href="https://tracker.invalid/click?id=7&amp;utm_source=mail&amp;utm_campaign=x&amp;fbclid=abc&amp;mc_eid=u1" ping="https://tracker.invalid/ping">Link</a>' +
+  '<a id="wrapped" href="https://www.google.com/url?q=https%3A%2F%2Fshop.invalid%2Fitem%3Fsku%3D9%26gclid%3Dzz&amp;sa=D">Wrapped</a>' +
   '<iframe src="https://tracker.invalid/frame"></iframe><form action="https://tracker.invalid/form"><input></form>' +
   '<meta http-equiv="refresh" content="0;url=https://tracker.invalid/refresh">' +
   '<script>parent.compromised=true</script><img onerror="parent.compromised=true">';
@@ -64,7 +65,12 @@ const fixture = '<p id="text">Readable message</p>' +
       assert.equal(await page.evaluate(() => !!window.compromised), false);
       assert.equal(await page.frameLocator('iframe').locator('#text').textContent(), 'Readable message');
       assert.equal(await page.frameLocator('iframe').locator('form,script,iframe').count(), 0);
-      assert.equal(await page.frameLocator('iframe').locator('a').getAttribute('rel'), 'noopener noreferrer');
+      const link = page.frameLocator('iframe').locator('a').first();
+      assert.equal(await link.getAttribute('rel'), 'noopener noreferrer');
+      // 追踪参数去掉、业务参数保留；悬停能看到真实地址；跳转包装直接拆到目标
+      assert.equal(await link.getAttribute('href'), 'https://tracker.invalid/click?id=7', renderer + ': tracking params not stripped');
+      assert.equal(await link.getAttribute('title'), 'https://tracker.invalid/click?id=7');
+      assert.equal(await page.frameLocator('iframe').locator('#wrapped').getAttribute('href'), 'https://shop.invalid/item?sku=9', renderer + ': redirect wrapper not unwrapped');
       assert.equal(await page.frameLocator('iframe').locator('img[src^="data:"]').count(), 1);
       assert.ok(await page.frameLocator('iframe').locator('img[src^="data:"]').evaluate(image => image.naturalWidth > 0), renderer + ': inline image did not render');
       page.once('dialog', dialog => dialog.dismiss());

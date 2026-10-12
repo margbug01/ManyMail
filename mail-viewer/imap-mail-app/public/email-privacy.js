@@ -14,6 +14,45 @@
     }
   }
 
+  // 链接里用来认人/记来源的参数。去掉不影响打开页面，但营销平台就对不上是谁点的了
+  const trackingParam = /^(utm_\w+|fbclid|gclid|gclsrc|gbraid|wbraid|dclid|msclkid|yclid|twclid|ttclid|li_fat_id|igshid|mc_cid|mc_eid|_hsenc|_hsmi|__hssc|__hstc|__hsfp|hsctatracking|mkt_tok|oly_anon_id|oly_enc_id|vero_id|vero_conv|ck_subscriber_id|_kx|sc_cid|s_cid|trk|trkcampaign|spm|ref_src)$/i;
+
+  // 常见的「跳转包装」：真实地址在参数里，拆出来直接去，不经过中转站
+  function unwrapRedirect(url) {
+    const host = url.hostname.toLowerCase();
+    let inner = null;
+    if (/(^|\.)google\.[a-z.]+$/.test(host) && url.pathname === '/url') inner = url.searchParams.get('q') || url.searchParams.get('url');
+    else if (host.endsWith('.safelinks.protection.outlook.com')) inner = url.searchParams.get('url');
+    else if ((host === 'l.facebook.com' || host === 'lm.facebook.com') && url.pathname === '/l.php') inner = url.searchParams.get('u');
+    else if (host === 'l.instagram.com') inner = url.searchParams.get('u');
+    else if (host === 'www.linkedin.com' && url.pathname === '/redir/redirect') inner = url.searchParams.get('url');
+    if (!inner) return url;
+    try {
+      const target = new URL(inner);
+      return ['http:', 'https:'].includes(target.protocol) ? target : url;
+    } catch {
+      return url;
+    }
+  }
+
+  function cleanLink(href) {
+    let url;
+    try {
+      url = new URL(href);
+    } catch {
+      return href;
+    }
+    for (let depth = 0; depth < 3; depth++) {
+      const next = unwrapRedirect(url);
+      if (next === url) break;
+      url = next;
+    }
+    Array.from(url.searchParams.keys()).forEach(key => {
+      if (trackingParam.test(key)) url.searchParams.delete(key);
+    });
+    return url.href;
+  }
+
   function prepare(html, allowImages) {
     const template = document.createElement('template');
     template.innerHTML = html || '';
@@ -29,7 +68,13 @@
       });
       if (element.localName === 'a') {
         const href = element.getAttribute('href') || '';
-        if (!remoteUrl(href) && !/^mailto:[^\s]+$/i.test(href) && !href.startsWith('#')) element.removeAttribute('href');
+        const remote = remoteUrl(href);
+        if (remote) {
+          const cleaned = cleanLink(remote);
+          element.setAttribute('href', cleaned);
+          // 悬停显示真正要去的地址：显示文字可以随便写，营销邮件的点击跳转站也藏在这里
+          element.setAttribute('title', cleaned);
+        } else if (!/^mailto:[^\s]+$/i.test(href) && !href.startsWith('#')) element.removeAttribute('href');
         element.setAttribute('target', '_blank');
         element.setAttribute('rel', 'noopener noreferrer');
         element.setAttribute('referrerpolicy', 'no-referrer');
