@@ -129,8 +129,9 @@ if [ -n "$SERVICES" ]; then
     exit 1
   fi
   # The IMAP bridge ships its unit tests in the image; run them against what was just built.
+  # </dev/null matters: this script arrives on stdin, and `exec -T` would swallow the rest of it.
   case " $SERVICES " in *" imap-mail "*)
-    if ! docker compose exec -T imap-mail npm test >/tmp/imap-mail-test.log 2>&1; then
+    if ! docker compose exec -T imap-mail npm test </dev/null >/tmp/imap-mail-test.log 2>&1; then
       tail -30 /tmp/imap-mail-test.log >&2
       echo "WARNING: imap-mail unit tests failed after deploy." >&2
       echo "Rollback: cd $DIR && sudo git reset -q --keep $OLD && sudo docker compose up -d --build --no-deps$SERVICES" >&2
