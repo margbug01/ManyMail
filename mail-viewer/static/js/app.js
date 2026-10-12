@@ -2202,3 +2202,15 @@ async function trashAction(url, messageId, okMessage) {
         toastError(t('networkError') + ': ' + e.message);
     }
 }
+
+// 滚动条平时隐藏：正在滚动的元素临时挂 .is-scrolling 让它显示，停下 0.8 秒后收起（触控板/触屏没有 hover 也看得到）
+(function () {
+    const timers = new WeakMap();
+    document.addEventListener('scroll', (e) => {
+        const el = e.target === document ? document.documentElement : e.target;
+        if (!el.classList) return;
+        el.classList.add('is-scrolling');
+        clearTimeout(timers.get(el));
+        timers.set(el, setTimeout(() => el.classList.remove('is-scrolling'), 800));
+    }, true);
+})();

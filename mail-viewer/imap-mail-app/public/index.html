@@ -280,7 +280,7 @@ html.embedded-mode .sidebar-header {
 }
 
 .mail-row {
-  padding: 9px 14px 9px 12px;
+  padding: 12px 18px 12px 14px;
   border-bottom: 1px solid #e6efeb;
   cursor: pointer;
   display: flex;
@@ -316,8 +316,8 @@ html.embedded-mode .sidebar-header {
   display: flex;
   justify-content: space-between;
   align-items: baseline;
-  gap: 8px;
-  margin-bottom: 2px;
+  gap: 12px;
+  margin-bottom: 4px;
 }
 
 .mail-from {
@@ -851,10 +851,14 @@ html.embedded-mode .sidebar-header {
 .tab-content { display: none; }
 .tab-content.active { display: block; }
 
-::-webkit-scrollbar { width: 6px; }
-::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: #c7d8d1; border-radius: 3px; }
-::-webkit-scrollbar-thumb:hover { background: #a8c0b7; }
+/* 滚动条：和外层页面同一套，淡色细条，平时隐藏；鼠标移上或正在滚动（.is-scrolling）时才出现 */
+* { scrollbar-width: thin; scrollbar-color: transparent transparent; }
+*:hover, .is-scrolling { scrollbar-color: rgba(108,135,125,0.32) transparent; }
+*::-webkit-scrollbar { width: 8px; height: 8px; }
+*::-webkit-scrollbar-track { background: transparent; }
+*::-webkit-scrollbar-thumb { background-color: transparent; border-radius: 999px; border: 2px solid transparent; background-clip: padding-box; }
+*:hover::-webkit-scrollbar-thumb, .is-scrolling::-webkit-scrollbar-thumb { background-color: rgba(108,135,125,0.32); }
+*::-webkit-scrollbar-thumb:hover { background-color: rgba(108,135,125,0.5); }
 
 @media (max-width: 991.98px) {
   .app {
@@ -1117,7 +1121,7 @@ html.embedded-mode .detail-back:hover {
   .toolbar button { width: 40px; flex-shrink: 0; }
   .toolbar select { width: 64px; flex-shrink: 0; }
   .toolbar input[type="text"] { font-family: inherit; font-size: 14px; line-height: 20px; }
-  .mail-row { padding: 11px 12px; gap: 8px; }
+  .mail-row { padding: 12px 16px 12px 14px; gap: 8px; }
   .mail-row-top { align-items: center; margin-bottom: 4px; gap: 12px; }
   .mail-from { display: block; font-size: 14px; line-height: 22px; white-space: nowrap; text-overflow: ellipsis; }
   .mail-subject { display: block; font-size: 14px; line-height: 22px; white-space: nowrap; text-overflow: ellipsis; }
@@ -1179,7 +1183,7 @@ html.embedded-mode .sidebar-section:last-child { border-bottom: 0; }
 @media (min-width: 992px) {
   html.embedded-mode .mail-list-pane { width: clamp(300px, 44%, 560px); }
 }
-.mail-list-scroll { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
+.mail-list-scroll { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; scrollbar-gutter: stable; }
 /* 文件夹按钮组并进顶部工具栏：一整条白色横栏，下面不再多一条灰色带和横线 */
 .toolbar { flex-wrap: wrap; position: relative; z-index: 5; }
 .toolbar input[type="text"] { min-width: 160px; }
@@ -2762,6 +2766,18 @@ async function restoreImapView(s) {
   var index = mailCache.findIndex(function(m) { return String(m.uid) === String(s.uid); });
   if (index >= 0) readMail(index);
 }
+
+// 正在滚动的元素临时挂 .is-scrolling 让滚动条显示，停下 0.8 秒后收起（触控板/触屏没有 hover）
+(function() {
+  var timers = new WeakMap();
+  document.addEventListener('scroll', function(e) {
+    var el = e.target === document ? document.documentElement : e.target;
+    if (!el.classList) return;
+    el.classList.add('is-scrolling');
+    clearTimeout(timers.get(el));
+    timers.set(el, setTimeout(function() { el.classList.remove('is-scrolling'); }, 800));
+  }, true);
+})();
 
 window.addEventListener('resize', syncResponsiveView);
 syncResponsiveView();
