@@ -111,13 +111,13 @@
                 <div class="card h-100">
                     <div class="card-header mail-list-header d-flex flex-wrap justify-content-between align-items-center gap-2">
                         <div class="btn-group btn-group-sm nav-tabs-group" id="folder-seg" role="group">
-                            <button type="button" class="btn btn-primary" id="tab-inbox" aria-pressed="true" onclick="switchTab('inbox')">
+                            <button type="button" class="btn btn-primary" id="tab-inbox" data-i18n-title="inbox" title="收件箱" aria-pressed="true" onclick="switchTab('inbox')">
                                 <i class="bi bi-envelope-open me-1"></i><span data-i18n="inbox">收件箱</span><span id="unread-badge" class="badge ms-1" style="display:none;background:var(--navy);font-size:0.7em;"></span>
                             </button>
-                            <button type="button" class="btn btn-outline-secondary" id="tab-sent" aria-pressed="false" onclick="switchTab('sent')">
+                            <button type="button" class="btn btn-outline-secondary" id="tab-sent" data-i18n-title="sent" title="已发送" aria-pressed="false" onclick="switchTab('sent')">
                                 <i class="bi bi-send me-1"></i><span data-i18n="sent">已发送</span>
                             </button>
-                            <button type="button" class="btn btn-outline-secondary" id="tab-trash" aria-pressed="false" onclick="switchTab('trash')">
+                            <button type="button" class="btn btn-outline-secondary" id="tab-trash" data-i18n-title="trash" title="回收站" aria-pressed="false" onclick="switchTab('trash')">
                                 <i class="bi bi-trash me-1"></i><span data-i18n="trash">回收站</span>
                             </button>
                         </div>
