@@ -3,6 +3,8 @@ const { simpleParser } = require('mailparser');
 const fs = require('fs');
 const path = require('path');
 
+const FOLDER_CACHE_TTL = 10 * 60 * 1000;
+
 class MailClient {
   constructor(account) {
     this.account = account;
@@ -16,6 +18,14 @@ class MailClient {
     this.client.on('error', (err) => {
       console.error(`[${account.name}] 连接错误: ${err.message}`);
     });
+    // 文件夹结构很少变，缓存起来；远端服务器一个往返就要几百毫秒
+    this.folderCache = null;
+    this.folderPromise = null;
+    // 各文件夹最近一次查到的未读数，邮件列表接口直接复用，不再单独发 STATUS
+    this.unseen = new Map();
+    // 未读数统计走单独一条连接：imapflow 同一连接上命令串行，挤在主连接上会拖慢邮件列表
+    this.statusClient = null;
+    this.statusPromise = null;
   }
 
   /** 连接到邮箱服务器 */
@@ -43,8 +53,51 @@ class MailClient {
     }
   }
 
+  /** 文件夹列表（带缓存，并发调用共用同一个请求） */
+  async folders({ fresh = false } = {}) {
+    if (!fresh && this.folderCache && Date.now() - this.folderCache.at < FOLDER_CACHE_TTL) {
+      return this.folderCache.list;
+    }
+    if (!this.folderPromise) {
+      this.folderPromise = (async () => {
+        await this.ensureConnected();
+        const list = await this.client.list();
+        this.folderCache = { at: Date.now(), list };
+        return list;
+      })().finally(() => { this.folderPromise = null; });
+    }
+    return this.folderPromise;
+  }
+
+  /** 统计专用连接，断了就重建 */
+  async statusConnection() {
+    if (this.statusClient && this.statusClient.usable) return this.statusClient;
+    if (!this.statusPromise) {
+      this.statusPromise = (async () => {
+        const conn = new ImapFlow({
+          host: this.account.host,
+          port: this.account.port,
+          secure: this.account.secure,
+          auth: this.account.auth,
+          logger: false,
+        });
+        conn.on('error', (err) => {
+          console.error(`[${this.account.name}] 统计连接错误: ${err.message}`);
+        });
+        await conn.connect();
+        this.statusClient = conn;
+        return conn;
+      })().finally(() => { this.statusPromise = null; });
+    }
+    return this.statusPromise;
+  }
+
   /** 断开连接 */
   async disconnect() {
+    if (this.statusClient) {
+      try { await this.statusClient.logout(); } catch {}
+      this.statusClient = null;
+    }
     await this.client.logout();
     console.log(`[${this.account.name}] 已断开连接`);
   }

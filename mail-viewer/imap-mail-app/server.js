@@ -143,8 +143,7 @@ app.get('/api/accounts/:id/folders', async (req, res) => {
   const client = clients.get(parseInt(req.params.id, 10));
   if (!client) return res.status(404).json({ error: '账户不存在' });
   try {
-    await client.ensureConnected();
-    const folders = await client.client.list();
+    const folders = await client.folders({ fresh: req.query.fresh === '1' });
     res.json(folders.map(f => ({
       path: f.path,
       name: f.name,
@@ -168,21 +167,29 @@ app.get('/api/accounts/:id/mails', async (req, res) => {
     await client.ensureConnected();
     const lock = await client.client.getMailboxLock(folder);
     try {
-      const status = await client.client.status(folder, { messages: true, unseen: true });
-      const total = status.messages;
+      // 选中文件夹时服务器已经回了总数，不再单独发 STATUS（省一个往返）；
+      // 未读数用 /folders/status 最近一次的结果，还没查过就是 null，前端自行兜底
+      const unseen = client.unseen.has(folder) ? client.unseen.get(folder) : null;
+      let total = client.client.mailbox.exists;
+      if (total === 0 && !before) {
+        // 空文件夹的计数可能是旧的（选中后一直没发过命令），补一个 NOOP 让服务器把新邮件报上来
+        await client.client.noop();
+        total = client.client.mailbox.exists;
+      }
       if (total === 0) {
-        return res.json({ total: 0, unseen: status.unseen, mails: [], hasMore: false });
+        return res.json({ total: 0, unseen, mails: [], hasMore: false });
       }
 
       let startSeq, endSeq;
       if (before) {
         endSeq = before - 1;
         if (endSeq < 1) {
-          return res.json({ total, unseen: status.unseen, mails: [], hasMore: false });
+          return res.json({ total, unseen, mails: [], hasMore: false });
         }
         startSeq = Math.max(1, endSeq - count + 1);
       } else {
-        endSeq = total;
+        // 首屏用 *：由服务器按当下解析，计数没来得及更新时新到的邮件也不会漏
+        endSeq = '*';
         startSeq = Math.max(1, total - count + 1);
       }
 
@@ -208,7 +215,8 @@ app.get('/api/accounts/:id/mails', async (req, res) => {
       }
 
       mails.sort((a, b) => new Date(b.date) - new Date(a.date));
-      res.json({ total, unseen: status.unseen, mails, hasMore: startSeq > 1 });
+      // fetch 期间服务器报来的 EXISTS 已经更新到 mailbox 上
+      res.json({ total: Math.max(total, client.client.mailbox.exists || 0), unseen, mails, hasMore: startSeq > 1 });
     } finally {
       lock.release();
     }
@@ -482,14 +490,24 @@ app.get('/api/accounts/:id/folders/status', async (req, res) => {
   if (!client) return res.status(404).json({ error: '账户不存在' });
 
   try {
-    await client.ensureConnected();
-    const folders = await client.client.list();
+    const folders = await client.folders();
     const selectable = folders.filter(f => !f.flags?.has('\\Noselect')).slice(0, 20);
+
+    // 走统计专用连接，不跟邮件列表抢主连接；建不起来再退回主连接
+    let conn;
+    try {
+      conn = await client.statusConnection();
+    } catch (err) {
+      console.error(`[${client.account.name}] 统计连接不可用，改用主连接: ${err.message}`);
+      await client.ensureConnected();
+      conn = client.client;
+    }
 
     const statuses = [];
     for (const f of selectable) {
       try {
-        const st = await client.client.status(f.path, { messages: true, unseen: true });
+        const st = await conn.status(f.path, { messages: true, unseen: true });
+        client.unseen.set(f.path, st.unseen);
         statuses.push({ path: f.path, name: f.name, messages: st.messages, unseen: st.unseen });
       } catch {
         statuses.push({ path: f.path, name: f.name, messages: 0, unseen: 0 });

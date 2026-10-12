@@ -1467,6 +1467,89 @@ let selectedUids = new Set();
 let folderCache = [];
 let folderUnseen = {};
 let accountCache = [];
+
+// === 列表缓存：先画上次的结果，后台再拉最新的（远端 IMAP 一个往返就要近 300ms） ===
+var IMAP_CACHE_KEY = 'manymail-imap-cache';
+var LIST_CACHE_MAX = 24;
+var listCache = {};         // '账号|文件夹' -> { mails, hasMore, oldestSeq, total, unseen }
+var foldersByAccount = {};  // 账号 -> 可选文件夹
+var unseenByAccount = {};   // 账号 -> { 文件夹: 未读数 }
+var listInflight = {};      // 同一个列表的并发请求共用一个
+var loadSeq = 0;            // 只认最后一次 loadMails 的结果
+var mailCacheKey = null;    // 当前 mailCache 属于哪个列表；搜索结果为 null，不写回缓存
+var persistTimer = null;
+
+(function restoreImapCache() {
+  try {
+    var c = JSON.parse(sessionStorage.getItem(IMAP_CACHE_KEY) || '{}') || {};
+    listCache = c.lists || {};
+    foldersByAccount = c.folders || {};
+    unseenByAccount = c.unseen || {};
+  } catch (e) {}
+})();
+
+function persistImapCache() {
+  clearTimeout(persistTimer);
+  persistTimer = setTimeout(function() {
+    var keys = Object.keys(listCache);
+    keys.slice(0, Math.max(0, keys.length - LIST_CACHE_MAX)).forEach(function(k) { delete listCache[k]; });
+    try {
+      sessionStorage.setItem(IMAP_CACHE_KEY, JSON.stringify({ lists: listCache, folders: foldersByAccount, unseen: unseenByAccount }));
+    } catch (e) {}
+  }, 300);
+}
+
+// 用邮箱地址当缓存键：服务端重启后账号 id 会按顺序重新分配，id 不可靠
+function acctKey(accountId) {
+  var email = accountEmail(accountId);
+  return email ? email.toLowerCase() : 'id:' + accountId;
+}
+
+function listKey(accountId, folder) {
+  return acctKey(accountId) + '|' + folder;
+}
+
+function putListCache(key, entry) {
+  delete listCache[key];  // 挪到末尾，超量时先丢最久没用的
+  listCache[key] = entry;
+  persistImapCache();
+}
+
+function fetchMailList(accountId, folder) {
+  var key = listKey(accountId, folder);
+  if (!listInflight[key]) {
+    listInflight[key] = api('GET', '/api/accounts/' + accountId + '/mails?folder=' + encodeURIComponent(folder) + '&count=30')
+      .then(function(data) {
+        var mails = data.mails || [];
+        var entry = {
+          mails: mails,
+          hasMore: data.hasMore,
+          oldestSeq: mails.length ? Math.min.apply(null, mails.map(function(m) { return m.seq; })) : null,
+          total: data.total,
+          unseen: data.unseen,
+        };
+        putListCache(key, entry);
+        return entry;
+      })
+      .finally(function() { delete listInflight[key]; });
+  }
+  return listInflight[key];
+}
+
+function listSummary(entry, accountId, folder) {
+  var fresh = (unseenByAccount[acctKey(accountId)] || {})[folder];
+  var unseen = fresh != null ? fresh : entry.unseen;
+  return unseen != null ? t('infoSummary', { total: entry.total, unseen: unseen }) : t('infoTotal', { total: entry.total });
+}
+
+function forgetAccountCache(accountId) {
+  var prefix = acctKey(accountId) + '|';
+  Object.keys(listCache).forEach(function(k) { if (k.indexOf(prefix) === 0) delete listCache[k]; });
+  delete foldersByAccount[acctKey(accountId)];
+  delete unseenByAccount[acctKey(accountId)];
+  persistImapCache();
+}
+
 const LANGS = {
   zh: {
     brandTitle: 'ManyMail',
@@ -1517,6 +1600,7 @@ const LANGS = {
     importSuccess: '成功',
     copiedPrefix: '已复制：',
     infoSummary: '共 {total} 封 / 未读 {unseen} 封',
+    infoTotal: '共 {total} 封',
     searchSummary: '搜索结果：共 {count} 封',
     importing: '正在导入 {count} 个账户...',
     importDone: '导入完成：成功 {success} / 共 {total}',
@@ -1597,6 +1681,7 @@ const LANGS = {
     importSuccess: 'Success',
     copiedPrefix: 'Copied: ',
     infoSummary: '{total} total / {unseen} unread',
+    infoTotal: '{total} total',
     searchSummary: 'Search results: {count}',
     importing: 'Importing {count} accounts...',
     importDone: 'Import complete: {success} succeeded / {total} total',
@@ -1756,6 +1841,7 @@ function copyAccountEmail(id, event) {
 async function removeAccount(id) {
   if (!confirm(t('disconnectConfirm', { email: accountEmail(id) }))) return;
   await api('DELETE', '/api/accounts/' + id);
+  forgetAccountCache(id);
   if (activeAccountId === id) {
     activeAccountId = null;
     saveImapView({ account: null, folder: 'INBOX', uid: null });
@@ -1769,13 +1855,23 @@ async function removeAccount(id) {
 
 // === 文件夹 ===
 async function loadFolders(id) {
+  var key = acctKey(id);
+  // 有缓存先画，未读角标也先用上次的
+  folderUnseen = unseenByAccount[key] || {};
+  if (foldersByAccount[key]) {
+    folderCache = foldersByAccount[key];
+    document.getElementById('folder-section').style.display = 'flex';
+    renderFolders();
+  }
+  loadFolderStatus(id);
   const folders = await api('GET', '/api/accounts/' + id + '/folders');
   const selectable = folders.filter(f => !f.noselect);
+  foldersByAccount[key] = selectable;
+  persistImapCache();
+  if (id !== activeAccountId) return;
   folderCache = selectable;
   document.getElementById('folder-section').style.display = 'flex';
   renderFolders();
-  // Load unread counts in background
-  loadFolderStatus(id);
 }
 
 // 文件夹按钮放不下时，竖向滚轮直接横向滚动
@@ -1852,10 +1948,16 @@ document.addEventListener('keydown', function(e) {
 async function loadFolderStatus(id) {
   try {
     var statuses = await api('GET', '/api/accounts/' + id + '/folders/status');
+    var map = {};
+    statuses.forEach(function(s) { map[s.path] = s.unseen; });
+    unseenByAccount[acctKey(id)] = map;
+    persistImapCache();
     if (id !== activeAccountId) return;
-    folderUnseen = {};
-    statuses.forEach(function(s) { folderUnseen[s.path] = s.unseen; });
+    folderUnseen = map;
     renderFolders();
+    // 邮件列表接口不再带实时未读数，这里拿到后顺手刷新顶部计数
+    var entry = listCache[listKey(id, activeFolder)];
+    if (entry && mailCacheKey === listKey(id, activeFolder)) setMailInfo(listSummary(entry, id, activeFolder));
   } catch (e) {}
 }
 
@@ -1864,7 +1966,9 @@ function selectFolder(path) {
   saveImapView({ folder: path, uid: null });
   detailVisible = false;
   syncResponsiveView();
-  loadFolders(activeAccountId);
+  // 文件夹结构没变，只换高亮；未读数后台刷新
+  renderFolders();
+  loadFolderStatus(activeAccountId);
   loadMails();
 }
 
@@ -1926,22 +2030,53 @@ async function loadMails() {
   if (!activeAccountId) return;
   detailVisible = false;
   syncResponsiveView();
+  var accountId = activeAccountId, folder = activeFolder;
+  var key = listKey(accountId, folder);
+  var seq = ++loadSeq;
+  var cached = listCache[key];
   const el = document.getElementById('mail-list');
-  el.innerHTML = '<div class="loading">' + t('loading') + '</div>';
+  if (cached) {
+    applyMailList(key, cached, accountId, folder, true);
+  } else {
+    mailCacheKey = null;
+    el.innerHTML = '<div class="loading">' + t('loading') + '</div>';
+  }
   try {
-    const data = await api('GET', '/api/accounts/' + activeAccountId + '/mails?folder=' + encodeURIComponent(activeFolder) + '&count=30');
-    mailCache = data.mails || [];
-    hasMore = data.hasMore;
-    selectedMailIndex = -1;
-    if (hasMore) oldestSeq = Math.min.apply(null, mailCache.map(function(m) { return m.seq; }));
-    setMailInfo(t('infoSummary', { total: data.total, unseen: data.unseen }));
-    renderMailList(mailCache);
+    var fresh = await fetchMailList(accountId, folder);
+    if (seq !== loadSeq) return;  // 期间切去了别的账号/文件夹
+    // 内容没变就不重画，免得列表闪一下
+    if (cached && mailCacheKey === key && JSON.stringify(fresh.mails) === JSON.stringify(mailCache.slice(0, fresh.mails.length)) && fresh.total === cached.total) {
+      setMailInfo(listSummary(fresh, accountId, folder));
+      return;
+    }
+    applyMailList(key, fresh, accountId, folder, true);
   } catch (err) {
-    el.innerHTML = '<div class="detail-empty">' + err.message + '</div>';
+    if (seq !== loadSeq) return;
+    if (!cached) el.innerHTML = '<div class="detail-empty">' + esc(err.message) + '</div>';
   }
 }
 
+function applyMailList(key, entry, accountId, folder, keepSelection) {
+  // 后台刷新回来时按 uid 保住当前选中的那封
+  var selectedUid = keepSelection && mailCacheKey === key && mailCache[selectedMailIndex] ? mailCache[selectedMailIndex].uid : null;
+  mailCacheKey = key;
+  mailCache = entry.mails.slice();
+  hasMore = entry.hasMore;
+  oldestSeq = entry.oldestSeq;
+  selectedMailIndex = selectedUid == null ? -1 : mailCache.findIndex(function(m) { return m.uid === selectedUid; });
+  setMailInfo(listSummary(entry, accountId, folder));
+  renderMailList(mailCache);
+}
+
+// 列表在本地被改过（已读、星标、删除、加载更多）就写回缓存，下次直接用
+function syncListCache() {
+  if (!mailCacheKey || mailCacheKey !== listKey(activeAccountId, activeFolder)) return;
+  var old = listCache[mailCacheKey] || {};
+  putListCache(mailCacheKey, { mails: mailCache.slice(), hasMore: hasMore, oldestSeq: oldestSeq, total: old.total, unseen: old.unseen });
+}
+
 function renderMailList(mails) {
+  if (mails === mailCache) syncListCache();
   const el = document.getElementById('mail-list');
   if (mails.length === 0) {
     el.innerHTML = '<div class="detail-empty">' + richEmpty('noMailsTitle', 'noMailsDesc') + '</div>';
@@ -2073,6 +2208,7 @@ async function readMail(index) {
 }
 
 function refreshMails() {
+  selectedMailIndex = -1;  // 详情会被清空，列表高亮也一起去掉
   loadMails();
   resetMailDetail();
 }
@@ -2106,6 +2242,8 @@ async function doSearch() {
   try {
     var field = document.getElementById('search-field').value || 'subject';
     var mails = await api('GET', '/api/accounts/' + activeAccountId + '/search?folder=' + encodeURIComponent(activeFolder) + '&q=' + encodeURIComponent(q) + '&field=' + field);
+    loadSeq++;           // 作废还在路上的列表刷新，别让它把搜索结果顶掉
+    mailCacheKey = null;  // 搜索结果不写回文件夹缓存
     mailCache = mails;
     hasMore = false;
     selectedMailIndex = -1;
@@ -2627,7 +2765,27 @@ async function restoreImapView(s) {
 
 window.addEventListener('resize', syncResponsiveView);
 syncResponsiveView();
-loadAccounts().then(function() { return restoreImapView(pendingImapView); }).catch(function() {});
+// 后台把其他账号的收件箱和文件夹先拉一遍，第一次点过去也是秒开；一个一个来，不挤服务器
+async function prefetchOtherAccounts() {
+  for (var i = 0; i < accountCache.length; i++) {
+    var id = accountCache[i].id;
+    if (id === activeAccountId || document.hidden) continue;
+    var key = acctKey(id);
+    try {
+      if (!listCache[listKey(id, 'INBOX')]) await fetchMailList(id, 'INBOX');
+      if (!foldersByAccount[key]) {
+        var folders = await api('GET', '/api/accounts/' + id + '/folders');
+        foldersByAccount[key] = folders.filter(function(f) { return !f.noselect; });
+        persistImapCache();
+      }
+    } catch (e) {}
+  }
+}
+
+loadAccounts()
+  .then(function() { return restoreImapView(pendingImapView); })
+  .then(function() { setTimeout(prefetchOtherAccounts, 1500); })
+  .catch(function() {});
 applyLang();
 </script>
 
