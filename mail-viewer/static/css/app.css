@@ -721,6 +721,19 @@ body {
 .mail-time { font-variant-numeric: tabular-nums; }
 .detail-actions .btn-label { margin-left: 0.25rem; }
 
+/* 三栏卡片头同高：中栏有一排 btn-sm，左右只有文字，不统一的话底线会错开几像素 */
+@media (min-width: 992px) {
+    .mail-query-card > .card-header,
+    #mail-list-column > .card > .card-header,
+    #mail-detail-column > .card > .card-header {
+        display: flex;
+        align-items: center;
+        min-height: 54px;
+        padding-top: 8px;
+        padding-bottom: 8px;
+    }
+}
+
 @media (max-width: 991.98px) {
     .mail-shell { padding: 8px !important; }
     #mail-layout { --bs-gutter-x: 0; --bs-gutter-y: 8px; }

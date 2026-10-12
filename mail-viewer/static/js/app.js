@@ -760,7 +760,8 @@ async function _doDeleteDomain(domain) {
 document.addEventListener('DOMContentLoaded', () => {
     applyLang();
     renderRecentMailboxes();
-    loadDomains();
+    // 恢复邮箱要等域名下拉框填好
+    loadDomains().then(restoreViewState);
     _initRecipientInput();
     document.getElementById('compose-subject').addEventListener('input', saveDraft);
     document.getElementById('compose-from-prefix').addEventListener('input', saveDraft);
@@ -833,6 +834,60 @@ let currentTab = 'inbox';
 let lastFolderTab = 'inbox';
 const FOLDER_TABS = ['inbox', 'sent', 'trash'];
 
+// ---- 刷新后恢复视图：停在哪个 Tab、查的哪个邮箱、打开的哪封信（按标签页存，关了就清） ----
+const VIEW_KEY = 'manymail-view';
+
+function loadViewState() {
+    try {
+        const s = JSON.parse(sessionStorage.getItem(VIEW_KEY) || '{}');
+        return s && typeof s === 'object' ? s : {};
+    } catch (e) {
+        return {};
+    }
+}
+
+function saveViewState(patch) {
+    try {
+        sessionStorage.setItem(VIEW_KEY, JSON.stringify({ ...loadViewState(), ...patch }));
+    } catch (e) {}
+}
+
+function _waitForElement(selector, timeout = 6000) {
+    return new Promise(resolve => {
+        const start = Date.now();
+        const tick = () => {
+            const el = document.querySelector(selector);
+            if (el || Date.now() - start > timeout) return resolve(el);
+            setTimeout(tick, 100);
+        };
+        tick();
+    });
+}
+
+async function restoreViewState() {
+    // 先整份读出来：下面的 queryInbox / switchTab 会顺手把 msg 清掉
+    const { tab, folder, email, msg } = loadViewState();
+    if (FOLDER_TABS.includes(folder)) lastFolderTab = folder;
+    if (tab === 'imap') switchTab('imap');
+
+    const [prefix, domain] = typeof email === 'string' ? email.split('@') : [];
+    if (prefix && activeDomains.includes(domain)) {
+        document.getElementById('inbox-domain').value = domain;
+        document.getElementById('inbox-domain-display').textContent = '@' + domain;
+        document.getElementById('inbox-prefix').value = prefix;
+        // IMAP 下在后台静默查，切回「邮件」时列表已经在了
+        await queryInbox(tab === 'imap');
+    }
+    if (tab === 'imap' || !currentEmail) return;
+    if (tab === 'sent' || tab === 'trash') switchTab(tab);
+    if (!msg) return;
+
+    const el = await _waitForElement(`.mail-item[data-msg-id="${CSS.escape(msg)}"]`);
+    if (!el || currentTab !== (tab || 'inbox')) return;
+    if (currentTab === 'sent') viewSentDetailById(msg, el);
+    else viewMailDetail(msg, el, currentTab === 'trash');
+}
+
 // 顶部模式切换 + 列表头文件夹分段控件的选中态都在这里同步
 function _syncListHeader(tab) {
     const isImap = tab === 'imap';
@@ -850,6 +905,7 @@ function _syncListHeader(tab) {
 function switchTab(tab) {
     currentTab = tab;
     if (FOLDER_TABS.includes(tab)) lastFolderTab = tab;
+    saveViewState({ tab, folder: lastFolderTab });
     const searchBar = document.getElementById('search-bar');
     const batchBar = document.getElementById('batch-bar');
     const leftColumn = document.getElementById('mail-left-column');
@@ -967,6 +1023,7 @@ function renderSentMessages(messages) {
 async function viewSentDetailById(messageId, element) {
     const msg = currentSentMessages.find(item => item.id === messageId);
     if (!msg) return;
+    saveViewState({ msg: messageId });
     document.querySelectorAll('.mail-item').forEach(el => el.classList.remove('active'));
     if (element) element.classList.add('active');
     showMailDetailView();
@@ -1060,6 +1117,7 @@ function resetMailDetail() {
                 </div>`;
     document.querySelectorAll('.mail-item').forEach(el => el.classList.remove('active'));
     window._currentDetailMsg = null;
+    saveViewState({ msg: null });
     showMailListView();
 }
 
@@ -1132,6 +1190,7 @@ async function queryInbox(silent = false, append = false) {
         }
 
         currentEmail = email;
+        saveViewState({ email });
         currentTotal = data.total || 0;
         isSearchMode = false;
         if (!silent) {
@@ -1416,6 +1475,7 @@ async function downloadEml(messageId) {
 
 async function viewMailDetail(messageId, element, isTrash = false) {
     if (!currentEmail) return;
+    saveViewState({ msg: messageId });
 
     document.querySelectorAll('.mail-item').forEach(el => el.classList.remove('active'));
     if (element) element.classList.add('active');
