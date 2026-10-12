@@ -91,6 +91,7 @@ const LANGS = {
         copied: '已复制 {v}',
         copyFailed: '复制失败，请手动选中',
         copyCode: '点击复制验证码',
+        copyMailbox: '复制邮箱地址',
         undo: '撤销',
         mailDeleted: '邮件已删除',
         mailsDeleted: '已删除 {n} 封邮件',
@@ -214,6 +215,7 @@ const LANGS = {
         copied: 'Copied {v}',
         copyFailed: 'Copy failed, select it manually',
         copyCode: 'Click to copy code',
+        copyMailbox: 'Copy address',
         undo: 'Undo',
         mailDeleted: 'Email deleted',
         mailsDeleted: '{n} emails deleted',
@@ -461,6 +463,9 @@ function renderRecentMailboxes() {
         return `
                     <span class="recent-pill${stale ? ' recent-stale' : ''}" title="${stale ? t('recentStale') : safe}">
                         <span class="recent-pill-label" ${stale ? '' : `onclick="useRecentMailbox(decodeURIComponent('${encoded}'))"`}>${safe}</span>
+                        <button type="button" class="recent-pill-copy" onclick="copyText(decodeURIComponent('${encoded}'), event)" title="${t('copyMailbox')}" aria-label="copy">
+                            <i class="bi bi-clipboard"></i>
+                        </button>
                         <button type="button" class="recent-pill-remove" onclick="removeRecentMailbox(decodeURIComponent('${encoded}'))" aria-label="remove">
                             <i class="bi bi-x-lg"></i>
                         </button>
@@ -840,7 +845,6 @@ function _syncListHeader(tab) {
     setActive(document.getElementById('tab-mail'), !isImap);
     setActive(document.getElementById('tab-imap'), isImap);
     FOLDER_TABS.forEach(f => setActive(document.getElementById(`tab-${f}`), f === tab));
-    document.getElementById('mail-list-mailbox').textContent = currentEmail || '';
 }
 
 function switchTab(tab) {

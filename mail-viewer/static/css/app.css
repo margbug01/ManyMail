@@ -63,12 +63,6 @@ body {
 }
 .mode-group { margin: 0 auto; }
 .mail-list-header { padding-top: 10px; padding-bottom: 10px; }
-.mail-list-mailbox {
-    font-size: 0.8rem;
-    color: var(--muted-text);
-    padding: 0 2px 8px;
-}
-.mail-list-mailbox:empty { display: none; }
 @media (max-width: 767.98px) {
     .navbar-brand {
         font-size: 1.35rem;
@@ -535,6 +529,7 @@ body {
     cursor: not-allowed;
     opacity: 0.5;
 }
+.recent-pill-copy,
 .recent-pill-remove {
     border: none;
     background: transparent;
@@ -545,6 +540,8 @@ body {
     cursor: pointer;
     font-size: 0.7rem;
 }
+.recent-pill-copy { margin-right: -4px; }
+.recent-pill-copy:hover { color: var(--primary-color); }
 .recent-pill-remove:hover { color: var(--danger-color); }
 
 /* 收件人 chip 输入 / 附件 chip */
