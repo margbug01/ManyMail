@@ -55,13 +55,25 @@ class MailClient {
 
   /** 文件夹列表（带缓存，并发调用共用同一个请求） */
   async folders({ fresh = false } = {}) {
-    if (!fresh && this.folderCache && Date.now() - this.folderCache.at < FOLDER_CACHE_TTL) {
+    if (!fresh && this.folderCache) {
+      // 过期了也先返回旧的，后台再刷新，不让 LIST 堵住后面的邮件列表请求
+      if (Date.now() - this.folderCache.at >= FOLDER_CACHE_TTL && !this.folderPromise) {
+        this.folders({ fresh: true }).catch(() => {});
+      }
       return this.folderCache.list;
     }
     if (!this.folderPromise) {
       this.folderPromise = (async () => {
-        await this.ensureConnected();
-        const list = await this.client.list();
+        // 已有旧缓存说明是后台刷新，走统计连接；第一次加载没得等，直接用主连接
+        let conn = null;
+        if (this.folderCache) {
+          try { conn = await this.statusConnection(); } catch {}
+        }
+        if (!conn) {
+          await this.ensureConnected();
+          conn = this.client;
+        }
+        const list = await conn.list();
         this.folderCache = { at: Date.now(), list };
         return list;
       })().finally(() => { this.folderPromise = null; });

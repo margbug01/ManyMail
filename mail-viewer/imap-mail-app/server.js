@@ -44,6 +44,8 @@ async function restoreAccounts() {
       const id = ++clientId;
       clients.set(id, client);
       console.log(`  ✓ ${item.account.auth.user} 已恢复`);
+      // 后台预热文件夹缓存，第一次打开这个账号时不用再等 LIST
+      client.folders().catch(() => {});
     } catch (err) {
       console.log(`  ✗ ${item.account.auth.user} 恢复失败: ${err.message}`);
     }
