@@ -11,6 +11,9 @@ from collections import defaultdict
 from functools import lru_cache, wraps
 
 import requests
+import urllib3.connection
+import urllib3.connectionpool
+import urllib3.exceptions
 import bleach
 from bleach.css_sanitizer import CSSSanitizer
 from urllib.parse import urlparse, urljoin, quote
@@ -648,18 +651,52 @@ def image_proxy():
 _MAX_IMAGE_PROXY_REDIRECTS = 5
 
 
-def _peer_ip(resp) -> str:
-    """这次请求实际连上的 IP；拿不到返回空串。"""
-    try:
-        return resp.raw.connection.sock.getpeername()[0]
-    except Exception:
-        return ""
+def _check_public_peer(conn, sock):
+    # 走 HTTP 代理时连的是代理本身，对端 IP 没意义，只靠逐跳地址检查
+    if getattr(conn, "proxy", None):
+        return sock
+    peer = sock.getpeername()[0]
+    if not _is_public_ip(peer):
+        sock.close()
+        raise urllib3.exceptions.NewConnectionError(conn, f"blocked non-public address {peer}")
+    return sock
+
+
+class _PublicOnlyHTTPConnection(urllib3.connection.HTTPConnection):
+    def _new_conn(self):
+        return _check_public_peer(self, super()._new_conn())
+
+
+class _PublicOnlyHTTPSConnection(urllib3.connection.HTTPSConnection):
+    def _new_conn(self):
+        return _check_public_peer(self, super()._new_conn())
+
+
+class _PublicOnlyHTTPPool(urllib3.connectionpool.HTTPConnectionPool):
+    ConnectionCls = _PublicOnlyHTTPConnection
+
+
+class _PublicOnlyHTTPSPool(urllib3.connectionpool.HTTPSConnectionPool):
+    ConnectionCls = _PublicOnlyHTTPSConnection
+
+
+class _PublicOnlyAdapter(requests.adapters.HTTPAdapter):
+    """socket 一连上就检查对端 IP：挡 DNS rebinding（检查时解析到公网、连接时解析到内网）。
+    必须在建连时查——302 这类没正文的响应一收完连接就回池了，事后拿不到对端。"""
+
+    def init_poolmanager(self, *args, **kwargs):
+        super().init_poolmanager(*args, **kwargs)
+        self.poolmanager.pool_classes_by_scheme = {"http": _PublicOnlyHTTPPool, "https": _PublicOnlyHTTPSPool}
+
+
+image_session = requests.Session()
+image_session.mount("http://", _PublicOnlyAdapter(max_retries=1))
+image_session.mount("https://", _PublicOnlyAdapter(max_retries=1))
 
 
 def _fetch_public_image(url: str):
-    """手动跟跳转：每一跳的地址都要是公网，实际连上的 IP 也要是公网。
-    requests 自动跟跳转时中间那几跳不经检查，302 到内网（如云元数据 169.254.169.254）照样会发出去；
-    只查域名解析也挡不住 DNS rebinding（检查时解析到公网，连接时解析到内网）。"""
+    """手动跟跳转，每一跳的地址都要是公网。
+    requests 自动跟跳转时中间那几跳不经检查，302 到内网（如云元数据 169.254.169.254）照样会发出去。"""
     headers = {
         "User-Agent": "Mozilla/5.0 mail-viewer-image-proxy",
         "Accept": "image/*,*/*;q=0.8",
@@ -667,12 +704,7 @@ def _fetch_public_image(url: str):
     for _ in range(_MAX_IMAGE_PROXY_REDIRECTS + 1):
         if not _is_proxyable_image_url(url):
             return None
-        resp = http_session.get(url, timeout=30, stream=True, allow_redirects=False, headers=headers)
-        # 走 HTTP 代理时连上的是代理本身，对端 IP 没有意义，只靠上面的逐跳地址检查
-        via_proxy = bool(requests.utils.get_environ_proxies(url))
-        if not via_proxy and not _is_public_ip(_peer_ip(resp)):
-            resp.close()
-            return None
+        resp = image_session.get(url, timeout=30, stream=True, allow_redirects=False, headers=headers)
         if not resp.is_redirect:
             return resp
         location = resp.headers.get("Location", "")
