@@ -109,7 +109,11 @@ class MailClient {
           await conn.mailboxOpen('INBOX', { readOnly: true });
           this.noteInboxExists(conn.mailbox.exists);
           conn.on('exists', (e) => { if (e.path === 'INBOX') this.noteInboxExists(e.count); });
-          conn.on('expunge', () => { this.inboxVersion++; });
+          conn.on('expunge', () => {
+            this.inboxVersion++;
+            // imapflow 自己已把 exists 减一；这里不跟上的话，下一封新邮件报的 EXISTS 会和旧计数相等而被漏掉
+            this.inboxExists = conn.mailbox.exists;
+          });
         } catch (err) {
           // 盯不了不影响统计，照常用
           console.error(`[${this.account.name}] 无法监听收件箱: ${err.message}`);
