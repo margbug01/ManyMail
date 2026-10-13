@@ -376,6 +376,7 @@ function setLang(code) {
     // 已打开的邮件只重画头部；没打开邮件时重画占位提示（加载中的骨架屏不用管）
     if (document.getElementById('mail-detail-head')) _rerenderDetailHead();
     else if (!window._currentDetailView) resetMailDetail();
+    window.EmailPrivacy?.relabel();
     if (activeId) document.querySelector(`.mail-item[data-msg-id="${CSS.escape(activeId)}"]`)?.classList.add('active');
     checkedIds.forEach(id => {
         const cb = document.querySelector(`.mail-checkbox[value="${CSS.escape(id)}"]`);

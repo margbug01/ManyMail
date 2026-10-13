@@ -346,6 +346,11 @@
     "enterPassword": "Passwort eingeben",
     "login": "Anmelden"
   },
+  "privacy": {
+    "blocked": "Externe Bilder blockiert · Für diese Nachricht laden",
+    "allowed": "Externe Bilder für diese Nachricht erlaubt · Wieder blockieren",
+    "warning": "Beim Laden von Bildern kann der Absender erfahren, dass Sie diese E-Mail geöffnet haben – auch über einen Proxy. Bilder nur für diese Nachricht laden?"
+  },
   "folders": {
     "收件箱": "Posteingang",
     "已发送": "Gesendet",

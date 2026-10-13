@@ -20,6 +20,8 @@ Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Switching language left the open message's buttons and field labels in the old language
   until another message was opened
 - The message list header no longer wraps in languages with longer labels
+- The "External images blocked" button above a message only knew Chinese and English and
+  kept its old language after switching
 
 ## [1.3.0] - 2026-10-13
 

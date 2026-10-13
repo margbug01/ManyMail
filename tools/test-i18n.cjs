@@ -27,6 +27,7 @@ const sources = {
     imap: grab('mail-viewer/imap-mail-app/public/app.js', /const LANGS = \{/, '\n};'),
     rules: grab('mail-viewer/static/js/rules.js', /const TEXT = \{/, '\n    };'),
     login: grab('mail-viewer/templates/login.html', /const LANGS = \{/, '\n        };'),
+    privacy: grab('mail-viewer/imap-mail-app/public/email-privacy.js', /const TEXT = \{/, '\n  };'),
 };
 const folderNames = new Set(Object.values(grab('mail-viewer/imap-mail-app/public/app.js', /var FOLDER_ZH = \{/, '\n};')));
 

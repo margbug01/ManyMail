@@ -110,16 +110,41 @@
     const button = document.createElement('button');
     button.type = 'button';
     button.dataset.emailPrivacy = 'control';
-    const chinese = (document.documentElement.lang || navigator.language).toLowerCase().startsWith('zh');
-    button.textContent = chinese
-      ? (allowImages ? '本封邮件已允许外部图片 · 点击重新屏蔽' : '外部图片已屏蔽 · 加载本封邮件的图片')
-      : (allowImages ? 'External images allowed · Block again' : 'External images blocked · Load for this message');
+    button.dataset.allowImages = allowImages ? '1' : '0';
     button.style.cssText = 'display:block;margin:8px 0;padding:6px 10px;font:inherit;cursor:pointer;';
     button.addEventListener('click', () => {
-      const warning = chinese ? '加载图片可能让发件人知道你已阅读邮件。即使通过代理也无法消除这种追踪。仅为本封邮件加载？' : 'Loading images may tell the sender you opened this email, even through a proxy. Load images for this message only?';
-      if (allowImages || window.confirm(warning)) render(!allowImages);
+      if (allowImages || window.confirm(text('warning'))) render(!allowImages);
     });
     iframe.before(button);
+    relabel(button.parentNode);
+  }
+
+  // 中英文写在这里；其他语言来自 i18n.js 的 privacy 段，没加载 i18n.js 时按 zh / en 二选一
+  const TEXT = {
+    zh: {
+      blocked: '外部图片已屏蔽 · 加载本封邮件的图片',
+      allowed: '本封邮件已允许外部图片 · 点击重新屏蔽',
+      warning: '加载图片可能让发件人知道你已阅读邮件。即使通过代理也无法消除这种追踪。仅为本封邮件加载？',
+    },
+    en: {
+      blocked: 'External images blocked · Load for this message',
+      allowed: 'External images allowed · Block again',
+      warning: 'Loading images may tell the sender you opened this email, even through a proxy. Load images for this message only?',
+    },
+  };
+
+  function text(key) {
+    const pageLang = document.documentElement.lang || navigator.language || 'en';
+    const i18n = window.ManyMailI18n;
+    if (i18n) return i18n.dict(i18n.normalize(pageLang) || 'en', 'privacy', TEXT)[key] || TEXT.en[key];
+    return (String(pageLang).toLowerCase().startsWith('zh') ? TEXT.zh : TEXT.en)[key];
+  }
+
+  // 切换界面语言后调用：按钮在邮件正文 iframe 外面，不会随邮件头部一起重画
+  function relabel(root) {
+    (root || document).querySelectorAll('[data-email-privacy="control"]').forEach((button) => {
+      button.textContent = text(button.dataset.allowImages === '1' ? 'allowed' : 'blocked');
+    });
   }
 
   function freshFrame(iframe) {
@@ -134,5 +159,5 @@
     return iframe;
   }
 
-  window.EmailPrivacy = Object.freeze({ prepare, head, control, freshFrame });
+  window.EmailPrivacy = Object.freeze({ prepare, head, control, freshFrame, relabel });
 }());

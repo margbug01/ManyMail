@@ -351,7 +351,7 @@ async function api(method, url, body) {
   }
   const res = await fetch(API_PREFIX + url, opts);
   const data = await res.json();
-  if (!res.ok) throw new Error(data.error || '请求失败');
+  if (!res.ok) throw new Error(data.error || ('HTTP ' + res.status));
   return data;
 }
 

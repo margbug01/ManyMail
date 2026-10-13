@@ -56,7 +56,7 @@ async function openPage(browser, locale, storage) {
     if (url.pathname === '/api/inbox/detail') {
       const { message_id } = JSON.parse(route.request().postData());
       const msg = MESSAGES.find((m) => m.id === message_id);
-      return json({ success: true, detail: { ...msg, to: [{ address: 'me@example.test' }], text: 'Body text', html: '<p id="body-marker">Body</p>' } });
+      return json({ success: true, detail: { ...msg, to: [{ address: 'me@example.test' }], text: 'Body text', html: '<p id="body-marker">Body</p><img src="https://tracker.example/pixel.png">' } });
     }
     return json({ success: true, messages: [], total: 0 });
   });
@@ -90,6 +90,14 @@ const headText = (page) => page.locator('#mail-detail-head').innerText();
     assert.equal(await page.locator('.mail-item.active').getAttribute('data-msg-id'), 'm1', 'active row lost');
     assert.equal(await page.locator('#lang-label').textContent(), 'EN');
     assert.equal(await page.evaluate(() => document.documentElement.lang), 'en-US');
+
+    // 外部图片按钮在正文 iframe 外面，也要跟着换（以前只认中/英，且切换后不重画）
+    const privacyBtn = page.locator('[data-email-privacy="control"]');
+    assert.equal(await privacyBtn.textContent(), 'External images blocked · Load for this message');
+    await page.evaluate(() => setLang('zh-TW'));
+    assert.equal(await privacyBtn.textContent(), '外部圖片已封鎖 · 載入這封郵件的圖片');
+    await page.evaluate(() => setLang('de'));
+    assert.equal(await privacyBtn.textContent(), 'Externe Bilder blockiert · Für diese Nachricht laden');
 
     // 2. 日语：按钮、字段名、时间格式都跟着变
     await page.evaluate(() => setLang('ja'));

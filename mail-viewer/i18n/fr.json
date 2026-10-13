@@ -346,6 +346,11 @@
     "enterPassword": "Saisissez le mot de passe",
     "login": "Se connecter"
   },
+  "privacy": {
+    "blocked": "Images externes bloquées · Afficher celles de ce message",
+    "allowed": "Images externes autorisées pour ce message · Bloquer à nouveau",
+    "warning": "Charger les images peut indiquer à l’expéditeur que vous avez ouvert ce message, même via un proxy. Charger les images de ce message uniquement ?"
+  },
   "folders": {
     "收件箱": "Boîte de réception",
     "已发送": "Envoyés",
