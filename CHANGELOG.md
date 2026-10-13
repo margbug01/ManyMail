@@ -3,6 +3,63 @@
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.0] - 2026-10-13
+
+Mostly IMAP and webmail work: faster account switching, live inbox updates, a reworked
+mobile layout, and tighter tracking protection. No breaking changes.
+
+### Added
+
+- IMAP server auto-detection from the email address (built-in presets, Thunderbird ISPDB,
+  MX provider lookup, then a TLS probe of `imap.` / `mail.` hosts)
+- Live inbox updates in the IMAP view: a read-only IDLE watcher bumps a version counter,
+  the page polls `/api/changes` and refreshes quietly when something arrives or is deleted
+- Reloading the page restores the open tab, mailbox, folder, and message (both the webmail
+  and the IMAP view)
+- Copy-address button on the recent-mailbox pills
+- Link cleanup in mail bodies: tracking parameters (`utm_*`, `fbclid`, `gclid`, …) are
+  stripped and redirect wrappers (Google, Outlook Safe Links, Facebook, LinkedIn) are
+  unwrapped; the link title shows the real target
+- `tools/deploy-prod.sh` deploys `master` to production, with a UI test gate
+  (`tools/test-ui.sh`, Playwright) and `npm test` inside the rebuilt IMAP container
+
+### Changed
+
+- IMAP account and folder switching is much faster: folder lists are cached and refreshed
+  in the background on a separate stats connection, message lists render from a session
+  cache first, other accounts' inboxes are prefetched
+- Saved IMAP accounts are restored in parallel at startup (about 16 s down to 3 s); an
+  account whose login fails is no longer removed from `accounts.json`
+- Navigation reworked: the navbar switches between Mail and IMAP, folder buttons live in
+  the list header; the IMAP page is redesigned for reading density
+- Mobile layout: compact navbar, short timestamps, icon-only actions, fullscreen compose,
+  message-first IMAP layout; iOS Safari no longer tints the bottom toolbar black
+- Column headers stay on one row in narrow windows (container queries collapse folder
+  tabs to icons)
+- Unified thin scrollbars that only show on hover or while scrolling
+- Front-end split into separate CSS / JS files with content-hashed URLs; the IMAP page is
+  split the same way and the proxy forwards ETag / 304
+- Message size limit is 10 MB (`SMTP_MAX_MESSAGE_BYTES`) in both the SMTP server and the
+  compose fallback
+- The forwarding loop guard only drops auto-replies from forward targets; ordinary mail
+  and automated notifications from them are stored
+
+### Fixed
+
+- Mail could be silently lost when a MIME part decoded to bytes
+- Attached messages, bounces, and calendar invites are kept as attachments; attachment-only
+  mail is accepted; undeclared UTF-8 is decoded
+- Remote image proxy follows redirects manually and checks the peer IP on every hop when
+  the socket connects (no SSRF through 302s or DNS rebinding); responses are
+  `Cache-Control: private`
+- Message previews no longer trigger automatic tracking requests
+- After a delete in the IMAP view, the next new mail was not noticed
+- Favicon 404 (static files were not copied into the image)
+
+### Removed
+
+- Obsolete `deploy.sh` (use `tools/deploy-prod.sh`); manual SMTP scripts moved to `tools/`
+
 ## [1.0.0] - 2026-08-22
 
 First tagged release. ManyMail has been running in production since April 2026; this is the
@@ -41,4 +98,5 @@ point where the feature set and the deployment story are stable enough to pin a 
 - Production hardening guide in `docs/production-hardening.md`
 - CI runs Ruff, Python tests, Node tests, and a Docker build on every push
 
+[1.1.0]: https://github.com/margbug01/ManyMail/releases/tag/v1.1.0
 [1.0.0]: https://github.com/margbug01/ManyMail/releases/tag/v1.0.0
