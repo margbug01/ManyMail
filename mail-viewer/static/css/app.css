@@ -746,3 +746,5 @@ body {
 
 /* 设置里的发信 key 列表：最后一行不要分隔线 */
 #sender-key-list .sender-key-row:last-child { border-bottom: 0 !important; }
+#sender-key-list .btn-link { color: var(--primary-color, #5b9a8b); text-decoration: none; }
+#sender-key-list .btn-link:hover { text-decoration: underline; }
