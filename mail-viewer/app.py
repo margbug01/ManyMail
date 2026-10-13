@@ -122,15 +122,29 @@ def _static_version(filename: str) -> str:
         return hashlib.sha256(f.read()).hexdigest()[:12]
 
 
+_SHARED_DIR = os.path.join(app.root_path, "imap-mail-app", "public")
+
+
+@lru_cache(maxsize=None)
+def _shared_version(filename: str) -> str:
+    with open(os.path.join(_SHARED_DIR, filename), "rb") as f:
+        return hashlib.sha256(f.read()).hexdigest()[:12]
+
+
 @app.context_processor
 def _inject_asset_url():
     # 带内容哈希的静态资源地址：部署后文件一变，浏览器就会拿新版本
-    return {"asset_url": lambda filename: url_for("static", filename=filename, v=_static_version(filename))}
+    return {
+        "asset_url": lambda filename: url_for("static", filename=filename, v=_static_version(filename)),
+        "shared_url": lambda filename: f"/{filename}?v={_shared_version(filename)}",
+    }
 
 
+# 和 IMAP 子页面共用的脚本，放在 imap-mail-app/public 里，两边各自对外提供
 @app.get("/email-privacy.js")
-def email_privacy_script():
-    return send_from_directory(os.path.join(app.root_path, "imap-mail-app", "public"), "email-privacy.js")
+@app.get("/i18n.js")
+def shared_script():
+    return send_from_directory(_SHARED_DIR, request.path.lstrip("/"))
 
 
 def _require_production_value(name: str, value: str, disallowed: set[str] | None = None):

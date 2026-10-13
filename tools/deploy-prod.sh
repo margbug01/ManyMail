@@ -90,7 +90,7 @@ while IFS= read -r f; do
     */tests/*|*/test/*|*.md|docs/*|tools/*|.github/*|.env.example|.gitignore) ;;
     mail-service/*) add mail-service ;;
     router/*) add mail-router ;;
-    mail-viewer/imap-mail-app/public/email-privacy.js) add imap-mail; add mail-viewer ;;
+    mail-viewer/imap-mail-app/public/email-privacy.js|mail-viewer/imap-mail-app/public/i18n.js) add imap-mail; add mail-viewer ;;
     mail-viewer/imap-mail-app/*) add imap-mail ;;
     mail-viewer/*) add mail-viewer ;;
     docker-compose.yml|Caddyfile|.env.example)

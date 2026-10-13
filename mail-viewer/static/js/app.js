@@ -173,6 +173,7 @@ const LANGS = {
         keyConfirmRemove: 'Remove the Resend key for {domain}? Sending falls back to .env.',
         enterDomain: 'Enter domain, e.g. example.com',
         domainTip: 'Enter prefix to query. Mailbox auto-created if not exists.',
+        mail: 'Mail',
         inbox: 'Inbox',
         sent: 'Sent',
         trash: 'Trash',
@@ -287,14 +288,37 @@ const LANGS = {
     }
 };
 
-let currentLang = localStorage.getItem('manymail-lang') || 'zh';
+let currentLang = ManyMailI18n.detect();
+let currentDict = ManyMailI18n.dict(currentLang, 'app', LANGS);
 
 function t(key, params) {
-    let s = (LANGS[currentLang] || LANGS.zh)[key] || key;
+    let s = currentDict[key] || LANGS.zh[key] || key;
     if (params) {
         Object.keys(params).forEach(k => { s = s.replace(`{${k}}`, params[k]); });
     }
     return s;
+}
+
+// 日期、时间格式跟着界面语言走
+function _locale() {
+    return ManyMailI18n.locale(currentLang);
+}
+
+function renderLangMenu() {
+    const menu = document.getElementById('lang-menu');
+    if (!menu) return;
+    menu.replaceChildren(...ManyMailI18n.languages.map(lang => {
+        const li = document.createElement('li');
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'dropdown-item' + (lang.code === currentLang ? ' active' : '');
+        btn.lang = lang.locale;
+        btn.textContent = lang.name;
+        if (lang.code === currentLang) btn.setAttribute('aria-current', 'true');
+        btn.addEventListener('click', () => setLang(lang.code));
+        li.appendChild(btn);
+        return li;
+    }));
 }
 
 function applyLang() {
@@ -307,13 +331,34 @@ function applyLang() {
     document.querySelectorAll('[data-i18n-title]').forEach(el => {
         el.title = t(el.dataset.i18nTitle);
     });
-    document.getElementById('lang-label').textContent = currentLang === 'zh' ? 'EN' : '中';
-    document.documentElement.lang = currentLang === 'zh' ? 'zh-CN' : 'en';
+    const info = ManyMailI18n.info(currentLang);
+    document.getElementById('lang-label').textContent = info.short;
+    document.getElementById('btn-lang')?.setAttribute('title', info.name);
+    document.documentElement.lang = info.locale;
+    renderLangMenu();
+    fitListHeader();
 }
 
-function toggleLang() {
-    currentLang = currentLang === 'zh' ? 'en' : 'zh';
-    localStorage.setItem('manymail-lang', currentLang);
+// 中栏卡片头一行放不下时先收文件夹文字、再收「自动」。CSS 容器查询的阈值是按中英文量的，
+// 法语、俄语这类长文字要实际量：最后一组掉到第一组下面就算折行了
+function fitListHeader() {
+    const header = document.querySelector('.mail-list-header');
+    if (!header || !header.getClientRects().length) return;
+    const wraps = () => {
+        const kids = header.children;
+        return kids[kids.length - 1].getBoundingClientRect().top >= kids[0].getBoundingClientRect().bottom - 1;
+    };
+    header.classList.remove('compact-tabs', 'compact-auto');
+    if (wraps()) header.classList.add('compact-tabs');
+    if (wraps()) header.classList.add('compact-auto');
+}
+
+function setLang(code) {
+    const next = ManyMailI18n.normalize(code);
+    if (!next || next === currentLang) return;
+    currentLang = next;
+    currentDict = ManyMailI18n.dict(currentLang, 'app', LANGS);
+    ManyMailI18n.save(currentLang);
     applyLang();
     const imapFrame = document.getElementById('imap-frame');
     try {
@@ -322,11 +367,21 @@ function toggleLang() {
             lang: currentLang,
         }, window.location.origin);
     } catch (e) {}
-    // re-render dynamic content
+    // re-render dynamic content；重画列表前记下选中的邮件和勾选框，画完再恢复
+    const activeId = document.querySelector('.mail-item.active')?.dataset.msgId;
+    const checkedIds = getSelectedIds();
     if (currentMessages.length > 0 && currentTab === 'inbox') renderMessages(currentMessages);
     if (currentSentMessages.length > 0 && currentTab === 'sent') renderSentMessages(currentSentMessages);
     if (currentTrashMessages.length > 0 && currentTab === 'trash') renderTrashMessages(currentTrashMessages);
-    if (!currentEmail) resetMailDetail();
+    // 已打开的邮件只重画头部；没打开邮件时重画占位提示（加载中的骨架屏不用管）
+    if (document.getElementById('mail-detail-head')) _rerenderDetailHead();
+    else if (!window._currentDetailView) resetMailDetail();
+    if (activeId) document.querySelector(`.mail-item[data-msg-id="${CSS.escape(activeId)}"]`)?.classList.add('active');
+    checkedIds.forEach(id => {
+        const cb = document.querySelector(`.mail-checkbox[value="${CSS.escape(id)}"]`);
+        if (cb) cb.checked = true;
+    });
+    if (checkedIds.length) updateBatchButtons();
     // applyLang 会把列表标题重置成"收件箱"，这里按当前 Tab 校回来
     _syncListHeader(currentTab);
     renderRecentMailboxes();
@@ -632,6 +687,7 @@ function _updateUnreadBadge() {
     } else {
         badge.style.display = 'none';
     }
+    fitListHeader();
 }
 
 function _attachmentId(att, index) {
@@ -920,6 +976,9 @@ async function _doDeleteDomain(domain) {
 // 页面加载时初始化语言 + 获取域名列表 + 最近邮箱
 document.addEventListener('DOMContentLoaded', () => {
     applyLang();
+    // 看卡片的宽度而不是卡片头本身：收起文字会改变卡片头的高度，不能让它自己触发自己
+    const listCard = document.querySelector('.mail-list-header')?.parentElement;
+    if (listCard && window.ResizeObserver) new ResizeObserver(fitListHeader).observe(listCard);
     renderRecentMailboxes();
     // 恢复邮箱要等域名下拉框填好
     loadDomains().then(restoreViewState);
@@ -1206,12 +1265,9 @@ function viewSentDetail(element, msg) {
     document.querySelectorAll('.mail-item').forEach(el => el.classList.remove('active'));
     if (element) element.classList.add('active');
     const detailContent = document.getElementById('mail-detail-content');
-    const toStr = _escapeHtml((msg.to || []).join(', '));
+    window._currentDetailView = { kind: 'sent', msg };
     detailContent.innerHTML = `
-                <div class="mb-3"><strong>${t('from')}:</strong> ${_escapeHtml(msg.from_address || currentEmail)}</div>
-                <div class="mb-3"><strong>${t('to')}:</strong> ${toStr}</div>
-                <div class="mb-3"><strong>${t('subject')}:</strong> ${_escapeHtml(msg.subject || t('noSubject'))}</div>
-                <div class="mb-3"><strong>${t('time')}:</strong> ${new Date(msg.createdAt).toLocaleString(currentLang === 'zh' ? 'zh-CN' : 'en-US')}</div>
+                <div id="mail-detail-head">${_sentHeadHtml(msg)}</div>
                 <hr>
                 <div class="mail-body-container" style="background:#f8f9fa; padding:0; border-radius:8px; overflow:hidden;">
                     <iframe id="sent-body-frame" sandbox="allow-same-origin allow-popups allow-popups-to-escape-sandbox" referrerpolicy="no-referrer" style="width:100%;border:none;min-height:200px;"></iframe>
@@ -1278,6 +1334,7 @@ function resetMailDetail() {
                 </div>`;
     document.querySelectorAll('.mail-item').forEach(el => el.classList.remove('active'));
     window._currentDetailMsg = null;
+    window._currentDetailView = null;
     saveViewState({ msg: null });
     showMailListView();
 }
@@ -1542,7 +1599,7 @@ function _renderAddressList(list) {
 
 function _fullDate(value) {
     const d = new Date(value);
-    return Number.isNaN(d.getTime()) ? '' : d.toLocaleString(currentLang === 'zh' ? 'zh-CN' : 'en-US');
+    return Number.isNaN(d.getTime()) ? '' : d.toLocaleString(_locale());
 }
 
 // 列表里的短时间：今天只显示时:分，今年显示月/日，更早带年份
@@ -1553,7 +1610,7 @@ function _shortDate(value) {
     if (d.toDateString() === now.toDateString()) {
         return d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', hour12: false });
     }
-    const locale = currentLang === 'zh' ? 'zh-CN' : 'en-US';
+    const locale = _locale();
     const opts = currentLang === 'zh' ? { month: 'numeric', day: 'numeric' } : { month: 'short', day: 'numeric' };
     if (d.getFullYear() !== now.getFullYear()) opts.year = 'numeric';
     return d.toLocaleDateString(locale, opts);
@@ -1593,6 +1650,54 @@ function _detailActions(messageId, isTrash) {
                 <button class="btn btn-sm btn-outline-danger" onclick="deleteEmail('${messageId}')" title="${t('delete')}" aria-label="${t('delete')}">
                     <i class="bi bi-trash"></i><span class="btn-label">${t('delete')}</span>
                 </button>`;
+}
+
+function _detailHeadHtml(msg, messageId, isTrash) {
+    const fromName = _escapeHtml(msg.from?.name || '');
+    const fromAddr = _escapeHtml(msg.from?.address || '');
+    const fromHtml = fromName ? `${fromName} &lt;${fromAddr}&gt;` : fromAddr;
+    const codeHtml = msg.extracted_code
+        ? `<button type="button" class="badge bg-success code-badge" title="${t('copyCode')}" onclick="copyText('${msg.extracted_code}', event)"><i class="bi bi-clipboard me-1"></i>${msg.extracted_code}</button>`
+        : '';
+    return `
+                    <div class="detail-actions mb-3">${_detailActions(messageId, isTrash)}</div>
+                    ${_detailMetaRow(t('from'), fromHtml)}
+                    ${_detailMetaRow(t('to'), _renderAddressList(msg.to))}
+                    ${_detailMetaRow(t('cc'), _renderAddressList(msg.cc))}
+                    ${_detailMetaRow(t('subject'), _escapeHtml(msg.subject || t('noSubject')))}
+                    ${_detailMetaRow(t('time'), _fullDate(msg.createdAt))}
+                    ${codeHtml ? _detailMetaRow(t('verifyCode'), codeHtml) : ''}
+                    ${_renderAttachments(messageId, msg.attachments)}`;
+}
+
+function _sentHeadHtml(msg) {
+    const toStr = _escapeHtml((msg.to || []).join(', '));
+    return `
+                <div class="mb-3"><strong>${t('from')}:</strong> ${_escapeHtml(msg.from_address || currentEmail)}</div>
+                <div class="mb-3"><strong>${t('to')}:</strong> ${toStr}</div>
+                <div class="mb-3"><strong>${t('subject')}:</strong> ${_escapeHtml(msg.subject || t('noSubject'))}</div>
+                <div class="mb-3"><strong>${t('time')}:</strong> ${_fullDate(msg.createdAt)}</div>`;
+}
+
+// 切换语言后重画已打开邮件的头部（按钮、字段名、时间格式）
+function _rerenderDetailHead() {
+    const head = document.getElementById('mail-detail-head');
+    const view = window._currentDetailView;
+    if (!head || !view) return;
+    if (view.kind === 'sent') {
+        head.innerHTML = _sentHeadHtml(view.msg);
+        return;
+    }
+    const msg = window._currentDetailMsg;
+    if (!msg) return;
+    head.innerHTML = _detailHeadHtml(msg, view.messageId, view.isTrash);
+    const plainBox = document.getElementById('mail-body-plain');
+    const btn = document.getElementById('btn-toggle-plain');
+    if (btn && plainBox && plainBox.style.display !== 'none') {
+        btn.innerHTML = `<i class="bi bi-code-slash"></i><span class="btn-label">${t('viewHtml')}</span>`;
+        btn.title = t('viewHtml');
+        btn.setAttribute('aria-label', t('viewHtml'));
+    }
 }
 
 function togglePlainText() {
@@ -1683,22 +1788,11 @@ async function viewMailDetail(messageId, element, isTrash = false) {
         if (!isTrash && idx !== -1) currentMessages[idx].seen = true;
         if (!isTrash && element) element.classList.remove('mail-unread');
         _updateUnreadBadge();
-        const fromName = _escapeHtml(msg.from?.name || '');
-        const fromAddr = _escapeHtml(msg.from?.address || '');
-        const fromHtml = fromName ? `${fromName} &lt;${fromAddr}&gt;` : fromAddr;
-        const codeHtml = msg.extracted_code
-            ? `<button type="button" class="badge bg-success code-badge" title="${t('copyCode')}" onclick="copyText('${msg.extracted_code}', event)"><i class="bi bi-clipboard me-1"></i>${msg.extracted_code}</button>`
-            : '';
+        // 切语言时只重画头部，正文 iframe 和纯文本/HTML 切换状态保持不动
+        window._currentDetailView = { kind: 'inbox', messageId, isTrash };
 
         detailContent.innerHTML = `
-                    <div class="detail-actions mb-3">${_detailActions(messageId, isTrash)}</div>
-                    ${_detailMetaRow(t('from'), fromHtml)}
-                    ${_detailMetaRow(t('to'), _renderAddressList(msg.to))}
-                    ${_detailMetaRow(t('cc'), _renderAddressList(msg.cc))}
-                    ${_detailMetaRow(t('subject'), _escapeHtml(msg.subject || t('noSubject')))}
-                    ${_detailMetaRow(t('time'), new Date(msg.createdAt).toLocaleString(currentLang === 'zh' ? 'zh-CN' : 'en-US'))}
-                    ${codeHtml ? _detailMetaRow(t('verifyCode'), codeHtml) : ''}
-                    ${_renderAttachments(messageId, msg.attachments)}
+                    <div id="mail-detail-head">${_detailHeadHtml(msg, messageId, isTrash)}</div>
                     <hr>
                     <div class="mail-body-container" id="mail-body-html" style="background:#fff; padding:0; overflow:hidden;">
                         <iframe id="mail-body-frame" sandbox="allow-same-origin allow-popups allow-popups-to-escape-sandbox" referrerpolicy="no-referrer" style="width:100%;border:none;min-height:200px;"></iframe>
@@ -2021,7 +2115,7 @@ function openCompose() {
 }
 
 function _quoteOriginal(msg, origSubject) {
-    const origDate = msg.createdAt ? new Date(msg.createdAt).toLocaleString(currentLang === 'zh' ? 'zh-CN' : 'en-US') : '';
+    const origDate = msg.createdAt ? new Date(msg.createdAt).toLocaleString(_locale()) : '';
     const origFrom = msg.from?.address || '';
     const editor = _getQuillEditor();
     editor.setContents([]);

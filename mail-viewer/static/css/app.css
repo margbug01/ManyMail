@@ -73,6 +73,17 @@ body {
 @container (max-width: 269px) {
     .mail-list-header .form-switch .form-check-label { display: none; }
 }
+/* 上面的阈值按中英文量的；法语、俄语等文字更长，由 fitListHeader() 实测折行后加这两个类，效果同上 */
+.mail-list-header.compact-tabs .nav-tabs-group .btn > span[data-i18n] { display: none; }
+.mail-list-header.compact-tabs .nav-tabs-group .btn > i { margin-right: 0 !important; }
+.mail-list-header.compact-tabs .nav-tabs-group .btn { padding-left: 10px; padding-right: 10px; }
+.mail-list-header.compact-auto .form-switch .form-check-label { display: none; }
+
+#lang-menu .dropdown-item.active,
+#lang-menu .dropdown-item:active {
+    background: var(--primary-color);
+    color: #fff;
+}
 @media (max-width: 767.98px) {
     .navbar-brand {
         font-size: 1.35rem;

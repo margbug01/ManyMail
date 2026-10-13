@@ -1,5 +1,6 @@
 import base64
 import importlib.util
+import re
 import sys
 from pathlib import Path
 from unittest.mock import Mock
@@ -260,6 +261,16 @@ def test_privacy_script_is_available(client):
     response = client.get('/email-privacy.js')
     assert response.status_code == 200
     assert b'Content-Security-Policy' in response.data
+
+
+def test_i18n_script_is_public_and_versioned(client):
+    response = client.get('/i18n.js')
+    assert response.status_code == 200
+    assert b'ManyMailI18n' in response.data
+    # 登录页没登录也要能拿到语言包，地址带内容哈希
+    page = client.get('/login').get_data(as_text=True)
+    assert re.search(r'src="/i18n\.js\?v=[0-9a-f]{12}"', page)
+    assert 'id="lang-select"' in page
 
 
 def test_index_links_versioned_static_assets(client):

@@ -80,6 +80,19 @@ jobs:
         working-directory: ${{ matrix.package }}
         run: npm test
 
+  i18n:
+    name: Translations complete
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Check translations and bundled i18n.js
+        run: node tools/test-i18n.cjs
+
   docker-build:
     name: Docker build smoke
     runs-on: ubuntu-latest

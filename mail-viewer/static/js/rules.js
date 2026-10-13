@@ -2,7 +2,7 @@
 (function () {
     'use strict';
 
-    const LANG = (localStorage.getItem('manymail-lang') || 'zh') === 'en' ? 'en' : 'zh';
+    const LANG = ManyMailI18n.detect();
     const TEXT = {
         zh: {
             noRules: '还没有规则。点「新建规则」开始。',
@@ -76,7 +76,8 @@
             statuses: { done: 'done', retry: 'retrying', running: 'running', failed: 'failed' },
         },
     };
-    const T = Object.assign({}, TEXT.zh, LANG === 'en' ? TEXT.en : {});
+    // 英文词典只覆盖了一部分键，其余沿用中文；其他语言由 i18n.js 按 fallback 补齐
+    const T = ManyMailI18n.dict(LANG, 'rules', { zh: TEXT.zh, en: Object.assign({}, TEXT.zh, TEXT.en) });
     const fmt = (s, vars) => s.replace(/\{(\w+)\}/g, (_, k) => (vars[k] !== undefined ? vars[k] : ''));
 
     // 每种动作的字段：[key, kind]；kind = text | list | env | priority
@@ -427,10 +428,10 @@
     // ---- 启动 ------------------------------------------------------------------------
 
     function init() {
-        if (LANG === 'en') {
-            document.documentElement.lang = 'en';
+        if (LANG !== 'zh') {
+            document.documentElement.lang = ManyMailI18n.locale(LANG);
             document.querySelectorAll('[data-i18n]').forEach((node) => {
-                const text = TEXT.en[node.dataset.i18n];
+                const text = T[node.dataset.i18n];
                 if (text) node.textContent = text;
             });
         }

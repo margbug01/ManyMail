@@ -11,14 +11,19 @@ cd "$(git rev-parse --show-toplevel)"
 topath() { if command -v cygpath >/dev/null 2>&1; then cygpath "$@"; else echo "${@: -1}"; fi; }
 
 DEPS="${MANYMAIL_TEST_DEPS:-$HOME/.cache/manymail-ui-tests}"
+# 页面用的 Bootstrap 版本（和模板里的 CDN 地址一致），布局测试要用真样式量宽度
+UI_PACKAGES="bootstrap@5.3.0 bootstrap-icons@1.10.0"
 if [ -z "${PLAYWRIGHT_MODULE:-}" ]; then
-  if [ ! -d "$DEPS/node_modules/playwright-core" ]; then
-    echo "installing playwright-core into $DEPS ..."
+  if [ ! -d "$DEPS/node_modules/playwright-core" ] || [ ! -d "$DEPS/node_modules/bootstrap-icons" ]; then
+    echo "installing playwright-core $UI_PACKAGES into $DEPS ..."
     mkdir -p "$DEPS"
-    (cd "$DEPS" && { [ -f package.json ] || npm init -y >/dev/null; } && npm i --silent playwright-core >/dev/null)
+    # shellcheck disable=SC2086
+    (cd "$DEPS" && { [ -f package.json ] || npm init -y >/dev/null; } && npm i --silent playwright-core $UI_PACKAGES >/dev/null)
   fi
   PLAYWRIGHT_MODULE="$DEPS/node_modules/playwright-core"
 fi
+UI_TEST_MODULES="$(topath -w "$DEPS/node_modules")"
+export UI_TEST_MODULES
 
 if [ -z "${BROWSER_PATH:-}" ]; then
   WIN_CACHE=""

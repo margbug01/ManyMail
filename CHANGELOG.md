@@ -3,6 +3,24 @@
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- Seven more interface languages: Traditional Chinese, Japanese, Korean, Spanish, French,
+  German and Russian, picked from a menu behind the language button (also on the login page).
+  Dates follow the language, IMAP folder names are translated, and without a saved choice
+  the browser language is used (falling back to English)
+- `tools/test-i18n.cjs` fails when a page gains a string that a translation lacks;
+  translations live in `mail-viewer/i18n/*.json` and `tools/build-i18n.cjs` bundles them
+  into the shared `i18n.js`
+
+### Fixed
+
+- Switching language left the open message's buttons and field labels in the old language
+  until another message was opened
+- The message list header no longer wraps in languages with longer labels
+
 ## [1.3.0] - 2026-10-13
 
 Forwarding and push rules get a page in the webmail, new mail in external IMAP accounts can

@@ -21,6 +21,7 @@ const privacy = fs.readFileSync(path.join(root, 'mail-viewer/imap-mail-app/publi
         if (url.hostname !== 'manymail.test') return route.abort();
         if (url.pathname === '/host') return route.fulfill({ contentType: 'text/html', body: '<!doctype html><style>body{margin:0}iframe{display:block;width:100%;border:0;min-height:80vh}</style><nav style="height:96px">Host navigation</nav><iframe id="imap-frame" src="/?embedded=1"></iframe><script>' + hostSizing + '; fitMobileImapFrame();</script>' });
         if (url.pathname.endsWith('email-privacy.js')) return route.fulfill({ contentType: 'text/javascript', body: privacy });
+        if (url.pathname.endsWith('/i18n.js')) return route.fulfill({ path: path.join(imapPublic, 'i18n.js') });
         if (url.pathname.endsWith('/app.js')) return route.fulfill({ contentType: 'text/javascript', body: imapJs });
         if (url.pathname.endsWith('/style.css')) return route.fulfill({ contentType: 'text/css', body: imapCss });
         if (url.pathname.includes('/api/')) return route.fulfill({ contentType: 'application/json', body: '[]' });

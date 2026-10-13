@@ -274,10 +274,11 @@ const LANGS = {
     operationFailed: 'Operation failed',
   }
 };
-let currentLang = localStorage.getItem('manymail-lang') || 'zh';
+let currentLang = ManyMailI18n.detect();
+let currentDict = ManyMailI18n.dict(currentLang, 'imap', LANGS);
 
 function t(key, vars) {
-  let s = (LANGS[currentLang] || LANGS.zh)[key] || key;
+  let s = currentDict[key] || LANGS.zh[key] || key;
   if (vars) {
     Object.keys(vars).forEach(function(k) {
       s = s.replace(new RegExp('\\{' + k + '\\}', 'g'), vars[k]);
@@ -301,12 +302,13 @@ function refreshStaticText() {
     el.title = t(el.dataset.i18nTitle);
     el.setAttribute('aria-label', el.title);
   });
-  document.documentElement.lang = currentLang === 'zh' ? 'zh-CN' : 'en';
+  document.documentElement.lang = ManyMailI18n.locale(currentLang);
 }
 
-function toggleLang() {
-  currentLang = currentLang === 'zh' ? 'en' : 'zh';
-  localStorage.setItem('manymail-lang', currentLang);
+function setLang(code) {
+  currentLang = ManyMailI18n.normalize(code) || currentLang;
+  currentDict = ManyMailI18n.dict(currentLang, 'imap', LANGS);
+  ManyMailI18n.save(currentLang);
   applyLang();
 }
 
@@ -337,9 +339,7 @@ function applyLang() {
 window.addEventListener('message', function(event) {
   if (event.origin !== window.location.origin) return;
   if (event.data?.type === 'manymail-lang-change' && event.data.lang) {
-    currentLang = event.data.lang === 'en' ? 'en' : 'zh';
-    localStorage.setItem('manymail-lang', currentLang);
-    applyLang();
+    setLang(event.data.lang);
   }
 });
 
@@ -1183,7 +1183,9 @@ function translateFolder(name) {
   var key = folderKey(name);
   if (!key) return name;
   if (currentLang === 'zh') return FOLDER_ZH[key];
-  return key === 'INBOX' ? 'Inbox' : key;
+  // 其他语言的文件夹名按中文名查（i18n.js 的 folders 段），查不到用英文
+  var folders = ManyMailI18n.section(currentLang, 'folders') || {};
+  return folders[FOLDER_ZH[key]] || (key === 'INBOX' ? 'Inbox' : key);
 }
 
 var FOLDER_ICONS = {
@@ -1215,7 +1217,7 @@ function makeCopyable(text) {
 
 function formatDate(d) {
   if (!d) return '';
-  return new Date(d).toLocaleString(currentLang === 'zh' ? 'zh-CN' : 'en-US');
+  return new Date(d).toLocaleString(ManyMailI18n.locale(currentLang));
 }
 
 // 列表里的短日期：今天只显示时间，今年显示月日，更早带年份
@@ -1223,9 +1225,9 @@ function formatShortDate(d) {
   var ts = new Date(d);
   if (!d || Number.isNaN(ts.getTime())) return '';
   var now = new Date();
-  var locale = currentLang === 'zh' ? 'zh-CN' : 'en-US';
+  var locale = ManyMailI18n.locale(currentLang);
   if (ts.toDateString() === now.toDateString()) {
-    return ts.toLocaleTimeString(locale === 'zh-CN' ? 'zh-CN' : 'en-GB', { hour: '2-digit', minute: '2-digit', hour12: false });
+    return ts.toLocaleTimeString(locale === 'en-US' ? 'en-GB' : locale, { hour: '2-digit', minute: '2-digit', hour12: false });
   }
   var opts = currentLang === 'zh' ? { month: 'numeric', day: 'numeric' } : { month: 'short', day: 'numeric' };
   if (ts.getFullYear() !== now.getFullYear()) opts.year = 'numeric';
