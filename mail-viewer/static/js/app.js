@@ -15,8 +15,9 @@ const LANGS = {
         senderKeys: '发信 Resend Key',
         senderKeyTip: '这里设置的优先于 .env；保存前会找 Resend 验证，加密存储。',
         keyFromSettings: '已设置 {hint}',
-        keyFromEnvDomain: '.env 专用 key',
-        keyFromEnvDefault: '.env 通用 key',
+        keyFromEnvDomain: '.env 专用',
+        keyOriginSettings: '页面设置',
+        keyFromEnvDefault: '.env 通用',
         keyNone: '未配置',
         keyUnreadable: '无法解密，请重填',
         keyPlaceholder: '粘贴 re_ 开头的 key',
@@ -157,8 +158,9 @@ const LANGS = {
         senderKeys: 'Resend keys for sending',
         senderKeyTip: 'Keys set here win over .env; they are checked with Resend and stored encrypted.',
         keyFromSettings: 'Set {hint}',
-        keyFromEnvDomain: '.env domain key',
-        keyFromEnvDefault: '.env default key',
+        keyFromEnvDomain: '.env domain',
+        keyOriginSettings: 'set here',
+        keyFromEnvDefault: '.env default',
         keyNone: 'Not set',
         keyUnreadable: 'Unreadable, set again',
         keyPlaceholder: 'Paste a key starting with re_',
@@ -702,20 +704,29 @@ function renderSenderKeyRow(item) {
     name.className = 'small text-truncate';
     name.style.flex = '1 1 auto';
     name.textContent = item.domain;
-    const labels = {
-        settings: [item.hint, 'text-success'],
-        'env-domain': [t('keyFromEnvDomain'), 'text-muted'],
-        'env-default': [t('keyFromEnvDefault'), 'text-muted'],
-        none: [t('keyNone'), 'text-danger'],
-    };
-    const [label, cls] = item.unreadable ? [t('keyUnreadable'), 'text-danger'] : labels[item.source] || [item.source, 'text-muted'];
+    // 有 key 就显示 re_…末4位，后面小字标来源；没有才显示「未配置」
+    const origins = { settings: t('keyOriginSettings'), 'env-domain': t('keyFromEnvDomain'), 'env-default': t('keyFromEnvDefault') };
     const status = document.createElement('span');
-    status.className = 'small text-nowrap ' + cls;
-    status.textContent = label;
+    status.className = 'small text-nowrap';
+    if (item.unreadable) {
+        status.classList.add('text-danger');
+        status.textContent = t('keyUnreadable');
+    } else if (item.hint) {
+        const hint = document.createElement('code');
+        hint.className = 'sender-key-hint';
+        hint.textContent = item.hint;
+        const origin = document.createElement('span');
+        origin.className = 'text-muted ms-1';
+        origin.textContent = origins[item.source] || '';
+        status.append(hint, origin);
+    } else {
+        status.classList.add('text-danger');
+        status.textContent = t('keyNone');
+    }
     const toggle = document.createElement('button');
     toggle.type = 'button';
     toggle.className = 'btn btn-link btn-sm p-0 text-nowrap';
-    toggle.textContent = item.source === 'settings' || item.unreadable ? t('keyChange') : t('keySet');
+    toggle.textContent = item.hint || item.unreadable ? t('keyChange') : t('keySet');
     line.append(name, status, toggle);
 
     const editor = document.createElement('div');

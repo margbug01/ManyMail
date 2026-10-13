@@ -1568,17 +1568,17 @@ def list_sender_keys():
     for domain in sorted(domains):
         saved = stored.get(domain)
         if saved and saved["key"]:
-            source = "settings"
+            source, hint = "settings", saved["hint"]
         elif RESEND_DOMAIN_KEYS.get(domain):
-            source = "env-domain"
+            source, hint = "env-domain", _key_hint(RESEND_DOMAIN_KEYS[domain])
         elif RESEND_API_KEY:
-            source = "env-default"
+            source, hint = "env-default", _key_hint(RESEND_API_KEY)
         else:
-            source = "none"
+            source, hint = "none", ""
         items.append({
             "domain": domain,
             "source": source,
-            "hint": saved["hint"] if saved else "",
+            "hint": hint,
             "unreadable": bool(saved and not saved["key"]),
             "updated_at": saved["updated_at"] if saved else None,
         })

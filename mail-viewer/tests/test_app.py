@@ -478,6 +478,9 @@ def test_sender_keys_settings(client, viewer, monkeypatch):
     assert items["a.test"]["source"] == "settings" and items["a.test"]["hint"] == "re_…1234"
     assert items["broken.test"]["unreadable"] is True
     assert items["env.test"]["source"] == "env-domain"
+    assert items["env.test"]["hint"] == "re_…nkey"  # .env keys show their last 4 too
+    assert items["plain.test"]["hint"] == ""
+    assert "re_envdomainkey" not in str(items)
     assert items["plain.test"]["source"] == "none"
     assert "re_savedkey" not in str(items)
 
