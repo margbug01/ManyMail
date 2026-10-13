@@ -12,6 +12,19 @@ const LANGS = {
         domainMgmt: '域名管理',
         dnsCheck: 'DNS 自检',
         routingRules: '规则',
+        senderKeys: '发信 Resend Key',
+        senderKeyTip: '按发件人所在域名选 key：这里填的优先，其次是 .env 里的配置。保存前会先找 Resend 验证，key 加密存储，只显示末 4 位。',
+        keyFromSettings: '已设置 {hint}',
+        keyFromEnvDomain: '用 .env 里的专用 key',
+        keyFromEnvDefault: '用 .env 里的通用 key',
+        keyNone: '未配置，不能发信',
+        keyUnreadable: '无法解密，请重新填写',
+        keyPlaceholder: '粘贴 re_ 开头的 key',
+        keySave: '保存',
+        keyRemove: '移除',
+        keySaving: '正在找 Resend 验证…',
+        keyRemoved: '已移除 {domain} 的 key',
+        keyConfirmRemove: '移除 {domain} 在设置里的 Resend key？之后会改用 .env 里的配置。',
         enterDomain: '输入新域名，如 example.com',
         domainTip: '输入前缀即可查询邮件，邮箱不存在会自动创建。',
         mail: '邮件',
@@ -139,6 +152,19 @@ const LANGS = {
         domainMgmt: 'Domains',
         dnsCheck: 'DNS check',
         routingRules: 'Rules',
+        senderKeys: 'Resend keys for sending',
+        senderKeyTip: 'The key is picked by the domain of the From address: one entered here wins over .env. Keys are checked with Resend before saving, stored encrypted, and only the last 4 characters are shown.',
+        keyFromSettings: 'Set {hint}',
+        keyFromEnvDomain: 'Using the domain key from .env',
+        keyFromEnvDefault: 'Using the default key from .env',
+        keyNone: 'Not configured, cannot send',
+        keyUnreadable: 'Cannot be decrypted, enter it again',
+        keyPlaceholder: 'Paste a key starting with re_',
+        keySave: 'Save',
+        keyRemove: 'Remove',
+        keySaving: 'Checking with Resend…',
+        keyRemoved: 'Removed the key for {domain}',
+        keyConfirmRemove: 'Remove the Resend key for {domain}? Sending falls back to .env.',
         enterDomain: 'Enter domain, e.g. example.com',
         domainTip: 'Enter prefix to query. Mailbox auto-created if not exists.',
         inbox: 'Inbox',
@@ -643,6 +669,104 @@ function openSettings() {
     document.getElementById('domain-error').style.display = 'none';
     settingsModal.show();
     loadDomains();
+    loadSenderKeys();
+}
+
+// ---- 发信 Resend Key：每个域名一行，状态 + 输入框 ----
+async function loadSenderKeys() {
+    const box = document.getElementById('sender-key-list');
+    if (!box) return;
+    box.replaceChildren(Object.assign(document.createElement('div'), { className: 'text-muted small', textContent: t('loading') }));
+    try {
+        const resp = await fetch('/api/settings/sender-keys');
+        const data = await resp.json();
+        if (!data.success) throw new Error(data.message || resp.status);
+        box.replaceChildren(...data.domains.map(renderSenderKeyRow));
+    } catch (e) {
+        box.replaceChildren(Object.assign(document.createElement('div'), { className: 'text-danger small', textContent: t('loadFailed') + ': ' + e.message }));
+    }
+}
+
+function renderSenderKeyRow(item) {
+    const row = document.createElement('div');
+    row.className = 'sender-key-row py-2 px-2 mb-1';
+    row.style.cssText = 'background:#f5f9f7;border-radius:6px;';
+    const head = document.createElement('div');
+    head.className = 'd-flex justify-content-between align-items-center gap-2 mb-1';
+    const name = document.createElement('span');
+    name.className = 'small fw-semibold text-break';
+    name.textContent = item.domain;
+    const status = document.createElement('span');
+    const labels = {
+        settings: [t('keyFromSettings', { hint: item.hint }), 'text-success'],
+        'env-domain': [t('keyFromEnvDomain'), 'text-muted'],
+        'env-default': [t('keyFromEnvDefault'), 'text-muted'],
+        none: [t('keyNone'), 'text-danger'],
+    };
+    const [label, cls] = item.unreadable ? [t('keyUnreadable'), 'text-danger'] : labels[item.source] || [item.source, 'text-muted'];
+    status.className = 'small text-end ' + cls;
+    status.textContent = label;
+    head.append(name, status);
+
+    const group = document.createElement('div');
+    group.className = 'input-group input-group-sm';
+    const input = document.createElement('input');
+    input.type = 'password';
+    input.className = 'form-control';
+    input.placeholder = t('keyPlaceholder');
+    input.autocomplete = 'off';
+    input.setAttribute('aria-label', item.domain + ' Resend key');
+    const save = document.createElement('button');
+    save.className = 'btn btn-primary';
+    save.type = 'button';
+    save.textContent = t('keySave');
+    const note = document.createElement('div');
+    note.className = 'small mt-1';
+    save.addEventListener('click', async () => {
+        const key = input.value.trim();
+        if (!key) { input.focus(); return; }
+        save.disabled = true;
+        note.className = 'small mt-1 text-muted';
+        note.textContent = t('keySaving');
+        try {
+            const resp = await fetch('/api/settings/sender-keys/' + encodeURIComponent(item.domain), {
+                method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ api_key: key }),
+            });
+            const data = await resp.json();
+            if (!data.success) throw new Error(data.message || resp.status);
+            input.value = '';
+            showToast(item.domain + ': ' + data.message, { type: 'success' });
+            await loadSenderKeys();
+        } catch (e) {
+            note.className = 'small mt-1 text-danger';
+            note.textContent = e.message;
+            save.disabled = false;
+        }
+    });
+    input.addEventListener('keydown', (e) => { if (e.key === 'Enter') save.click(); });
+    group.append(input, save);
+    if (item.source === 'settings' || item.unreadable) {
+        const remove = document.createElement('button');
+        remove.className = 'btn btn-outline-danger';
+        remove.type = 'button';
+        remove.textContent = t('keyRemove');
+        remove.addEventListener('click', async () => {
+            if (!confirm(t('keyConfirmRemove', { domain: item.domain }))) return;
+            try {
+                const resp = await fetch('/api/settings/sender-keys/' + encodeURIComponent(item.domain), { method: 'DELETE' });
+                const data = await resp.json();
+                if (!data.success) throw new Error(data.message || resp.status);
+                showToast(t('keyRemoved', { domain: item.domain }), { type: 'success' });
+                await loadSenderKeys();
+            } catch (e) {
+                note.className = 'small mt-1 text-danger';
+                note.textContent = e.message;
+            }
+        });
+        group.append(remove);
+    }
+    row.append(head, group, note);
+    return row;
 }
 
 async function loadDomains() {

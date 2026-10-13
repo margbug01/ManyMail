@@ -15,6 +15,10 @@ Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Push notifications for new mail in external IMAP accounts: the IMAP bridge reports the
   sender and subject of each new INBOX message to mail-router, and rules with
   `"source": ["imap"]` push them through ntfy, Telegram or a webhook
+- Resend keys per sending domain in Settings: paste a key next to each domain; it is checked
+  against Resend (full or sending-only access) before saving, encrypted with a key derived
+  from `SECRET_KEY`, stored by mail-service as ciphertext, and shown only as `re_…1234`.
+  Sending uses it ahead of `RESEND_API_KEY_*` / `RESEND_API_KEY` from `.env`
 
 ### Changed
 

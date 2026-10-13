@@ -748,6 +748,63 @@ async def admin_delete_domain(domain: str, request: Request):
     return {"message": f"Domain '{domain}' deactivated", "domain": domain}
 
 
+_SENDER_DOMAIN_RE = re.compile(r"^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$")
+
+
+def _sender_domain(domain: str) -> str:
+    domain = (domain or "").strip().lower().rstrip(".")
+    if not _SENDER_DOMAIN_RE.match(domain):
+        raise HTTPException(status_code=400, detail="invalid domain")
+    return domain
+
+
+@app.get("/admin/sender-keys")
+async def admin_list_sender_keys(request: Request):
+    """各发件域名在网页上填的 Resend key。存的是 viewer 用 SECRET_KEY 加密后的密文，这里解不开"""
+    _require_api_key(request)
+    keys = []
+    for doc in db.sender_keys.find({}).sort("_id", 1):
+        updated = doc.get("updated_at")
+        keys.append({
+            "domain": doc["_id"],
+            "ciphertext": doc.get("ciphertext", ""),
+            "hint": doc.get("hint", ""),
+            "updated_at": updated.isoformat() if isinstance(updated, datetime) else None,
+        })
+    return {"keys": keys}
+
+
+@app.put("/admin/sender-keys/{domain}")
+async def admin_put_sender_key(domain: str, request: Request):
+    _require_api_key(request)
+    domain = _sender_domain(domain)
+    try:
+        body = await request.json()
+    except Exception:
+        raise HTTPException(status_code=400, detail="body must be JSON")
+    ciphertext = str((body or {}).get("ciphertext") or "")
+    hint = str((body or {}).get("hint") or "")[:40]
+    if not ciphertext or len(ciphertext) > 4096:
+        raise HTTPException(status_code=400, detail="ciphertext is required")
+    db.sender_keys.replace_one(
+        {"_id": domain},
+        {"_id": domain, "ciphertext": ciphertext, "hint": hint, "updated_at": datetime.now(timezone.utc)},
+        upsert=True,
+    )
+    logger.info(f"Sender key saved for {domain}")
+    return {"domain": domain}
+
+
+@app.delete("/admin/sender-keys/{domain}")
+async def admin_delete_sender_key(domain: str, request: Request):
+    _require_api_key(request)
+    domain = _sender_domain(domain)
+    if db.sender_keys.delete_one({"_id": domain}).deleted_count == 0:
+        raise HTTPException(status_code=404, detail="no key for this domain")
+    logger.info(f"Sender key removed for {domain}")
+    return {"domain": domain}
+
+
 _public_ip_cache = {"ip": None, "at": 0.0}
 
 

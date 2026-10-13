@@ -449,3 +449,71 @@ def test_rules_page_and_router_proxy(client, viewer, monkeypatch):
 
     monkeypatch.setattr(viewer.http_session, "request", Mock(side_effect=OSError("down")))
     assert client.get("/api/router/rules").status_code == 502
+
+
+def _resp(status, body):
+    return Mock(status_code=status, json=Mock(return_value=body), raise_for_status=Mock())
+
+
+def test_sender_keys_settings(client, viewer, monkeypatch):
+    assert client.get("/api/settings/sender-keys").status_code in (302, 401)
+    login(client)
+    cipher = viewer._sender_key_cipher()
+    stored = {"keys": [
+        {"domain": "a.test", "ciphertext": cipher.encrypt(b"re_savedkey_1234").decode(), "hint": "re_…1234"},
+        {"domain": "broken.test", "ciphertext": "not-a-token", "hint": "re_…9999"},
+    ]}
+    monkeypatch.setattr(viewer, "RESEND_DOMAIN_KEYS", {"env.test": "re_envdomainkey"})
+    monkeypatch.setattr(viewer, "RESEND_API_KEY", "")
+
+    def fake_get(url, **kwargs):
+        if url.endswith("/admin/sender-keys"):
+            return _resp(200, stored)
+        if url.endswith("/domains") and "resend" not in url:
+            return _resp(200, {"hydra:member": [{"domain": "a.test"}, {"domain": "plain.test"}]})
+        raise AssertionError(url)
+
+    monkeypatch.setattr(viewer.http_session, "get", fake_get)
+    items = {i["domain"]: i for i in client.get("/api/settings/sender-keys").get_json()["domains"]}
+    assert items["a.test"]["source"] == "settings" and items["a.test"]["hint"] == "re_…1234"
+    assert items["broken.test"]["unreadable"] is True
+    assert items["env.test"]["source"] == "env-domain"
+    assert items["plain.test"]["source"] == "none"
+    assert "re_savedkey" not in str(items)
+
+    # sending picks the key from settings, then .env
+    assert viewer._resend_key_for("a.test") == ("re_savedkey_1234", "settings")
+    assert viewer._resend_key_for("env.test") == ("re_envdomainkey", "env-domain")
+    assert viewer._resend_key_for("plain.test") == ("", "none")
+
+
+def test_sender_key_save_checks_resend(client, viewer, monkeypatch):
+    login(client)
+    monkeypatch.setattr(viewer, "SENSITIVE_RATE_LIMIT_MAX", 100)  # the fixture allows only 2
+    puts = []
+    monkeypatch.setattr(viewer.http_session, "put", lambda url, json=None, **kw: puts.append((url, json)) or _resp(200, {}))
+    resend = {}
+    monkeypatch.setattr(viewer.http_session, "get", lambda url, **kw: resend["resp"])
+
+    assert client.put("/api/settings/sender-keys/a.test", json={"api_key": "sk-nope"}).status_code == 400
+
+    resend["resp"] = _resp(401, {"name": "validation_error", "message": "API key is invalid"})
+    resp = client.put("/api/settings/sender-keys/a.test", json={"api_key": "re_badbadbad1"})
+    assert resp.status_code == 400 and "API key is invalid" in resp.get_json()["message"] and not puts
+
+    resend["resp"] = _resp(401, {"name": "restricted_api_key", "message": "restricted"})
+    resp = client.put("/api/settings/sender-keys/A.test", json={"api_key": "re_sendonly_5678"})
+    assert resp.status_code == 200 and "仅限发信" in resp.get_json()["message"]
+    url, body = puts[-1]
+    assert url.endswith("/admin/sender-keys/a.test")
+    assert body["hint"] == "re_…5678"
+    assert "re_sendonly" not in body["ciphertext"]
+    assert viewer._sender_key_cipher().decrypt(body["ciphertext"].encode()) == b"re_sendonly_5678"
+
+    resend["resp"] = _resp(200, {"data": [{"name": "a.test", "status": "verified"}]})
+    assert "域名已验证" in client.put("/api/settings/sender-keys/a.test", json={"api_key": "re_fullaccess_1"}).get_json()["message"]
+    resend["resp"] = _resp(200, {"data": [{"name": "other.test", "status": "verified"}]})
+    assert "没有 a.test" in client.put("/api/settings/sender-keys/a.test", json={"api_key": "re_fullaccess_1"}).get_json()["message"]
+
+    monkeypatch.setattr(viewer.http_session, "delete", lambda url, **kw: _resp(200, {}))
+    assert client.delete("/api/settings/sender-keys/a.test").get_json() == {"success": True}

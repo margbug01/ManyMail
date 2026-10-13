@@ -294,6 +294,13 @@
                     </div>
                     <div id="domain-error" class="text-danger small mt-2" style="display:none;"></div>
                     <div class="small text-muted mt-2" data-i18n="domainTip">输入前缀即可查询邮件，邮箱不存在会自动创建。</div>
+
+                    <hr class="my-3">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <strong><i class="bi bi-key me-2"></i><span data-i18n="senderKeys">发信 Resend Key</span></strong>
+                    </div>
+                    <div id="sender-key-list" class="mb-2"></div>
+                    <div class="small text-muted" data-i18n="senderKeyTip">按发件人所在域名选 key：这里填的优先，其次是 .env 里的配置。保存前会先找 Resend 验证，key 加密存储，只显示末 4 位。</div>
                 </div>
             </div>
         </div>

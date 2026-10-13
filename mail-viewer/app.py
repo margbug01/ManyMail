@@ -15,6 +15,7 @@ import urllib3.connection
 import urllib3.connectionpool
 import urllib3.exceptions
 import bleach
+from cryptography.fernet import Fernet, InvalidToken
 from bleach.css_sanitizer import CSSSanitizer
 from urllib.parse import urlparse, urljoin, quote
 from flask import Flask, render_template, jsonify, request, session, redirect, url_for, Response, stream_with_context, send_from_directory
@@ -1470,6 +1471,157 @@ def _normalize_attachments(raw) -> tuple[list, str]:
         normalized.append(entry)
 
     return normalized, ""
+
+
+# ---- 各发件域名的 Resend key（设置里填写）--------------------------------------------
+# key 用 SECRET_KEY 派生的 Fernet 密钥加密后存进 mail-service（sender_keys 集合），
+# mail-service 只存密文；页面上只显示 re_…末 4 位。SECRET_KEY 换了的话旧 key 解不开，需要重填。
+
+_SENDER_KEY_RE = re.compile(r"^re_[A-Za-z0-9_-]{8,200}$")
+
+
+def _sender_key_cipher() -> Fernet:
+    digest = hashlib.sha256(b"manymail-sender-keys:" + app.secret_key.encode("utf-8")).digest()
+    return Fernet(base64.urlsafe_b64encode(digest))
+
+
+def _key_hint(key: str) -> str:
+    return f"{key[:3]}…{key[-4:]}"
+
+
+def _load_sender_keys() -> dict:
+    """{domain: {"key": 明文或 None(解不开), "hint", "updated_at"}}；每次现取，两个 worker 不会读到旧值"""
+    resp = http_session.get(
+        f"{DUCKMAIL_BASE_URL.rstrip('/')}/admin/sender-keys",
+        headers={"Authorization": f"Bearer {DUCKMAIL_API_KEY}"},
+        timeout=10,
+    )
+    resp.raise_for_status()
+    cipher = _sender_key_cipher()
+    keys = {}
+    for item in resp.json().get("keys", []):
+        try:
+            plain = cipher.decrypt(str(item.get("ciphertext", "")).encode()).decode("utf-8")
+        except (InvalidToken, ValueError):
+            plain = None
+        keys[item["domain"]] = {"key": plain, "hint": item.get("hint", ""), "updated_at": item.get("updated_at")}
+    return keys
+
+
+def _resend_key_for(domain: str) -> tuple:
+    """(key, 来源)；来源 settings / env-domain / env-default / none"""
+    try:
+        stored = _load_sender_keys().get(domain)
+    except Exception as e:
+        app.logger.error(f"读取发信 key 失败: {e}")
+        stored = None
+    if stored and stored["key"]:
+        return stored["key"], "settings"
+    if RESEND_DOMAIN_KEYS.get(domain):
+        return RESEND_DOMAIN_KEYS[domain], "env-domain"
+    if RESEND_API_KEY:
+        return RESEND_API_KEY, "env-default"
+    return "", "none"
+
+
+def _check_resend_key(key: str, domain: str) -> tuple:
+    """(ok, info)：拿 key 调一次 Resend 的域名列表。仅限发信的 key 会被拒绝列域名，但这说明 key 本身有效"""
+    try:
+        resp = http_session.get(
+            "https://api.resend.com/domains",
+            headers={"Authorization": f"Bearer {key}"},
+            timeout=15,
+        )
+    except Exception as e:
+        app.logger.error(f"校验 Resend key 失败: {e}")
+        return False, "连接 Resend 失败，稍后再试"
+    try:
+        body = resp.json()
+    except ValueError:
+        body = {}
+    if resp.status_code == 200:
+        names = {str(d.get("name", "")).lower(): d.get("status", "") for d in body.get("data", []) or []}
+        if domain not in names:
+            return True, f"key 有效，但这个 Resend 账号里没有 {domain}，发信会被拒绝"
+        status = names[domain]
+        return True, "key 有效，域名已验证" if status == "verified" else f"key 有效，域名在 Resend 的状态是 {status}"
+    if resp.status_code == 401 and body.get("name") == "restricted_api_key":
+        return True, "key 有效（仅限发信权限，无法查看域名状态）"
+    return False, "Resend 拒绝了这个 key：" + str(body.get("message") or f"HTTP {resp.status_code}")
+
+
+@app.route("/api/settings/sender-keys", methods=["GET"])
+@login_required
+def list_sender_keys():
+    """设置页：每个域名用哪个 Resend key 发信"""
+    base_url = DUCKMAIL_BASE_URL.rstrip("/")
+    try:
+        stored = _load_sender_keys()
+        resp = http_session.get(f"{base_url}/domains", timeout=30)
+        payload = resp.json() if resp.status_code == 200 else {}
+    except Exception as e:
+        app.logger.error(f"获取发信 key 列表失败: {e}")
+        return jsonify({"success": False, "message": "连接邮件服务失败"}), 502
+    domains = {str(d.get("domain", "")).lower() for d in payload.get("hydra:member", []) if d.get("domain")}
+    domains |= set(stored) | {d for d, k in RESEND_DOMAIN_KEYS.items() if k}
+    items = []
+    for domain in sorted(domains):
+        saved = stored.get(domain)
+        if saved and saved["key"]:
+            source = "settings"
+        elif RESEND_DOMAIN_KEYS.get(domain):
+            source = "env-domain"
+        elif RESEND_API_KEY:
+            source = "env-default"
+        else:
+            source = "none"
+        items.append({
+            "domain": domain,
+            "source": source,
+            "hint": saved["hint"] if saved else "",
+            "unreadable": bool(saved and not saved["key"]),
+            "updated_at": saved["updated_at"] if saved else None,
+        })
+    return jsonify({"success": True, "domains": items})
+
+
+@app.route("/api/settings/sender-keys/<domain>", methods=["PUT", "DELETE"])
+@login_required
+def save_sender_key(domain):
+    if _check_viewer_rate_limit("sender_key", SENSITIVE_RATE_LIMIT_WINDOW, SENSITIVE_RATE_LIMIT_MAX):
+        return _rate_limited_json()
+    domain = domain.strip().lower()
+    url = f"{DUCKMAIL_BASE_URL.rstrip('/')}/admin/sender-keys/{quote(domain, safe='')}"
+    headers = {"Authorization": f"Bearer {DUCKMAIL_API_KEY}"}
+    if request.method == "DELETE":
+        try:
+            resp = http_session.delete(url, headers=headers, timeout=15)
+        except Exception as e:
+            app.logger.error(f"删除发信 key 失败: {e}")
+            return jsonify({"success": False, "message": "连接邮件服务失败"}), 502
+        if resp.status_code not in (200, 404):
+            return jsonify({"success": False, "message": _extract_api_error(resp, "删除失败")}), resp.status_code
+        return jsonify({"success": True})
+
+    key = str((request.get_json(silent=True) or {}).get("api_key") or "").strip()
+    if not _SENDER_KEY_RE.match(key):
+        return jsonify({"success": False, "message": "Resend API key 应以 re_ 开头"}), 400
+    ok, info = _check_resend_key(key, domain)
+    if not ok:
+        return jsonify({"success": False, "message": info}), 400
+    try:
+        resp = http_session.put(
+            url,
+            json={"ciphertext": _sender_key_cipher().encrypt(key.encode("utf-8")).decode("ascii"), "hint": _key_hint(key)},
+            headers=headers,
+            timeout=15,
+        )
+    except Exception as e:
+        app.logger.error(f"保存发信 key 失败: {e}")
+        return jsonify({"success": False, "message": "连接邮件服务失败"}), 502
+    if resp.status_code != 200:
+        return jsonify({"success": False, "message": _extract_api_error(resp, "保存失败")}), resp.status_code
+    return jsonify({"success": True, "hint": _key_hint(key), "message": info})
 
 
 @app.route("/api/send", methods=["POST"])
