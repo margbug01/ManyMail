@@ -638,16 +638,15 @@ function _renderMailBodyIframe(iframe, mailContent, allowImages = false) {
             const scale = _computeBodyScale(available, natural);
             if (scale < 1) {
                 body.style.width = natural + 'px';
+                // 从左上角缩，默认的中心缩放会把内容往右下挪、底部被切掉
+                body.style.transformOrigin = '0 0';
                 body.style.transform = `scale(${scale})`;
             }
 
-            const height = Math.max(
-                body.scrollHeight,
-                body.offsetHeight,
-                doc ? doc.scrollHeight : 0,
-                doc ? doc.offsetHeight : 0
-            );
-            iframe.style.height = Math.ceil(height * scale + 20) + 'px';
+            // 只量 body：<html> 的高度至少等于 iframe 本身，量它会让高度只增不减，
+            // 每次重新适配（图片加载、窗口变宽、手机地址栏收起）底下就多一截空白
+            const height = Math.max(body.scrollHeight, body.offsetHeight);
+            iframe.style.height = Math.ceil(height * scale) + 'px';
         } catch (e) {}
     };
 

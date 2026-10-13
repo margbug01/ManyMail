@@ -99,6 +99,19 @@ const headText = (page) => page.locator('#mail-detail-head').innerText();
     await page.evaluate(() => setLang('de'));
     assert.equal(await privacyBtn.textContent(), 'Externe Bilder blockiert · Für diese Nachricht laden');
 
+    // 正文 iframe 高度贴着内容：窗口宽窄来回切（手机转屏、地址栏收起）后底下不能越攒越多空白
+    const bodyGap = () => page.evaluate(() => {
+      const f = document.getElementById('mail-body-frame');
+      // iframe 自带 min-height:200px，短邮件按 200 算
+      return f.offsetHeight - Math.max(200, Math.round(f.contentDocument.body.getBoundingClientRect().bottom));
+    });
+    for (const width of [390, 700, 1366]) {
+      await page.setViewportSize({ width, height: 900 });
+      await page.waitForTimeout(400);
+      const gap = await bodyGap();
+      assert.ok(gap >= 0 && gap <= 4, `mail body iframe leaves ${gap}px blank @ ${width}px`);
+    }
+
     // 2. 日语：按钮、字段名、时间格式都跟着变
     await page.evaluate(() => setLang('ja'));
     head = await headText(page);

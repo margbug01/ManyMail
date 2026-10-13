@@ -26,6 +26,9 @@ Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   fetched again, a beat after the mail list had already changed
 - On desktop the mail columns ran 24px past the bottom of the window (bottom border cut off)
   and ended lower than the IMAP view; both now share one bottom gap and line up
+- A blank area grew under the message body every time it was refitted (images loading,
+  resizing, phone rotation or the address bar collapsing); wide messages scaled to fit
+  the column now shrink from the top-left instead of the centre
 
 ## [1.3.0] - 2026-10-13
 
