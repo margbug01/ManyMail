@@ -17,7 +17,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Stars](https://img.shields.io/github/stars/margbug01/ManyMail?style=flat)](https://github.com/margbug01/ManyMail/stargazers)
 
-**[English](README.md)** · **[linux.do 介绍稿](docs/linuxdo-post.md)**
+**[English](README.md)**
 
 ---
 

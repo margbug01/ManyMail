@@ -17,7 +17,7 @@ Lightweight self-hosted email server with Docker: SMTP, IMAP, webmail, and REST 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Stars](https://img.shields.io/github/stars/margbug01/ManyMail?style=flat)](https://github.com/margbug01/ManyMail/stargazers)
 
-**[Website](https://margbug01.github.io/ManyMail/)** · **[中文文档](README_CN.md)** · **[linux.do post](docs/linuxdo-post.md)**
+**[Website](https://margbug01.github.io/ManyMail/)** · **[中文文档](README_CN.md)**
 
 ---
 
