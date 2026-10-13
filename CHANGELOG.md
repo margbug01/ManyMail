@@ -3,7 +3,11 @@
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [1.3.0] - 2026-10-13
+
+Forwarding and push rules get a page in the webmail, new mail in external IMAP accounts can
+be pushed to your phone, and each sending domain can have its own Resend key set from
+Settings. No breaking changes.
 
 ### Added
 
@@ -18,7 +22,8 @@ Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Resend keys per sending domain in Settings: paste a key next to each domain; it is checked
   against Resend (full or sending-only access) before saving, encrypted with a key derived
   from `SECRET_KEY`, stored by mail-service as ciphertext, and shown only as `re_…1234`.
-  Sending uses it ahead of `RESEND_API_KEY_*` / `RESEND_API_KEY` from `.env`
+  Sending uses it ahead of `RESEND_API_KEY_*` / `RESEND_API_KEY` from `.env`. Every domain
+  shows the masked key it currently sends with and where it comes from
 
 ### Changed
 
@@ -153,6 +158,7 @@ point where the feature set and the deployment story are stable enough to pin a 
 - Production hardening guide in `docs/production-hardening.md`
 - CI runs Ruff, Python tests, Node tests, and a Docker build on every push
 
+[1.3.0]: https://github.com/margbug01/ManyMail/releases/tag/v1.3.0
 [1.2.0]: https://github.com/margbug01/ManyMail/releases/tag/v1.2.0
 [1.1.0]: https://github.com/margbug01/ManyMail/releases/tag/v1.1.0
 [1.0.0]: https://github.com/margbug01/ManyMail/releases/tag/v1.0.0
