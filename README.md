@@ -44,7 +44,7 @@ Mailcow, docker-mailserver and Mail-in-a-Box are full mail platforms. ManyMail i
 - **Webmail** — search, read, reply, compose; HTML is sanitized before it renders
 - **IMAP** — Thunderbird and phone apps; optional bridge for Gmail, Outlook, QQ, 163
 - **REST API** — DuckMail-compatible endpoints for scripts and disposable-mail tools
-- **Forwarding and push rules** — forward to Gmail/QQ via Resend, push to ntfy, Telegram or a webhook, tag / mark read / trash by recipient, sender or subject ([docs](docs/mail-router.md))
+- **Forwarding and push rules** — forward to Gmail/QQ via Resend, push to ntfy, Telegram or a webhook, tag / mark read / trash by recipient, sender or subject, edited on a Rules page; new mail in external IMAP accounts can be pushed too ([docs](docs/mail-router.md))
 - **Multi-domain** — more than one domain; prefixes can be created when you need them
 - **One-command install** — `install.sh` plus prebuilt amd64 / arm64 images on GHCR; FastAPI + Flask + Node.js + MongoDB in Docker Compose. MIT licensed, data stays on your server
 

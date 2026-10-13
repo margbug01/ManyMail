@@ -3,6 +3,24 @@
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- Rules page in the webmail (`/rules`, linked from Settings): list, create, edit, enable /
+  disable and delete routing rules, dry-run a draft against the last 100 messages, send a
+  test push, and see recently routed mail. Rules from `.env` are shown read-only
+- mail-router serves a JSON API on port 8090 inside the compose network (`X-API-Key`),
+  which the webmail proxies after login; the CLI and the API share the same code
+- Push notifications for new mail in external IMAP accounts: the IMAP bridge reports the
+  sender and subject of each new INBOX message to mail-router, and rules with
+  `"source": ["imap"]` push them through ntfy, Telegram or a webhook
+
+### Changed
+
+- Rules match only mail received here unless their `source` includes `imap`, so existing
+  rules behave as before
+
 ## [1.2.0] - 2026-10-13
 
 Self-hosting gets a one-command installer and prebuilt images, and incoming mail can now be

@@ -2,6 +2,7 @@ const { ImapFlow } = require('imapflow');
 const { simpleParser } = require('mailparser');
 const fs = require('fs');
 const path = require('path');
+const notifier = require('./notifier');
 
 const FOLDER_CACHE_TTL = 10 * 60 * 1000;
 
@@ -30,6 +31,12 @@ class MailClient {
     // 前端轮询 /api/changes 比对版本号，变了才去拉列表（轮询本身不碰 IMAP）
     this.inboxVersion = 0;
     this.inboxExists = null;
+    // 新邮件通知：记住 INBOX 已见过的最大 UID，之后 UID 更大的就是新信，报给 mail-router
+    this.lastUid = null;
+    this.uidValidity = null;
+    this.newMailTimer = null;
+    this.reporting = false;
+    this.reportAgain = false;
     this.closed = false;
     this.rewatchTimer = null;
   }
@@ -107,6 +114,7 @@ class MailClient {
         await conn.connect();
         try {
           await conn.mailboxOpen('INBOX', { readOnly: true });
+          this.trackNewMail(conn.mailbox);
           this.noteInboxExists(conn.mailbox.exists);
           conn.on('exists', (e) => { if (e.path === 'INBOX') this.noteInboxExists(e.count); });
           conn.on('expunge', () => {
@@ -131,8 +139,62 @@ class MailClient {
 
   /** 收件箱邮件数变了（含断线期间的变化）就把版本号 +1 */
   noteInboxExists(count) {
+    const grew = this.inboxExists !== null && count > this.inboxExists;
     if (this.inboxExists !== null && count !== this.inboxExists) this.inboxVersion++;
     this.inboxExists = count;
+    if (grew) this.queueNewMail();
+  }
+
+  /** 统计连接（重新）选中 INBOX 时调用：第一次只记下当前最大 UID，重连后补报断线期间到的信 */
+  trackNewMail(mailbox) {
+    const validity = String(mailbox.uidValidity || '');
+    if (this.lastUid === null || this.uidValidity !== validity) {
+      // 没给 UIDNEXT 的服务器：先记成「基线未知」，第一次查询只定基线不通知，免得把整个收件箱当新信
+      this.lastUid = mailbox.uidNext ? Math.max(0, Number(mailbox.uidNext) - 1) : -1;
+      this.uidValidity = validity;
+    } else {
+      this.queueNewMail();
+    }
+  }
+
+  /** 新信往往一阵一阵来，攒 1 秒再一起查 */
+  queueNewMail() {
+    if (!notifier.enabled() || this.closed || this.newMailTimer) return;
+    this.newMailTimer = setTimeout(() => {
+      this.newMailTimer = null;
+      this.reportNewMail().catch((err) => console.error(`[${this.account.name}] 新邮件通知出错: ${err.message}`));
+    }, 1000);
+  }
+
+  /** 取 UID 大于上次的那些信的信封，报给 mail-router */
+  async reportNewMail(conn = this.statusClient) {
+    if (this.reporting) { this.reportAgain = true; return 0; }
+    if (!conn || !conn.usable || this.lastUid === null) return 0;
+    this.reporting = true;
+    try {
+      if (this.lastUid === -1) {
+        let top = 0;
+        for await (const msg of conn.fetch('*', { uid: true }, { uid: true })) top = Math.max(top, msg.uid);
+        this.lastUid = top;
+        return 0;
+      }
+      const found = [];
+      // UID 范围 n:* 在 n 超过最大 UID 时会返回最后一封，所以还要再滤一遍
+      for await (const msg of conn.fetch(`${this.lastUid + 1}:*`, { uid: true, envelope: true }, { uid: true })) {
+        if (msg.uid > this.lastUid) found.push(msg);
+      }
+      if (!found.length) return 0;
+      found.sort((a, b) => a.uid - b.uid);
+      this.lastUid = found[found.length - 1].uid;
+      await notifier.reportImapMail(this.account.auth.user, this.uidValidity, found.map(notifier.toEvent));
+      return found.length;
+    } finally {
+      this.reporting = false;
+      if (this.reportAgain) {
+        this.reportAgain = false;
+        this.queueNewMail();
+      }
+    }
   }
 
   /** 开始盯收件箱：服务启动恢复账号、新添加账号时调用 */
@@ -160,6 +222,7 @@ class MailClient {
   async disconnect() {
     this.closed = true;
     clearTimeout(this.rewatchTimer);
+    clearTimeout(this.newMailTimer);
     if (this.statusClient) {
       try { await this.statusClient.logout(); } catch {}
       this.statusClient = null;

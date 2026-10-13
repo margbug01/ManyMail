@@ -123,6 +123,9 @@ services:
       - ACCOUNTS_FILE=/data/accounts.json
       - IMAP_ACCOUNT_PERSISTENCE=${IMAP_ACCOUNT_PERSISTENCE:-encrypted}
       - IMAP_ACCOUNT_ENCRYPTION_KEY=${IMAP_ACCOUNT_ENCRYPTION_KEY:-}
+      # New mail in external accounts is reported to mail-router for push rules
+      - ROUTER_URL=http://mail-router:8090
+      - ROUTER_API_KEY=${API_KEY:-}
     volumes:
       - imap_mail_data:/data
     expose:
@@ -137,8 +140,8 @@ services:
       - mail-net
 
   # ---- Mail router: forwarding and push-notification rules ----
-  # Rules live in MongoDB (router/cli.py); FORWARD_* / PAYPAL_FORWARD_* in .env become rules.
-  # With no rules it only marks new mail as routed.
+  # Rules live in MongoDB, edited on the webmail's /rules page or with router/cli.py;
+  # FORWARD_* / PAYPAL_FORWARD_* in .env become rules. Its API (:8090) is only on mail-net.
   mail-router:
     image: ghcr.io/margbug01/manymail-router:${MANYMAIL_VERSION:-latest}
     build: ./router
@@ -149,6 +152,14 @@ services:
     environment:
       - MONGO_URL=mongodb://mongodb:27017
       - DB_NAME=${DB_NAME:-mailserver}
+    expose:
+      - "8090"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8090/health', timeout=5).read()"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
     depends_on:
       mongodb:
         condition: service_healthy

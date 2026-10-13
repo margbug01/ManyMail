@@ -11,7 +11,8 @@ A rule looks like:
         "subject_regex": "code\\s*\\d+",    # Python regex, case-insensitive
         "body": ["invoice"],                # substring of the text body, any of
         "has_attachments": true,
-        "include_spam": false
+        "include_spam": false,
+        "source": ["smtp", "imap"]          # default ["smtp"]: mail received here
       },
       "actions": [
         {"type": "forward", "to": ["me@gmail.com"], "from": "Me <hi@example.com>",
@@ -26,14 +27,18 @@ A rule looks like:
     }
 
 Every condition that is present must hold; inside a list any entry may match.
-An empty match block matches all mail that is not spam.
+An empty match block matches all mail received here that is not spam. New mail in external
+IMAP accounts (reported by the IMAP bridge) only matches rules whose source includes "imap",
+and only the notification actions run for it.
 """
 
 import fnmatch
 import re
 
 ACTION_TYPES = ("forward", "ntfy", "telegram", "webhook", "tag", "mark_read", "trash")
-MATCH_KEYS = ("to", "from", "subject", "subject_regex", "body", "has_attachments", "include_spam")
+NOTIFY_TYPES = ("ntfy", "telegram", "webhook")
+SOURCES = ("smtp", "imap")
+MATCH_KEYS = ("to", "from", "subject", "subject_regex", "body", "has_attachments", "include_spam", "source")
 _ENV_NAME = re.compile(r"^[A-Z_][A-Z0-9_]*$")
 
 
@@ -81,6 +86,9 @@ def validate_rule(rule: dict) -> list:
     unknown = sorted(set(match) - set(MATCH_KEYS))
     if unknown:
         errors.append("unknown match keys: " + ", ".join(unknown))
+    bad_sources = [s for s in as_list(match.get("source")) if s not in SOURCES]
+    if bad_sources:
+        errors.append("match.source must be smtp and/or imap")
     if match.get("subject_regex"):
         try:
             re.compile(str(match["subject_regex"]))
@@ -131,6 +139,9 @@ def matches(rule: dict, message: dict) -> bool:
     if not rule.get("enabled", True):
         return False
     match = rule.get("match") or {}
+
+    if message.get("source", "smtp") not in (as_list(match.get("source")) or ["smtp"]):
+        return False
 
     if message.get("is_deleted"):
         # Spam is stored soft-deleted; anything else deleted before routing ran is skipped.

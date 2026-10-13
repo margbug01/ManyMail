@@ -418,3 +418,34 @@ def test_dns_check_page(client, viewer, monkeypatch):
 
     monkeypatch.setattr(viewer.http_session, "get", Mock(side_effect=OSError("down")))
     assert "连接邮件服务失败" in client.get("/dns-check").get_data(as_text=True)
+
+
+def test_rules_page_and_router_proxy(client, viewer, monkeypatch):
+    assert client.get("/rules").status_code == 302
+    assert client.get("/api/router/rules").status_code in (302, 401)
+    login(client)
+    assert "rules.js" in client.get("/rules").get_data(as_text=True)
+
+    calls = []
+
+    def fake_request(method, url, params=None, json=None, headers=None, timeout=None):
+        calls.append((method, url, json, headers))
+        return Mock(status_code=201, content=b'{"rule": {"_id": "x"}}')
+
+    monkeypatch.setattr(viewer.http_session, "request", fake_request)
+    resp = client.post("/api/router/rules", json={"name": "x"})
+    assert resp.status_code == 201 and resp.get_json() == {"rule": {"_id": "x"}}
+    method, url, body, headers = calls[-1]
+    assert (method, url, body) == ("POST", "http://mail-router:8090/rules", {"name": "x"})
+    assert headers["X-API-Key"]
+
+    client.get("/api/router/status?limit=5")
+    assert calls[-1][0] == "GET" and calls[-1][2] is None
+
+    # Only rule paths are proxied, and writes must be JSON.
+    for path in ("events/imap", "rules/../health", "rules/a/b/c", "health"):
+        assert client.post(f"/api/router/{path}", json={}).status_code == 404
+    assert client.post("/api/router/rules", data="name=x").status_code == 415
+
+    monkeypatch.setattr(viewer.http_session, "request", Mock(side_effect=OSError("down")))
+    assert client.get("/api/router/rules").status_code == 502

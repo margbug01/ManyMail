@@ -4,14 +4,21 @@
 says which mail it applies to and what to do with it: forward it through Resend, push a
 notification to ntfy / Telegram / a webhook, or tag, mark read, or trash it.
 
+It also hears about new mail in the external accounts added on the IMAP page (Gmail, QQ,
+Outlook, ...): the IMAP bridge reports each new message's sender and subject, and rules
+with `"source": ["imap"]` can push a notification for it.
+
 It replaces the old `mail-forwarder` and `mail-paypal-forwarder` containers. Their
 `FORWARD_*` and `PAYPAL_FORWARD_*` variables still work and show up as rules named
 `env-forward` and `env-paypal-forward`.
 
 ## Managing rules
 
-Rules are stored in MongoDB (`routing_rules`). Until the web UI lands, use the CLI inside
-the container:
+Rules are stored in MongoDB (`routing_rules`). The easiest way to manage them is the
+**Rules** page of the webmail (`/rules`, linked from Settings): create and edit rules, switch
+them on and off, dry-run a rule against the last 100 messages, and send a test push.
+
+The same operations are available from the CLI inside the container:
 
 ```bash
 docker compose exec -T mail-router python cli.py list
@@ -61,6 +68,11 @@ takes all mail that is not spam.
 | `body` | Substrings of the plain-text body |
 | `has_attachments` | `true` or `false` |
 | `include_spam` | Also run on mail the spam filter put in the trash (default `false`) |
+| `source` | `smtp` (mail received here, the default) and/or `imap` (new mail in external IMAP accounts) |
+
+For `imap` mail only the sender, recipient (the account address) and subject are known,
+so `body` never matches it and it counts as having no attachments; only `ntfy`, `telegram` and `webhook`
+actions run; the others are recorded as skipped.
 
 ### Actions
 
@@ -103,6 +115,14 @@ Forward invoices to an accounting inbox:
               "subject_prefix": "[Invoice]"}]}
 ```
 
+Push new mail from an external Gmail account, but only from your bank:
+
+```json
+{"name": "bank via gmail",
+ "match": {"source": ["imap"], "to": ["me@gmail.com"], "from": ["*@mybank.com"]},
+ "actions": [{"type": "ntfy", "topic": "bank-3b9d1e", "priority": 4}]}
+```
+
 ## How delivery works
 
 - On first start the router records the current time; older mail is never replayed.
@@ -115,6 +135,27 @@ Forward invoices to an accounting inbox:
   idempotency key per message and action.
 - The SMTP loop guard treats every `forward` target as a forwarding address: auto-replies
   from it are dropped instead of being stored and forwarded again.
+
+## API
+
+The webmail talks to mail-router over a small JSON API on port 8090, reachable only inside
+the compose network. Every call except `GET /health` needs `X-API-Key: $API_KEY`.
+
+| Method | Path | |
+|:-------|:-----|:-|
+| GET | `/rules` | all rules, each with `problems` from validation |
+| POST | `/rules` | create (or replace by `_id`) |
+| PUT / DELETE | `/rules/<id>` | replace / delete (rules from `.env` answer 409) |
+| POST | `/rules/<id>/enabled` | `{"enabled": false}` |
+| POST | `/rules/<id>/test`, `/test` | sample push through a saved rule / `{"rule": {...}}` |
+| POST | `/dry-run` | `{"rule": {...}, "limit": 100}` |
+| GET | `/status?limit=20` | recently routed mail and IMAP events |
+| POST | `/events/imap` | used by the IMAP bridge: `{"account", "uidvalidity", "messages": [{"uid", "from", "subject"}]}` |
+
+The IMAP bridge reports through this API when `ROUTER_URL` and `ROUTER_API_KEY` are set,
+which `docker-compose.yml` does. It keeps track of the highest UID it has seen in each
+account's INBOX, so it never reports old mail, and after a reconnect it reports what came in
+meanwhile (at most 20 messages). IMAP events are kept for 30 days.
 
 ## Upgrading from mail-forwarder
 

@@ -108,3 +108,11 @@ def test_validate_reports_each_problem():
 def test_extract_code():
     assert extract_code("Your code", "is 482913.") == "482913"
     assert extract_code("order 12345 or 1234567") is None
+
+
+def test_source_filter():
+    imap = {**MESSAGE, "source": "imap"}
+    assert matches(rule(), MESSAGE) and not matches(rule(), imap)
+    assert matches(rule({"source": ["imap"]}), imap) and not matches(rule({"source": "imap"}), MESSAGE)
+    assert matches(rule({"source": ["smtp", "imap"]}), imap)
+    assert "match.source must be smtp and/or imap" in validate_rule(rule({"source": ["pop3"]}))

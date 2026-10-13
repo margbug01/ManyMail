@@ -44,7 +44,7 @@ Mailcow、docker-mailserver 是完整的邮局方案。ManyMail 是一套很小�
 - **Web 邮箱** — 搜索、阅读、回复、发信；渲染前做 HTML 过滤
 - **IMAP** — Thunderbird、手机邮件 App；也可桥接 Gmail / Outlook / QQ / 163
 - **REST API** — 兼容 DuckMail 的接口，方便脚本和临时邮箱工具
-- **转发与推送规则** — 按收件人、发件人、主题匹配，经 Resend 转发到 Gmail/QQ，推送到 ntfy、Telegram 或 webhook，也能打标签、标已读、丢垃圾箱（[文档](docs/mail-router.md)）
+- **转发与推送规则** — 按收件人、发件人、主题匹配，经 Resend 转发到 Gmail/QQ，推送到 ntfy、Telegram 或 webhook，也能打标签、标已读、丢垃圾箱；网页里有规则页可直接编辑，外部 IMAP 邮箱的新信也能推送（[文档](docs/mail-router.md)）
 - **多域名** — 可挂多个域名，前缀按需创建
 - **一条命令安装** — `install.sh` 加上 GHCR 上的 amd64 / arm64 预构建镜像；FastAPI + Flask + Node.js + MongoDB 跑在 Docker Compose 里。MIT 协议，邮件留在你自己的服务器上
 

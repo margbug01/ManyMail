@@ -9,6 +9,10 @@ Per message, routing state is kept under `routing`:
     matched      ids of the rules that matched when the message was first seen
     results      {"<rule id>:<action index>": {"status": "done" | "error", ...}}
 Only actions that have not succeeded are run again on retry.
+
+New mail in external IMAP accounts arrives as `routing_events` documents (posted by the
+IMAP bridge to the HTTP API in api.py) and goes through the same loop, notification
+actions only.
 """
 
 import logging
@@ -19,7 +23,7 @@ from datetime import datetime, timedelta, timezone
 from pymongo import ASCENDING, MongoClient, ReturnDocument
 
 import actions
-from rules import select_rules, sort_rules, validate_rule
+from rules import NOTIFY_TYPES, select_rules, sort_rules, validate_rule
 
 MONGO_URL = os.getenv("MONGO_URL", "mongodb://mongodb:27017")
 DB_NAME = os.getenv("DB_NAME", "mailserver")
@@ -113,9 +117,10 @@ def load_rules() -> list:
     return sort_rules(usable)
 
 
-def claim_next_message(since: datetime):
+def claim_next_message(since: datetime, collection=None):
+    collection = db.messages if collection is None else collection
     now = now_utc()
-    return db.messages.find_one_and_update(
+    return collection.find_one_and_update(
         {
             "created_at": {"$gte": since},
             "$or": [
@@ -130,7 +135,9 @@ def claim_next_message(since: datetime):
     )
 
 
-def process_message(message: dict, rules: list) -> str:
+def process_message(message: dict, rules: list, collection=None) -> str:
+    collection = db.messages if collection is None else collection
+    external = message.get("source") == "imap"
     routing = message.get("routing") or {}
     if "matched" in routing:
         wanted = set(routing["matched"])
@@ -144,6 +151,10 @@ def process_message(message: dict, rules: list) -> str:
         for index, action in enumerate(rule["actions"]):
             key = f"{rule['_id']}:{index}"
             if (results.get(key) or {}).get("status") == "done":
+                continue
+            if external and action["type"] not in NOTIFY_TYPES:
+                # Forwarding or changing a message needs it stored here; IMAP mail only has a header.
+                results[key] = {"status": "done", "type": action["type"], "detail": "skipped for IMAP mail", "at": now_utc()}
                 continue
             ctx = {"db": db, "rule": rule, "action_key": key, "viewer_url": VIEWER_URL}
             try:
@@ -179,13 +190,28 @@ def process_message(message: dict, rules: list) -> str:
     change = {"$set": update}
     if unset:
         change["$unset"] = unset
-    db.messages.update_one({"_id": message["_id"]}, change)
+    collection.update_one({"_id": message["_id"]}, change)
     return status
 
 
 def ensure_indexes() -> None:
     db.messages.create_index([("routing.status", ASCENDING), ("created_at", ASCENDING)])
     db.messages.create_index([("routing.status", ASCENDING), ("routing.next_attempt_at", ASCENDING)])
+    db.routing_events.create_index("event_key", unique=True)
+    db.routing_events.create_index([("routing.status", ASCENDING), ("created_at", ASCENDING)])
+    # IMAP events only matter while they are fresh.
+    db.routing_events.create_index("created_at", expireAfterSeconds=30 * 24 * 3600)
+
+
+def run_once(since: datetime) -> bool:
+    """Route one pending message or IMAP event; False when there was nothing to do."""
+    for collection in (db.messages, db.routing_events):
+        message = claim_next_message(since, collection)
+        if message is not None:
+            # Rules are re-read per message (a handful of documents) so edits apply at once.
+            process_message(message, load_rules(), collection)
+            return True
+    return False
 
 
 def main():
@@ -193,13 +219,12 @@ def main():
     seed_legacy_rules()
     since = start_time()
     logger.info("Routing mail received since %s with %d rule(s)", since.isoformat(), len(load_rules()))
+    import api  # noqa: PLC0415 - api imports this module
+
+    api.start_in_background(db, viewer_url=VIEWER_URL)
     while True:
-        message = claim_next_message(since)
-        if message is None:
+        if not run_once(since):
             time.sleep(POLL_SECONDS)
-            continue
-        # Rules are re-read per message (a handful of documents) so edits apply at once.
-        process_message(message, load_rules())
 
 
 if __name__ == "__main__":

@@ -611,6 +611,39 @@ def dns_check_page():
     return render_template("dns_check.html", report=report, error=error)
 
 
+ROUTER_API_URL = os.getenv("ROUTER_API_URL", "http://mail-router:8090").rstrip("/")
+_ROUTER_PATHS = re.compile(r"^(rules(/[A-Za-z0-9_-]{1,80}(/(enabled|test))?)?|test|dry-run|status)$")
+
+
+@app.route("/rules")
+@login_required
+def rules_page():
+    return render_template("rules.html")
+
+
+@app.route("/api/router/<path:subpath>", methods=["GET", "POST", "PUT", "DELETE"])
+@login_required
+def router_proxy(subpath):
+    """转发与推送规则：登录后转给 mail-router 的规则 API（只放行规则相关路径）。"""
+    if not _ROUTER_PATHS.match(subpath):
+        return jsonify({"error": "not found"}), 404
+    if request.method != "GET" and not request.is_json:
+        return jsonify({"error": "JSON body required"}), 415
+    try:
+        resp = http_session.request(
+            request.method,
+            f"{ROUTER_API_URL}/{subpath}",
+            params=request.args,
+            json=request.get_json(silent=True) if request.method != "GET" else None,
+            headers={"X-API-Key": DUCKMAIL_API_KEY},
+            timeout=30,
+        )
+    except Exception as e:
+        app.logger.error(f"mail-router 请求失败: {e}")
+        return jsonify({"error": "连接 mail-router 失败"}), 502
+    return Response(resp.content, status=resp.status_code, content_type="application/json; charset=utf-8")
+
+
 @app.route("/imap")
 @login_required
 def imap_root():
