@@ -743,3 +743,6 @@ body {
 *::-webkit-scrollbar-thumb { background-color: transparent; border-radius: 999px; border: 2px solid transparent; background-clip: padding-box; }
 *:hover::-webkit-scrollbar-thumb, .is-scrolling::-webkit-scrollbar-thumb { background-color: rgba(108,135,125,0.32); }
 *::-webkit-scrollbar-thumb:hover { background-color: rgba(108,135,125,0.5); }
+
+/* 设置里的发信 key 列表：最后一行不要分隔线 */
+#sender-key-list .sender-key-row:last-child { border-bottom: 0 !important; }

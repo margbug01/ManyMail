@@ -13,14 +13,16 @@ const LANGS = {
         dnsCheck: 'DNS 自检',
         routingRules: '规则',
         senderKeys: '发信 Resend Key',
-        senderKeyTip: '按发件人所在域名选 key：这里填的优先，其次是 .env 里的配置。保存前会先找 Resend 验证，key 加密存储，只显示末 4 位。',
+        senderKeyTip: '这里设置的优先于 .env；保存前会找 Resend 验证，加密存储。',
         keyFromSettings: '已设置 {hint}',
-        keyFromEnvDomain: '用 .env 里的专用 key',
-        keyFromEnvDefault: '用 .env 里的通用 key',
-        keyNone: '未配置，不能发信',
-        keyUnreadable: '无法解密，请重新填写',
+        keyFromEnvDomain: '.env 专用 key',
+        keyFromEnvDefault: '.env 通用 key',
+        keyNone: '未配置',
+        keyUnreadable: '无法解密，请重填',
         keyPlaceholder: '粘贴 re_ 开头的 key',
         keySave: '保存',
+        keySet: '设置',
+        keyChange: '更换',
         keyRemove: '移除',
         keySaving: '正在找 Resend 验证…',
         keyRemoved: '已移除 {domain} 的 key',
@@ -153,14 +155,16 @@ const LANGS = {
         dnsCheck: 'DNS check',
         routingRules: 'Rules',
         senderKeys: 'Resend keys for sending',
-        senderKeyTip: 'The key is picked by the domain of the From address: one entered here wins over .env. Keys are checked with Resend before saving, stored encrypted, and only the last 4 characters are shown.',
+        senderKeyTip: 'Keys set here win over .env; they are checked with Resend and stored encrypted.',
         keyFromSettings: 'Set {hint}',
-        keyFromEnvDomain: 'Using the domain key from .env',
-        keyFromEnvDefault: 'Using the default key from .env',
-        keyNone: 'Not configured, cannot send',
-        keyUnreadable: 'Cannot be decrypted, enter it again',
+        keyFromEnvDomain: '.env domain key',
+        keyFromEnvDefault: '.env default key',
+        keyNone: 'Not set',
+        keyUnreadable: 'Unreadable, set again',
         keyPlaceholder: 'Paste a key starting with re_',
         keySave: 'Save',
+        keySet: 'Set',
+        keyChange: 'Change',
         keyRemove: 'Remove',
         keySaving: 'Checking with Resend…',
         keyRemoved: 'Removed the key for {domain}',
@@ -688,26 +692,34 @@ async function loadSenderKeys() {
 }
 
 function renderSenderKeyRow(item) {
+    // 一行一个域名：域名 · 当前用哪个 key · 设置/更换；点了才在下面展开输入框（同时只开一个）
     const row = document.createElement('div');
-    row.className = 'sender-key-row py-2 px-2 mb-1';
-    row.style.cssText = 'background:#f5f9f7;border-radius:6px;';
-    const head = document.createElement('div');
-    head.className = 'd-flex justify-content-between align-items-center gap-2 mb-1';
+    row.className = 'sender-key-row';
+    row.style.cssText = 'padding:6px 8px;border-bottom:1px solid #eef3f1;';
+    const line = document.createElement('div');
+    line.className = 'd-flex align-items-center gap-2';
     const name = document.createElement('span');
-    name.className = 'small fw-semibold text-break';
+    name.className = 'small text-truncate';
+    name.style.flex = '1 1 auto';
     name.textContent = item.domain;
-    const status = document.createElement('span');
     const labels = {
-        settings: [t('keyFromSettings', { hint: item.hint }), 'text-success'],
+        settings: [item.hint, 'text-success'],
         'env-domain': [t('keyFromEnvDomain'), 'text-muted'],
         'env-default': [t('keyFromEnvDefault'), 'text-muted'],
         none: [t('keyNone'), 'text-danger'],
     };
     const [label, cls] = item.unreadable ? [t('keyUnreadable'), 'text-danger'] : labels[item.source] || [item.source, 'text-muted'];
-    status.className = 'small text-end ' + cls;
+    const status = document.createElement('span');
+    status.className = 'small text-nowrap ' + cls;
     status.textContent = label;
-    head.append(name, status);
+    const toggle = document.createElement('button');
+    toggle.type = 'button';
+    toggle.className = 'btn btn-link btn-sm p-0 text-nowrap';
+    toggle.textContent = item.source === 'settings' || item.unreadable ? t('keyChange') : t('keySet');
+    line.append(name, status, toggle);
 
+    const editor = document.createElement('div');
+    editor.className = 'mt-2 d-none';
     const group = document.createElement('div');
     group.className = 'input-group input-group-sm';
     const input = document.createElement('input');
@@ -734,7 +746,6 @@ function renderSenderKeyRow(item) {
             });
             const data = await resp.json();
             if (!data.success) throw new Error(data.message || resp.status);
-            input.value = '';
             showToast(item.domain + ': ' + data.message, { type: 'success' });
             await loadSenderKeys();
         } catch (e) {
@@ -765,7 +776,18 @@ function renderSenderKeyRow(item) {
         });
         group.append(remove);
     }
-    row.append(head, group, note);
+    editor.append(group, note);
+
+    toggle.addEventListener('click', () => {
+        const opening = editor.classList.contains('d-none');
+        document.querySelectorAll('#sender-key-list .sender-key-editor').forEach((el) => el.classList.add('d-none'));
+        if (opening) {
+            editor.classList.remove('d-none');
+            input.focus();
+        }
+    });
+    editor.classList.add('sender-key-editor');
+    row.append(line, editor);
     return row;
 }
 
