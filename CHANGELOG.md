@@ -22,6 +22,8 @@ Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - The message list header no longer wraps in languages with longer labels
 - The "External images blocked" button above a message only knew Chinese and English and
   kept its old language after switching
+- Switching IMAP accounts moved the left-hand highlight only after the account list was
+  fetched again, a beat after the mail list had already changed
 
 ## [1.3.0] - 2026-10-13
 

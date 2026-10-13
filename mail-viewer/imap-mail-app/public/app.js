@@ -366,7 +366,7 @@ async function loadAccounts() {
     var local = at > 0 ? a.email.slice(0, at) : a.email;
     var domain = at > 0 ? a.email.slice(at) : '';
     var id = Number(a.id);
-    return '<div class="account-item' + (a.id === activeAccountId ? ' active' : '') + '" data-email="' + esc(a.email) + '" title="' + esc(a.email) + '" onclick="selectAccount(' + id + ')">' +
+    return '<div class="account-item' + (a.id === activeAccountId ? ' active' : '') + '" data-id="' + id + '" data-email="' + esc(a.email) + '" title="' + esc(a.email) + '" onclick="selectAccount(' + id + ')">' +
       '<span class="account-avatar">' + esc(local.charAt(0)) + '</span>' +
       '<span class="account-name"><span class="account-local">' + esc(local) + '</span><span class="account-domain">' + esc(domain) + '</span></span>' +
       '<span class="account-actions">' +
@@ -383,10 +383,18 @@ async function selectAccount(id) {
   activeFolder = 'INBOX';
   saveImapView({ account: id, folder: 'INBOX', uid: null });
   detailVisible = false;
+  // 账号列表没变，不用重新拉 /api/accounts（要等一个来回，高亮会比邮件列表慢一拍），原地挪高亮
+  markActiveAccount();
   syncResponsiveView();
-  loadAccounts();
   loadFolders(id);
   loadMails();
+}
+
+function markActiveAccount() {
+  document.querySelectorAll('#account-list .account-item').forEach(function(el) {
+    el.classList.toggle('active', Number(el.dataset.id) === activeAccountId);
+  });
+  updateMobileContext();
 }
 
 function accountEmail(id) {

@@ -15,6 +15,7 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
 // 服务器端状态：每个「账号|文件夹」一组按 UID 递增的邮件；versions 是 /api/changes 的收件箱版本号
 const store = {};
 const versions = { 1: 0, 2: 0, 3: 0 };
+let accountsDelay = 0;
 const mailOf = (acc, folder, uid) => ({ uid, from: { name: 'S' + uid, address: 's' + uid + '@x.test' }, subject: acc + ':' + folder + ' #' + uid, date: new Date(BASE_TIME + uid * 60000).toISOString(), seen: true, flagged: false });
 function mailbox(acc, folder) {
   const key = acc + '|' + folder;
@@ -48,7 +49,8 @@ function deliver(acc) {
     const api = p.slice(5);
     requests.push(api + url.search);
     let m;
-    if (api === '/api/accounts') return json([1, 2, 3].map(id => ({ id, email: 'u' + id + '@example.test' })));
+    // 高亮那一步才给账号列表加延迟：切账号时左侧高亮不能等它回来
+    if (api === '/api/accounts') { await sleep(accountsDelay); return json([1, 2, 3].map(id => ({ id, email: 'u' + id + '@example.test' }))); }
     if (api === '/api/changes') return json({ accounts: Object.fromEntries(Object.entries(versions).map(([id, v]) => [id, { inbox: v }])) });
     if (/^\/api\/accounts\/\d+\/folders$/.test(api)) { await sleep(LIST_DELAY); return json([{ path: 'INBOX', name: 'INBOX' }, { path: 'Sent', name: 'Sent' }]); }
     if (api.endsWith('/folders/status')) { await sleep(STATUS_DELAY); return json([{ path: 'INBOX', unseen: 1 }, { path: 'Sent', unseen: 0 }]); }
@@ -96,6 +98,18 @@ function deliver(acc) {
   assert.ok(t < 250, 'prefetched account should render from cache: ' + t);
   step('prefetched account renders instantly', t + 'ms');
   await sleep(LIST_DELAY + 200);
+
+  // 左侧高亮要和邮件列表同一拍切过去，不能等 /api/accounts 回来
+  accountsDelay = LIST_DELAY;
+  const highlighted = await page.evaluate(() => {
+    selectAccount(3);
+    return [...document.querySelectorAll('#account-list .account-item.active')].map(el => el.dataset.email);
+  });
+  assert.deepEqual(highlighted, ['u3@example.test'], 'account highlight must move immediately');
+  await page.evaluate(() => { selectAccount(1); });
+  step('account highlight moves with the click');
+  await sleep(LIST_DELAY + 200);
+  accountsDelay = 0;
 
   const folderRequests = count(/\/folders$/);
   await timeUntilRow('1:Sent #100', () => page.evaluate(() => { selectFolder('Sent'); }));
