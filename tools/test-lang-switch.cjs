@@ -141,6 +141,17 @@ const headText = (page) => page.locator('#mail-detail-head').innerText();
         assert.ok(oneLine, `list header wraps: ${code} @ ${width}px`);
       }
     }
+    // 桌面端邮件三栏和 IMAP 的底边对齐，而且卡片完整在屏幕内（以前三栏被 gutter 顶出 24px，IMAP 靠 calc 各算各的）
+    for (const [width, height] of HAVE_REAL_CSS ? [[1100, 700], [1366, 768], [1920, 1080]] : []) {
+      await page.setViewportSize({ width, height });
+      await page.evaluate(() => switchTab('inbox'));
+      const mailBottoms = await page.evaluate(() => ['#mail-list-column > .card', '#mail-detail-column > .card'].map(q => Math.round(document.querySelector(q).getBoundingClientRect().bottom)));
+      await page.evaluate(() => switchTab('imap'));
+      const imapBottom = await page.evaluate(() => Math.round(document.getElementById('imap-frame').getBoundingClientRect().bottom));
+      assert.deepEqual(mailBottoms, [imapBottom, imapBottom], `bottoms differ @ ${width}x${height}: mail ${mailBottoms} imap ${imapBottom}`);
+      assert.ok(imapBottom < height - 16, `cards should end above the window edge @ ${width}x${height}: ${imapBottom}`);
+    }
+    await page.evaluate(() => switchTab('inbox'));
     await page.evaluate(() => setLang('ru'));
     assert.deepEqual(errors, []);
 

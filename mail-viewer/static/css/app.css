@@ -219,6 +219,9 @@ body {
         flex-direction: column;
     }
     .mail-shell {
+        /* 邮件三栏和 IMAP 共用的底部留白（按原来 IMAP 的位置定的） */
+        --shell-bottom-gap: 72px;
+        padding-bottom: var(--shell-bottom-gap) !important;
         box-sizing: border-box;
         flex: 1 1 auto;
         min-height: 0;
@@ -232,11 +235,12 @@ body {
         overflow: hidden;
         align-items: stretch;
     }
+    /* g-4 给每一栏加了 margin-top（行本身是负 margin 抵消），高度要扣掉它，否则每栏多出 24px 把底边顶出屏幕 */
     .mail-col {
         display: flex;
         flex-direction: column;
         min-height: 0;
-        height: 100%;
+        height: calc(100% - var(--bs-gutter-y));
     }
     .mail-col > .card {
         flex: 1 1 auto;
@@ -674,6 +678,23 @@ body {
     min-height: calc(100vh - 180px);
     border: 0;
     background: transparent;
+}
+/* 桌面端 IMAP 和邮件三栏用同一块空间：高度跟 .mail-col 一样扣 gutter，iframe 撑满，
+   底边由 .mail-shell 的 --shell-bottom-gap 决定，两个视图自然对齐（以前各算各的，差 48px） */
+@media (min-width: 992px) {
+    #imap-panel {
+        height: calc(100% - var(--bs-gutter-y));
+        min-height: 0;
+    }
+    #imap-panel > .card,
+    #imap-panel > .card > .card-body {
+        height: 100%;
+    }
+    #imap-frame {
+        display: block;
+        height: 100%;
+        min-height: 0;
+    }
 }
 
 /* 邮件列表：扁平行 + 分隔线，不再卡片套卡片 */

@@ -24,6 +24,8 @@ Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   kept its old language after switching
 - Switching IMAP accounts moved the left-hand highlight only after the account list was
   fetched again, a beat after the mail list had already changed
+- On desktop the mail columns ran 24px past the bottom of the window (bottom border cut off)
+  and ended lower than the IMAP view; both now share one bottom gap and line up
 
 ## [1.3.0] - 2026-10-13
 
