@@ -3,6 +3,23 @@
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- `mail-router` with forwarding and push-notification rules: match on recipient / sender
+  globs, subject, body, or attachments; forward through Resend, push to ntfy, Telegram or
+  a signed webhook, tag, mark read, or trash. Per-action retry with backoff, a CLI for
+  listing, adding, dry-running, and testing rules. See `docs/mail-router.md`.
+
+### Changed
+
+- `mail-router` replaces `mail-forwarder` and `mail-paypal-forwarder`; the `FORWARD_*` and
+  `PAYPAL_FORWARD_*` variables become rules. The hard-coded forward subject prefix is now
+  `FORWARD_SUBJECT_PREFIX` / `PAYPAL_FORWARD_SUBJECT_PREFIX` (empty by default).
+- The SMTP loop guard also treats every forward target in the router rules as a
+  forwarding address.
+
 ## [1.1.0] - 2026-10-13
 
 Mostly IMAP and webmail work: faster account switching, live inbox updates, a reworked

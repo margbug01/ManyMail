@@ -89,7 +89,7 @@ while IFS= read -r f; do
   case "$f" in
     */tests/*|*/test/*|*.md|docs/*|tools/*|.github/*|.env.example|.gitignore) ;;
     mail-service/*) add mail-service ;;
-    forwarder/*) add mail-forwarder; add mail-paypal-forwarder ;;
+    router/*) add mail-router ;;
     mail-viewer/imap-mail-app/public/email-privacy.js) add imap-mail; add mail-viewer ;;
     mail-viewer/imap-mail-app/*) add imap-mail ;;
     mail-viewer/*) add mail-viewer ;;

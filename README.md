@@ -44,18 +44,20 @@ Mailcow, docker-mailserver and Mail-in-a-Box are full mail platforms. ManyMail i
 - **Webmail** — search, read, reply, compose; HTML is sanitized before it renders
 - **IMAP** — Thunderbird and phone apps; optional bridge for Gmail, Outlook, QQ, 163
 - **REST API** — DuckMail-compatible endpoints for scripts and disposable-mail tools
+- **Forwarding and push rules** — forward to Gmail/QQ via Resend, push to ntfy, Telegram or a webhook, tag / mark read / trash by recipient, sender or subject ([docs](docs/mail-router.md))
 - **Multi-domain** — more than one domain; prefixes can be created when you need them
 - **Docker Compose** — FastAPI + Flask + IMAP + MongoDB. MIT licensed, data stays on your server
 
 ## Overview
 
-Three services in one compose file:
+Four services in one compose file:
 
 | Service | Stack | Port | Description |
 |:--------|:------|:-----|:------------|
 | **mail-service** | FastAPI + aiosmtpd | `:25` `:8080` | SMTP receiver + DuckMail-compatible REST API |
 | **mail-viewer** | Flask + bleach | `:5000` | Web mail viewer with search, reply & compose |
 | **imap-bridge** | Node.js + imapflow | `:3939` | IMAP bridge for Gmail / Outlook / QQ etc. |
+| **mail-router** | Python | — | Forwarding and push-notification rules for incoming mail |
 
 <br>
 
@@ -247,6 +249,12 @@ ManyMail/
 │       ├── client.js            #     ImapFlow wrapper
 │       ├── config.js            #     Provider presets
 │       └── package.json         #     imapflow, mailparser
+│
+├── router/                      # Forwarding / notification rules
+│   ├── app.py                   #   Rule loop over new mail
+│   ├── rules.py                 #   Matching and validation
+│   ├── actions.py               #   forward, ntfy, telegram, webhook, tag, ...
+│   └── cli.py                   #   list / add / dry-run / test rules
 │
 ├── docker-compose.yml           # All 4 services orchestration
 ├── .env.example                 # Environment variable template

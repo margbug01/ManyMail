@@ -44,18 +44,20 @@ Mailcow、docker-mailserver 是完整的邮局方案。ManyMail 是一套很小�
 - **Web 邮箱** — 搜索、阅读、回复、发信；渲染前做 HTML 过滤
 - **IMAP** — Thunderbird、手机邮件 App；也可桥接 Gmail / Outlook / QQ / 163
 - **REST API** — 兼容 DuckMail 的接口，方便脚本和临时邮箱工具
+- **转发与推送规则** — 按收件人、发件人、主题匹配，经 Resend 转发到 Gmail/QQ，推送到 ntfy、Telegram 或 webhook，也能打标签、标已读、丢垃圾箱（[文档](docs/mail-router.md)）
 - **多域名** — 可挂多个域名，前缀按需创建
 - **Docker Compose** — FastAPI + Flask + IMAP + MongoDB。MIT 协议，邮件留在你自己的服务器上
 
 ## 概述
 
-一份 compose 里三个服务：
+一份 compose 里四个服务：
 
 | 服务 | 技术栈 | 端口 | 说明 |
 |:-----|:-------|:-----|:-----|
 | **mail-service** | FastAPI + aiosmtpd | `:25` `:8080` | SMTP 收件 + DuckMail 兼容 REST API |
 | **mail-viewer** | Flask + bleach | `:5000` | Web 邮件查看器，支持搜索、回复、发信 |
 | **imap-bridge** | Node.js + imapflow | `:3939` | IMAP 桥接，接入 Gmail / Outlook / QQ 等 |
+| **mail-router** | Python | — | 新邮件的转发与推送规则 |
 
 <br>
 
@@ -247,6 +249,12 @@ ManyMail/
 │       ├── client.js            #     ImapFlow 封装
 │       ├── config.js            #     邮件服务商预设配置
 │       └── package.json         #     imapflow, mailparser
+│
+├── router/                      # 转发 / 推送规则
+│   ├── app.py                   #   新邮件规则循环
+│   ├── rules.py                 #   匹配与校验
+│   ├── actions.py               #   forward、ntfy、telegram、webhook、tag 等动作
+│   └── cli.py                   #   规则的增删、试运行、测试推送
 │
 ├── docker-compose.yml           # 统一编排 4 个服务
 ├── .env.example                 # 环境变量模板

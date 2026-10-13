@@ -131,6 +131,27 @@ _LOOPBACK_SENDERS = {
     ).split(",")
     if a.strip() and "@" in a
 }
+_ROUTE_TARGETS_CACHE = {"at": 0.0, "targets": frozenset()}
+_monotonic = time.monotonic  # 测试会整体替换 app.time
+
+
+def _loopback_senders() -> set:
+    """转发目标 = .env 里的老变量 + mail-router 规则里 forward 动作的收件人(缓存 60 秒)。"""
+    if _monotonic() - _ROUTE_TARGETS_CACHE["at"] > 60:
+        targets = set()
+        try:
+            for rule in db.routing_rules.find({"actions.type": "forward"}, {"actions": 1}):
+                for action in rule.get("actions") or []:
+                    if action.get("type") != "forward":
+                        continue
+                    to = action.get("to")
+                    for address in to if isinstance(to, list) else [to]:
+                        if isinstance(address, str) and "@" in address:
+                            targets.add(address.strip().lower())
+        except Exception as exc:  # 查不到规则时只用 .env 里的目标,不影响收信
+            logger.warning(f"Could not load routing rule targets: {exc}")
+        _ROUTE_TARGETS_CACHE.update(at=_monotonic(), targets=frozenset(targets))
+    return _LOOPBACK_SENDERS | _ROUTE_TARGETS_CACHE["targets"]
 
 _smtp_rcpt_rate_store: dict = defaultdict(list)
 _smtp_data_rate_store: dict = defaultdict(list)
@@ -1203,7 +1224,7 @@ class MailHandler:
             # 提取收件人
             # 回环防护:只吞转发目标邮箱发回来的自动回复,不入库不转发。
             # 目标邮箱本人写的信、其他人的自动通知都照常收。
-            if from_email in _LOOPBACK_SENDERS and _is_auto_reply(msg):
+            if from_email in _loopback_senders() and _is_auto_reply(msg):
                 logger.info(
                     f"Loop-back/auto-reply dropped: {from_email} -> {envelope.rcpt_tos}"
                 )

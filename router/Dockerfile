@@ -5,6 +5,8 @@ WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY app.py .
+COPY *.py .
+RUN useradd --system --no-create-home router
+USER router
 
 CMD ["python", "app.py"]

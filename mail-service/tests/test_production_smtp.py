@@ -85,6 +85,20 @@ def test_auto_replies_from_forward_target_are_dropped(test_account, mock_mongo, 
     assert mock_mongo.messages.count_documents({}) == 0
 
 
+def test_auto_replies_from_router_rule_targets_are_dropped(test_account, mock_mongo, monkeypatch):
+    import app
+
+    monkeypatch.setattr(app, "_LOOPBACK_SENDERS", set())
+    monkeypatch.setattr(app, "_ROUTE_TARGETS_CACHE", {"at": 0.0, "targets": frozenset()})
+    mock_mongo.routing_rules.insert_one({
+        "_id": "fwd",
+        "actions": [{"type": "ntfy", "topic": "x"}, {"type": "forward", "to": ["Me@QQ.example"]}],
+    })
+    mail = _mail(test_account[0], "me@qq.example", "Re: hi", Auto_Submitted="auto-replied")
+    assert deliver(mail, test_account[0]) == "250 Message accepted"
+    assert mock_mongo.messages.count_documents({}) == 0
+
+
 def test_ordinary_mail_from_forward_target_is_stored(test_account, mock_mongo, monkeypatch):
     import app
 

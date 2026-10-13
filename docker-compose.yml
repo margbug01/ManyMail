@@ -131,43 +131,18 @@ services:
     networks:
       - mail-net
 
-  # ---- Forward selected hosted mail to an external inbox ----
-  mail-forwarder:
-    profiles: [forwarding]
-    build: ./forwarder
-    container_name: mail-forwarder
+  # ---- Mail router: forwarding and push-notification rules ----
+  # Rules live in MongoDB (router/cli.py); FORWARD_* / PAYPAL_FORWARD_* in .env become rules.
+  # With no rules it only marks new mail as routed.
+  mail-router:
+    build: ./router
+    container_name: mail-router
     restart: unless-stopped
     env_file:
       - .env
     environment:
       - MONGO_URL=mongodb://mongodb:27017
       - DB_NAME=${DB_NAME:-mailserver}
-      - FORWARD_POLL_SECONDS=${FORWARD_POLL_SECONDS:-5}
-      - FORWARD_RETRY_SECONDS=${FORWARD_RETRY_SECONDS:-60}
-      - RESEND_API_KEY=${FORWARD_RESEND_API_KEY:-}
-    depends_on:
-      mongodb:
-        condition: service_healthy
-    networks:
-      - mail-net
-
-  # ---- Forward the PayPal mailbox to the accounting inbox ----
-  mail-paypal-forwarder:
-    profiles: [paypal-forwarding]
-    build: ./forwarder
-    container_name: mail-paypal-forwarder
-    restart: unless-stopped
-    env_file:
-      - .env
-    environment:
-      - MONGO_URL=mongodb://mongodb:27017
-      - DB_NAME=${DB_NAME:-mailserver}
-      - FORWARD_SOURCE_ADDRESS=${PAYPAL_FORWARD_SOURCE_ADDRESS:-}
-      - FORWARD_TO_ADDRESS=${PAYPAL_FORWARD_TO_ADDRESS:-}
-      - FORWARD_FROM=${PAYPAL_FORWARD_FROM:-}
-      - FORWARD_POLL_SECONDS=5
-      - FORWARD_RETRY_SECONDS=60
-      - RESEND_API_KEY=${PAYPAL_FORWARD_RESEND_API_KEY:-}
     depends_on:
       mongodb:
         condition: service_healthy

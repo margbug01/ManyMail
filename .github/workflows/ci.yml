@@ -21,7 +21,7 @@ jobs:
         run: pip install ruff
 
       - name: Run Ruff
-        run: ruff check mail-service/ mail-viewer/app.py mail-viewer/tests/ tools/
+        run: ruff check mail-service/ mail-viewer/app.py mail-viewer/tests/ router/ tools/
 
   python-tests:
     name: Python tests
@@ -45,6 +45,12 @@ jobs:
 
       - name: Run mail-viewer tests
         run: pytest mail-viewer/tests/ -v --tb=short
+
+      - name: Install mail-router dependencies
+        run: pip install -r router/requirements-dev.txt
+
+      - name: Run mail-router tests
+        run: pytest router/tests/ -v --tb=short
 
   node-tests:
     name: Node tests
