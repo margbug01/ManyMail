@@ -3,10 +3,23 @@
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [1.2.0] - 2026-10-13
+
+Self-hosting gets a one-command installer and prebuilt images, and incoming mail can now be
+forwarded and pushed to your phone by rules. No breaking changes; the old forwarder
+variables keep working.
 
 ### Added
 
+- `install.sh`: checks Docker and ports 25/80/443, asks for domain, web host, password and
+  mail retention, writes `.env` with random secrets, starts the stack and runs a DNS check.
+  Works through `curl | bash` and unattended with `--yes` and `MANYMAIL_*` variables
+- Multi-arch images (`linux/amd64`, `linux/arm64`) on GHCR for mail-service, mail-viewer,
+  the IMAP bridge and mail-router, published on every release tag. Compose pulls them and
+  falls back to building from source; `MANYMAIL_VERSION` pins the tag
+- DNS self-check (`mail-service/dnscheck.py`, `GET /admin/dns-check`, and a `/dns-check`
+  page linked from the settings dialog): MX, the MX host's address, web host, SPF, DMARC and
+  PTR, with the exact record to add for anything missing
 - `mail-router` with forwarding and push-notification rules: match on recipient / sender
   globs, subject, body, or attachments; forward through Resend, push to ntfy, Telegram or
   a signed webhook, tag, mark read, or trash. Per-action retry with backoff, a CLI for
@@ -19,6 +32,9 @@ Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `FORWARD_SUBJECT_PREFIX` / `PAYPAL_FORWARD_SUBJECT_PREFIX` (empty by default).
 - The SMTP loop guard also treats every forward target in the router rules as a
   forwarding address.
+- README quick start and DNS setup rewritten around the installer; the DKIM instructions
+  were removed because ManyMail does not sign outgoing mail (Resend does)
+- Shell scripts are linted with ShellCheck in CI and kept at LF line endings
 
 ## [1.1.0] - 2026-10-13
 
@@ -115,5 +131,6 @@ point where the feature set and the deployment story are stable enough to pin a 
 - Production hardening guide in `docs/production-hardening.md`
 - CI runs Ruff, Python tests, Node tests, and a Docker build on every push
 
+[1.2.0]: https://github.com/margbug01/ManyMail/releases/tag/v1.2.0
 [1.1.0]: https://github.com/margbug01/ManyMail/releases/tag/v1.1.0
 [1.0.0]: https://github.com/margbug01/ManyMail/releases/tag/v1.0.0

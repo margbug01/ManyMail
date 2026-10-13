@@ -40,13 +40,13 @@ Mailcow、docker-mailserver 是完整的邮局方案。ManyMail 是一套很小�
 
 ## 功能
 
-- **自建 SMTP** — 域名 25 端口收信；文档里写了 MX、SPF、DKIM、DMARC
+- **自建 SMTP** — 域名 25 端口收信；自带 DNS 自检，缺哪条 MX、SPF、DMARC 记录直接告诉你
 - **Web 邮箱** — 搜索、阅读、回复、发信；渲染前做 HTML 过滤
 - **IMAP** — Thunderbird、手机邮件 App；也可桥接 Gmail / Outlook / QQ / 163
 - **REST API** — 兼容 DuckMail 的接口，方便脚本和临时邮箱工具
 - **转发与推送规则** — 按收件人、发件人、主题匹配，经 Resend 转发到 Gmail/QQ，推送到 ntfy、Telegram 或 webhook，也能打标签、标已读、丢垃圾箱（[文档](docs/mail-router.md)）
 - **多域名** — 可挂多个域名，前缀按需创建
-- **Docker Compose** — FastAPI + Flask + IMAP + MongoDB。MIT 协议，邮件留在你自己的服务器上
+- **一条命令安装** — `install.sh` 加上 GHCR 上的 amd64 / arm64 预构建镜像；FastAPI + Flask + Node.js + MongoDB 跑在 Docker Compose 里。MIT 协议，邮件留在你自己的服务器上
 
 ## 概述
 
@@ -93,81 +93,71 @@ Mailcow、docker-mailserver 是完整的邮局方案。ManyMail 是一套很小�
 
 ## 快速开始
 
-### 1. 克隆并配置
+需要一台装了 Docker 的 Linux 服务器（amd64 或 arm64）、一个公网 IPv4（入站 TCP 25、80、443
+放行），以及一个能改 DNS 的域名。
 
 ```bash
-git clone https://github.com/margbug01/ManyMail.git
-cd ManyMail
-cp .env.example .env
+curl -fsSL https://raw.githubusercontent.com/margbug01/ManyMail/master/install.sh | bash
 ```
 
-编辑 `.env`，填入实际值：
+安装脚本会问邮件域名、网页用的主机名（默认 `mail.<域名>`）、登录密码（留空自动生成）和邮件保留天数，
+然后用随机密钥写好 `.env`，从 GHCR 拉预构建镜像（`linux/amd64` 和 `linux/arm64`），启动全部服务，
+最后跑一遍 DNS 自检，把还缺的记录打印出来。
 
-```env
-# 邮件服务
-JWT_SECRET=你的JWT密钥
-API_KEY=你的API密钥
-SMTP_HOSTNAME=mail.yourdomain.com
-DOMAINS=yourdomain.com
+无人值守：`MANYMAIL_DOMAINS=example.com ./install.sh --yes`，全部选项见
+[`install.sh`](install.sh) 开头。
 
-# 邮件查看器
-ACCESS_PASSWORD=查看器登录密码
-SECRET_KEY=Flask会话密钥
-UNIFIED_PASSWORD=邮箱统一密码
-AUTO_CREATE_ACCOUNTS=0
-
-# 可选：外部 IMAP 桥接账户加密持久化
-IMAP_ACCOUNT_PERSISTENCE=encrypted
-IMAP_ACCOUNT_ENCRYPTION_KEY=请使用32位以上强随机密钥
-```
-
-生产部署前请阅读 `docs/production-hardening.md`，并在编辑 `.env` 后运行配置自检：
+### 手动安装
 
 ```bash
-python tools/check_production_config.py
+git clone https://github.com/margbug01/ManyMail.git && cd ManyMail
+cp .env.example .env     # 填 DOMAINS、SMTP_HOSTNAME、MAIL_WEB_HOST、各项密钥和 ACCESS_PASSWORD
+docker compose up -d     # 拉镜像；加 --build 则从当前源码构建
 ```
 
-### 2. 部署
+生产环境请看 `docs/production-hardening.md`，改完 `.env` 后跑一下
+`python tools/check_production_config.py`。
+
+### 检查
 
 ```bash
-docker compose up -d
-```
-
-### 3. 验证
-
-```bash
-# 检查服务状态
 docker compose ps
-
-# 查看日志
-docker compose logs -f
-
-# 健康检查
+docker compose exec -T mail-service python dnscheck.py   # 网页里也有：https://<网页主机名>/dns-check
 curl http://127.0.0.1:8080/health
+```
+
+### 升级
+
+```bash
+git fetch --depth 1 origin tag v1.2.0 && git checkout v1.2.0
+sed -i 's/^MANYMAIL_VERSION=.*/MANYMAIL_VERSION=1.2.0/' .env
+docker compose pull && docker compose up -d
 ```
 
 <br>
 
 ## DNS 配置
 
-为你的域名添加以下 DNS 记录：
+收信只需要前两条，后两条建议加上：
 
 ```dns
-; MX 记录 — 告诉其他邮件服务器投递到哪里
-yourdomain.com.       IN  MX   10  mail.yourdomain.com.
+; 必需：别的邮件服务器往哪投递，以及它连接的主机
+yourdomain.com.         IN  MX   10  mail.yourdomain.com.
+mail.yourdomain.com.    IN  A        <服务器 IP>
 
-; A 记录 — 指向你的服务器 IP
-mail.yourdomain.com.  IN  A        <你的服务器IP>
+; 建议：声明没有任何服务器可以用这个域名发信
+; （如果通过 Resend 发信，改用 Resend 后台给出的 SPF 记录）
+yourdomain.com.         IN  TXT      "v=spf1 -all"
 
-; SPF 记录 — 声明哪些 IP 可以代表你的域名发信
-yourdomain.com.       IN  TXT      "v=spf1 ip4:<你的服务器IP> -all"
-
-; DKIM 记录 — 邮件签名验证（需先生成密钥对）
-default._domainkey.yourdomain.com.  IN  TXT  "v=DKIM1; k=rsa; p=<你的公钥>"
-
-; DMARC 记录 — SPF/DKIM 验证失败时的处理策略
-_dmarc.yourdomain.com.  IN  TXT  "v=DMARC1; p=quarantine; rua=mailto:dmarc@yourdomain.com"
+; 建议：DMARC 策略
+_dmarc.yourdomain.com.  IN  TXT      "v=DMARC1; p=quarantine; rua=mailto:dmarc@yourdomain.com"
 ```
+
+ManyMail 自己不给外发邮件签名，所以这里没有 DKIM 密钥要生成。回复和转发经 Resend 发出，
+按 Resend 后台列出的 DKIM、SPF 记录配置即可。
+
+DNS 自检（网页里的 `/dns-check`，或 `dnscheck.py`）通过公共 DNS 查询 MX、MX 主机地址、网页主机名、
+SPF 和 DMARC，缺什么就给出可以直接照抄的记录。
 
 > **STARTTLS**：ManyMail 支持 STARTTLS 加密传输。在 `docker-compose.yml` 中挂载 TLS 证书，并在 `.env` 中设置 `SMTP_TLS_CERT` / `SMTP_TLS_KEY`。详见 `.env.example`。
 
@@ -234,6 +224,7 @@ ManyMail/
 │
 ├── mail-service/                # SMTP + REST API 服务
 │   ├── app.py                   #   FastAPI 主程序
+│   ├── dnscheck.py              #   DNS 自检（MX、SPF、DMARC）
 │   ├── Dockerfile               #   Python 3.11-slim
 │   └── requirements.txt         #   fastapi, aiosmtpd, pymongo, jwt, bcrypt
 │
@@ -256,7 +247,8 @@ ManyMail/
 │   ├── actions.py               #   forward、ntfy、telegram、webhook、tag 等动作
 │   └── cli.py                   #   规则的增删、试运行、测试推送
 │
-├── docker-compose.yml           # 统一编排 4 个服务
+├── docker-compose.yml           # 编排全部服务（GHCR 镜像或本地构建）
+├── install.sh                   # 交互式安装脚本
 ├── .env.example                 # 环境变量模板
 └── tools/                       # 运维与手动测试脚本
     ├── send_test_smtp.py        #   向本地 SMTP 发测试邮件

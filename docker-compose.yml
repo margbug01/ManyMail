@@ -1,3 +1,5 @@
+# Prebuilt multi-arch images (amd64 / arm64) are pulled from GHCR; if a pull fails, or with
+# `docker compose up -d --build`, the images are built from this checkout instead.
 services:
   # ---- MongoDB ----
   mongodb:
@@ -21,6 +23,7 @@ services:
 
   # ---- Mail Service (SMTP + REST API) ----
   mail-service:
+    image: ghcr.io/margbug01/manymail-mail-service:${MANYMAIL_VERSION:-latest}
     build: ./mail-service
     container_name: mail-service
     restart: unless-stopped
@@ -73,6 +76,7 @@ services:
 
   # ---- Mail Viewer (Web UI) ----
   mail-viewer:
+    image: ghcr.io/margbug01/manymail-mail-viewer:${MANYMAIL_VERSION:-latest}
     build: ./mail-viewer
     container_name: mail-viewer
     restart: unless-stopped
@@ -110,6 +114,7 @@ services:
 
   # ---- IMAP Mail Bridge (Node.js) ----
   imap-mail:
+    image: ghcr.io/margbug01/manymail-imap-bridge:${MANYMAIL_VERSION:-latest}
     build: ./mail-viewer/imap-mail-app
     container_name: mail-imap-bridge
     restart: unless-stopped
@@ -135,6 +140,7 @@ services:
   # Rules live in MongoDB (router/cli.py); FORWARD_* / PAYPAL_FORWARD_* in .env become rules.
   # With no rules it only marks new mail as routed.
   mail-router:
+    image: ghcr.io/margbug01/manymail-router:${MANYMAIL_VERSION:-latest}
     build: ./router
     container_name: mail-router
     restart: unless-stopped

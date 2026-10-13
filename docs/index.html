@@ -117,7 +117,7 @@ footer{
 <div class="grid">
   <div class="card">
     <h3>Self-hosted SMTP</h3>
-    <p>Receives mail on port 25 for any domain you point at it. MX, SPF, DKIM and DMARC setup is documented.</p>
+    <p>Receives mail on port 25 for any domain you point at it. A built-in DNS check tells you which MX, SPF and DMARC records are missing.</p>
   </div>
   <div class="card">
     <h3>Webmail</h3>
@@ -153,16 +153,12 @@ footer{
 </table>
 
 <h2>Quick start</h2>
-<pre><code>git clone https://github.com/margbug01/ManyMail.git
-cd ManyMail
-cp .env.example .env
-# set SECRET_KEY, ACCESS_PASSWORD, API_KEY, UNIFIED_PASSWORD, DOMAINS
-
-docker compose up -d --build
-curl http://localhost:8080/health</code></pre>
+<pre><code>curl -fsSL https://raw.githubusercontent.com/margbug01/ManyMail/master/install.sh | bash</code></pre>
 <p>
-  Then point an MX record at the host and open the viewer on port 5000. Full DNS setup, the API
-  reference and the architecture diagram are in the
+  The installer asks for your domain and a password, writes <code>.env</code> with random secrets,
+  pulls prebuilt amd64 / arm64 images and starts everything. It ends with a DNS check that prints
+  the MX, A, SPF and DMARC records you still need. Manual setup, the API reference and the
+  architecture diagram are in the
   <a href="https://github.com/margbug01/ManyMail#readme">README</a>.
 </p>
 

@@ -392,3 +392,29 @@ def test_domain_proxy_masks_internal_exception(client, viewer, monkeypatch):
 
     assert resp.status_code == 502
     assert resp.get_json()["message"] == "获取域名失败"
+
+
+def test_dns_check_page(client, viewer, monkeypatch):
+    assert client.get("/dns-check").status_code == 302
+    login(client)
+    report = {
+        "ip": "203.0.113.7",
+        "web_host": "",
+        "items": [
+            {"domain": "example.com", "check": "MX", "status": "fail",
+             "detail": "no MX <record>", "fix": "example.com.  MX  10  mail.example.com."},
+            {"domain": "example.com", "check": "SPF", "status": "ok", "detail": "v=spf1 -all", "fix": ""},
+        ],
+        "summary": {"ok": 1, "warn": 0, "fail": 1},
+    }
+    get = Mock(return_value=Mock(status_code=200, json=Mock(return_value=report)))
+    monkeypatch.setattr(viewer.http_session, "get", get)
+    html = client.get("/dns-check?ip=203.0.113.7").get_data(as_text=True)
+    assert get.call_args.kwargs["params"] == {"ip": "203.0.113.7"}
+    assert get.call_args.kwargs["headers"]["X-API-Key"]
+    assert "example.com.  MX  10  mail.example.com." in html
+    assert "no MX &lt;record&gt;" in html  # escaped
+    assert "1 <span" in html and "status-fail" in html
+
+    monkeypatch.setattr(viewer.http_session, "get", Mock(side_effect=OSError("down")))
+    assert "连接邮件服务失败" in client.get("/dns-check").get_data(as_text=True)

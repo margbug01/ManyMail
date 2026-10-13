@@ -23,6 +23,9 @@ jobs:
       - name: Run Ruff
         run: ruff check mail-service/ mail-viewer/app.py mail-viewer/tests/ router/ tools/
 
+      - name: ShellCheck
+        run: shellcheck -S warning install.sh tools/*.sh
+
   python-tests:
     name: Python tests
     runs-on: ubuntu-latest

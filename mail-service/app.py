@@ -26,6 +26,9 @@ from fastapi import FastAPI, Request, HTTPException, Depends
 from fastapi.responses import JSONResponse, Response
 from fastapi.middleware.cors import CORSMiddleware
 from aiosmtpd.controller import Controller
+from starlette.concurrency import run_in_threadpool
+
+import dnscheck
 
 # ---------------------------------------------------------------------------
 # Configuration
@@ -743,6 +746,33 @@ async def admin_delete_domain(domain: str, request: Request):
     _invalidate_domains_cache()
     logger.info(f"Domain deactivated: {domain}")
     return {"message": f"Domain '{domain}' deactivated", "domain": domain}
+
+
+_public_ip_cache = {"ip": None, "at": 0.0}
+
+
+@app.get("/admin/dns-check")
+async def admin_dns_check(request: Request, ip: str = ""):
+    """检查所有活跃域名的 MX / SPF / DMARC 以及网页域名解析(dnscheck.py)"""
+    _require_api_key(request)
+    ip = ip.strip() or os.getenv("PUBLIC_IP", "").strip()
+    if ip:
+        try:
+            ipaddress.ip_address(ip)
+        except ValueError:
+            raise HTTPException(status_code=400, detail="ip is not a valid IP address")
+    else:
+        if time.time() - _public_ip_cache["at"] > 3600 or not _public_ip_cache["ip"]:
+            _public_ip_cache.update(ip=await run_in_threadpool(dnscheck.detect_public_ip), at=time.time())
+        ip = _public_ip_cache["ip"]
+    domains = sorted(set(get_active_domains()) | set(_SEED_DOMAINS))
+    return await run_in_threadpool(
+        dnscheck.run,
+        domains,
+        ip=ip,
+        web_host=os.getenv("MAIL_WEB_HOST", ""),
+        mail_host=os.getenv("SMTP_HOSTNAME", ""),
+    )
 
 
 # ---- Messages ----

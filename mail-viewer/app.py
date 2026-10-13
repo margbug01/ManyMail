@@ -586,6 +586,31 @@ def index():
     return render_template("index.html")
 
 
+@app.route("/dns-check")
+@login_required
+def dns_check_page():
+    """域名 DNS 自检：MX / SPF / DMARC / 网页域名，数据来自 mail-service 的 /admin/dns-check。"""
+    report, error = None, None
+    params = {}
+    if request.args.get("ip", "").strip():
+        params["ip"] = request.args["ip"].strip()
+    try:
+        resp = http_session.get(
+            f"{DUCKMAIL_BASE_URL.rstrip('/')}/admin/dns-check",
+            params=params,
+            headers={"X-API-Key": DUCKMAIL_API_KEY},
+            timeout=90,
+        )
+        if resp.status_code == 200:
+            report = resp.json()
+        else:
+            error = _extract_api_error(resp, f"HTTP {resp.status_code}")
+    except Exception as e:
+        app.logger.error(f"DNS 自检失败: {e}")
+        error = "连接邮件服务失败"
+    return render_template("dns_check.html", report=report, error=error)
+
+
 @app.route("/imap")
 @login_required
 def imap_root():

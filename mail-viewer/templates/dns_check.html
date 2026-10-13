@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ManyMail - DNS</title>
+    <link rel="icon" type="image/svg+xml" href="{{ url_for('static', filename='favicon.svg') }}">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" rel="stylesheet">
+    <style>
+        :root { --primary-color: #5b9a8b; }
+        body { background: #f7fbf9; color: #2f3b37; }
+        .dns-card { max-width: 980px; margin: 32px auto; background: #fff; border-radius: 16px;
+                    box-shadow: 0 4px 20px rgba(91,154,139,.12); padding: 28px; }
+        .dns-card h1 { font-size: 1.35rem; }
+        .status { display: inline-block; min-width: 46px; text-align: center; font-size: .75rem;
+                  font-weight: 600; border-radius: 6px; padding: 2px 6px; }
+        .status-ok { background: #e3f3ee; color: #2f7a66; }
+        .status-warn { background: #fff4dd; color: #946200; }
+        .status-fail { background: #fde8e8; color: #b42318; }
+        .status-info { background: #eef1f4; color: #5b6670; }
+        .dns-table td { vertical-align: top; font-size: .9rem; }
+        .dns-fix { display: flex; gap: 6px; align-items: flex-start; margin-top: 6px; }
+        .dns-fix code { background: #f4f7f6; color: #2f3b37; padding: 4px 8px; border-radius: 6px;
+                        white-space: pre-wrap; word-break: break-all; flex: 1; }
+        .btn-primary { background: var(--primary-color); border-color: var(--primary-color); }
+        .summary-fail { color: #b42318; } .summary-ok { color: #2f7a66; }
+    </style>
+</head>
+<body>
+<div class="dns-card">
+    <div class="d-flex justify-content-between align-items-center mb-3 gap-2 flex-wrap">
+        <h1 class="mb-0"><i class="bi bi-globe me-2"></i><span data-zh="域名 DNS 自检" data-en="Domain DNS check">域名 DNS 自检</span></h1>
+        <div class="d-flex gap-2">
+            <a class="btn btn-sm btn-outline-secondary" href="/"><i class="bi bi-arrow-left me-1"></i><span data-zh="返回邮箱" data-en="Back to mail">返回邮箱</span></a>
+            <a class="btn btn-sm btn-primary" href="/dns-check{% if request.args.get('ip') %}?ip={{ request.args.get('ip') | urlencode }}{% endif %}"><i class="bi bi-arrow-clockwise me-1"></i><span data-zh="重新检查" data-en="Check again">重新检查</span></a>
+        </div>
+    </div>
+
+    {% if error %}
+    <div class="alert alert-danger"><span data-zh="检查失败：" data-en="Check failed: ">检查失败：</span>{{ error }}</div>
+    {% elif report %}
+    {% set summary = report.summary %}
+    <p class="mb-3">
+        <span data-zh="服务器公网 IP" data-en="Server public IP">服务器公网 IP</span>:
+        <code>{{ report.ip or '?' }}</code>
+        {% if not report.ip %}<span class="text-muted small" data-zh="（没探测到，MX 是否指向本机无法确认，可以加 ?ip=你的IP）" data-en="(not detected; add ?ip=YOUR_IP to check that MX points here)">（没探测到，MX 是否指向本机无法确认，可以加 ?ip=你的IP）</span>{% endif %}
+        &nbsp;·&nbsp;
+        {% if summary.fail %}
+        <strong class="summary-fail">{{ summary.fail }} <span data-zh="项需要修复" data-en="to fix">项需要修复</span></strong>
+        {% else %}
+        <strong class="summary-ok" data-zh="收信必需的记录都正常" data-en="Records needed to receive mail look fine">收信必需的记录都正常</strong>
+        {% endif %}
+        {% if summary.warn %}<span class="text-muted">, {{ summary.warn }} <span data-zh="条建议" data-en="suggestion(s)">条建议</span></span>{% endif %}
+    </p>
+    <div class="table-responsive">
+        <table class="table dns-table align-middle">
+            <thead><tr>
+                <th style="width:70px"></th>
+                <th data-zh="对象" data-en="Name">对象</th>
+                <th data-zh="检查" data-en="Check">检查</th>
+                <th data-zh="结果" data-en="Result">结果</th>
+            </tr></thead>
+            <tbody>
+            {% for item in report["items"] %}
+            <tr>
+                <td><span class="status status-{{ item.status }}">{{ item.status | upper }}</span></td>
+                <td><code>{{ item.domain }}</code></td>
+                <td>{{ item.check }}</td>
+                <td>
+                    {{ item.detail }}
+                    {% if item.fix and item.status in ('warn', 'fail') %}
+                    <div class="dns-fix">
+                        <code>{{ item.fix }}</code>
+                        <button class="btn btn-sm btn-outline-secondary copy-fix" type="button" title="Copy"><i class="bi bi-clipboard"></i></button>
+                    </div>
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    <p class="text-muted small mb-0" data-zh="查询走 1.1.1.1 / 8.8.8.8，刚改的记录可能要等 TTL 过期才看得到。ManyMail 自己不签 DKIM；如果通过 Resend 发信，按 Resend 后台给出的记录配置 DKIM 和发信域的 SPF。25 端口能否从外网连通需要从外部测：给本域任意地址发一封信，看能不能收到。"
+       data-en="Lookups go through 1.1.1.1 / 8.8.8.8; recent changes may take until the TTL expires to show up. ManyMail does not sign DKIM itself; if you send through Resend, publish the DKIM and SPF records Resend shows. Whether port 25 is reachable has to be tested from outside: send a message to any address on the domain and see if it arrives.">查询走 1.1.1.1 / 8.8.8.8，刚改的记录可能要等 TTL 过期才看得到。ManyMail 自己不签 DKIM；如果通过 Resend 发信，按 Resend 后台给出的记录配置 DKIM 和发信域的 SPF。25 端口能否从外网连通需要从外部测：给本域任意地址发一封信，看能不能收到。</p>
+    {% endif %}
+</div>
+<script>
+    (function () {
+        if ((localStorage.getItem('manymail-lang') || 'zh') === 'en') {
+            document.documentElement.lang = 'en';
+            document.querySelectorAll('[data-en]').forEach(function (el) { el.textContent = el.dataset.en; });
+        }
+        document.querySelectorAll('.copy-fix').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                var text = btn.parentElement.querySelector('code').textContent;
+                navigator.clipboard.writeText(text).then(function () {
+                    btn.innerHTML = '<i class="bi bi-check2"></i>';
+                    setTimeout(function () { btn.innerHTML = '<i class="bi bi-clipboard"></i>'; }, 1200);
+                });
+            });
+        });
+    })();
+</script>
+</body>
+</html>

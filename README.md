@@ -40,13 +40,13 @@ Mailcow, docker-mailserver and Mail-in-a-Box are full mail platforms. ManyMail i
 
 ## Features
 
-- **Self-hosted SMTP** — receive mail for your domain on port 25; MX, SPF, DKIM, DMARC records are documented
+- **Self-hosted SMTP** — receive mail for your domain on port 25; a built-in DNS check tells you which MX, SPF and DMARC records are missing
 - **Webmail** — search, read, reply, compose; HTML is sanitized before it renders
 - **IMAP** — Thunderbird and phone apps; optional bridge for Gmail, Outlook, QQ, 163
 - **REST API** — DuckMail-compatible endpoints for scripts and disposable-mail tools
 - **Forwarding and push rules** — forward to Gmail/QQ via Resend, push to ntfy, Telegram or a webhook, tag / mark read / trash by recipient, sender or subject ([docs](docs/mail-router.md))
 - **Multi-domain** — more than one domain; prefixes can be created when you need them
-- **Docker Compose** — FastAPI + Flask + IMAP + MongoDB. MIT licensed, data stays on your server
+- **One-command install** — `install.sh` plus prebuilt amd64 / arm64 images on GHCR; FastAPI + Flask + Node.js + MongoDB in Docker Compose. MIT licensed, data stays on your server
 
 ## Overview
 
@@ -93,81 +93,73 @@ Four services in one compose file:
 
 ## Quick Start
 
-### 1. Clone & Configure
+You need a Linux server (amd64 or arm64) with Docker, a public IPv4 with inbound TCP 25, 80
+and 443 open, and a domain whose DNS you control.
 
 ```bash
-git clone https://github.com/margbug01/ManyMail.git
-cd ManyMail
-cp .env.example .env
+curl -fsSL https://raw.githubusercontent.com/margbug01/ManyMail/master/install.sh | bash
 ```
 
-Edit `.env` with your actual values:
+The installer asks for your mail domain(s), the host name for the web UI (default
+`mail.<domain>`), a password (or generates one) and how long to keep mail. It writes `.env`
+with random secrets, pulls the prebuilt images from GHCR (`linux/amd64` and `linux/arm64`),
+starts everything, and finishes with a DNS check that prints the records still missing.
 
-```env
-# Mail Service
-JWT_SECRET=your-strong-jwt-secret
-API_KEY=your-api-key
-SMTP_HOSTNAME=mail.yourdomain.com
-DOMAINS=yourdomain.com
+Unattended: `MANYMAIL_DOMAINS=example.com ./install.sh --yes`. All options are listed at the
+top of [`install.sh`](install.sh).
 
-# Mail Viewer
-ACCESS_PASSWORD=your-viewer-password
-SECRET_KEY=random-flask-secret
-UNIFIED_PASSWORD=shared-mailbox-password
-AUTO_CREATE_ACCOUNTS=0
-
-# Optional external IMAP bridge persistence
-IMAP_ACCOUNT_PERSISTENCE=encrypted
-IMAP_ACCOUNT_ENCRYPTION_KEY=use-a-strong-32-plus-character-key
-```
-
-For production, review `docs/production-hardening.md` and run the configuration self-check after editing `.env`:
+### Manual setup
 
 ```bash
-python tools/check_production_config.py
+git clone https://github.com/margbug01/ManyMail.git && cd ManyMail
+cp .env.example .env     # DOMAINS, SMTP_HOSTNAME, MAIL_WEB_HOST, secrets, ACCESS_PASSWORD
+docker compose up -d     # pulls images; add --build to build from this checkout
 ```
 
-### 2. Deploy
+For production, review `docs/production-hardening.md` and run
+`python tools/check_production_config.py` after editing `.env`.
+
+### Check
 
 ```bash
-docker compose up -d
-```
-
-### 3. Verify
-
-```bash
-# Check all services
 docker compose ps
-
-# View logs
-docker compose logs -f
-
-# Health check
+docker compose exec -T mail-service python dnscheck.py   # also at https://<web host>/dns-check
 curl http://127.0.0.1:8080/health
+```
+
+### Update
+
+```bash
+git fetch --depth 1 origin tag v1.2.0 && git checkout v1.2.0
+sed -i 's/^MANYMAIL_VERSION=.*/MANYMAIL_VERSION=1.2.0/' .env
+docker compose pull && docker compose up -d
 ```
 
 <br>
 
 ## DNS Setup
 
-Add these DNS records for your domain:
+Receiving needs two records; the other two are recommended:
 
 ```dns
-; MX record — tells other mail servers where to deliver
-yourdomain.com.       IN  MX   10  mail.yourdomain.com.
+; Required: where other servers deliver mail, and the host they connect to
+yourdomain.com.         IN  MX   10  mail.yourdomain.com.
+mail.yourdomain.com.    IN  A        <your-server-ip>
 
-; A record — points to your server IP
-mail.yourdomain.com.  IN  A        <your-server-ip>
+; Recommended: nobody may send as this domain
+; (if you send through Resend, publish the SPF record Resend shows instead)
+yourdomain.com.         IN  TXT      "v=spf1 -all"
 
-; SPF record — declares which IPs may send for your domain
-yourdomain.com.       IN  TXT      "v=spf1 ip4:<your-server-ip> -all"
-
-; DKIM record — email signature verification (generate key pair first)
-default._domainkey.yourdomain.com.  IN  TXT  "v=DKIM1; k=rsa; p=<your-public-key>"
-
-; DMARC record — policy for failed SPF/DKIM checks
-_dmarc.yourdomain.com.  IN  TXT  "v=DMARC1; p=quarantine; rua=mailto:dmarc@yourdomain.com"
+; Recommended: DMARC policy
+_dmarc.yourdomain.com.  IN  TXT      "v=DMARC1; p=quarantine; rua=mailto:dmarc@yourdomain.com"
 ```
+
+ManyMail does not sign outgoing mail, so there is no DKIM key to generate here. Replies and
+forwards go out through Resend; add the DKIM and SPF records Resend lists for your domain.
+
+The DNS self-check (`/dns-check` in the web UI, or `dnscheck.py`) looks up MX, the MX host's
+address, the web host, SPF and DMARC through public resolvers and prints the exact record
+to add for anything missing.
 
 > **STARTTLS**: ManyMail supports STARTTLS. Mount your TLS certificate and key via `docker-compose.yml` and set `SMTP_TLS_CERT` / `SMTP_TLS_KEY` in `.env`. See `.env.example` for details.
 
@@ -234,6 +226,7 @@ ManyMail/
 │
 ├── mail-service/                # SMTP + REST API
 │   ├── app.py                   #   FastAPI main app
+│   ├── dnscheck.py              #   DNS self-check (MX, SPF, DMARC)
 │   ├── Dockerfile               #   Python 3.11-slim
 │   └── requirements.txt         #   fastapi, aiosmtpd, pymongo, jwt, bcrypt
 │
@@ -256,7 +249,8 @@ ManyMail/
 │   ├── actions.py               #   forward, ntfy, telegram, webhook, tag, ...
 │   └── cli.py                   #   list / add / dry-run / test rules
 │
-├── docker-compose.yml           # All 4 services orchestration
+├── docker-compose.yml           # All services (GHCR images, or build from source)
+├── install.sh                   # Interactive installer
 ├── .env.example                 # Environment variable template
 └── tools/                       # Ops and manual test scripts
     ├── send_test_smtp.py        #   Send a test mail to local SMTP

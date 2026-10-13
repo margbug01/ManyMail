@@ -271,9 +271,14 @@
                 <div class="modal-body">
                     <div class="d-flex justify-content-between align-items-center mb-2">
                         <strong><i class="bi bi-globe me-2"></i><span data-i18n="domainMgmt">域名管理</span></strong>
-                        <button class="btn btn-sm btn-outline-secondary" onclick="loadDomains()" data-i18n-title="refresh" title="刷新">
-                            <i class="bi bi-arrow-clockwise"></i>
-                        </button>
+                        <div class="d-flex gap-1">
+                            <a class="btn btn-sm btn-outline-secondary" href="/dns-check" target="_blank" rel="noopener">
+                                <i class="bi bi-shield-check me-1"></i><span data-i18n="dnsCheck">DNS 自检</span>
+                            </a>
+                            <button class="btn btn-sm btn-outline-secondary" onclick="loadDomains()" data-i18n-title="refresh" title="刷新">
+                                <i class="bi bi-arrow-clockwise"></i>
+                            </button>
+                        </div>
                     </div>
                     <div id="domain-list" class="mail-domain-scroll mb-3">
                         <div class="text-center text-muted py-2 small" data-i18n="loading">加载中...</div>
