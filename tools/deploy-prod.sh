@@ -39,10 +39,10 @@ if [ "$LOCAL" != "$REMOTE" ]; then
 fi
 echo "local = github = ${LOCAL:0:7}"
 
-# 1b. Local tests (stubbed APIs, ~30s). Tested code == pushed code, since the tree is clean.
+# 1b. Local tests (Go tests, then the UI with stubbed APIs, ~40s). Tested code == pushed code, since the tree is clean.
 if [ "$DRY" = "1" ] || [ "$SKIP_TESTS" = "1" ]; then
   echo "local tests skipped"
-elif ! tools/test-ui.sh; then
+elif ! go test ./... || ! tools/test-ui.sh; then
   echo "ABORT: local tests failed. Fix them, or deploy anyway with --skip-tests." >&2
   exit 1
 fi
@@ -87,12 +87,9 @@ WARN=""
 while IFS= read -r f; do
   [ -z "$f" ] && continue
   case "$f" in
-    */tests/*|*/test/*|*.md|docs/*|tools/*|.github/*|.env.example|.gitignore) ;;
-    mail-service/*) add mail-service ;;
-    router/*) add mail-router ;;
-    mail-viewer/imap-mail-app/public/email-privacy.js|mail-viewer/imap-mail-app/public/i18n.js) add imap-mail; add mail-viewer ;;
-    mail-viewer/imap-mail-app/*) add imap-mail ;;
-    mail-viewer/*) add mail-viewer ;;
+    */test/*|*_test.go|*.md|docs/*|tools/*|i18n/*|.github/*|.env.example|.gitignore) ;;
+    *.go|go.mod|go.sum|web/*|Dockerfile|.dockerignore) add manymail ;;
+    imap-bridge/*) add imap-mail ;;
     docker-compose.yml|Caddyfile|.env.example)
       WARN="$WARN $f" ;;
   esac

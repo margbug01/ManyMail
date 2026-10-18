@@ -1,200 +1,206 @@
 # ManyMail
 
-轻量自建邮箱，Docker 一键部署：SMTP 收信、IMAP、Web 邮箱、REST API。用来收验证码、做临时邮箱、挂多个域名，不用装 Postfix / Mailcow。
+轻量自建邮箱：SMTP 收信、Web 邮箱、转发推送规则和 REST API 全在一个 Go 程序里，数据存 SQLite。用来收验证码、做临时邮箱、挂多个域名，不用装 Postfix / Mailcow。
 
 <div align="center">
 
 <img src="docs/banner.svg" alt="ManyMail — 轻量自建邮箱" width="700">
 
-**一条 `docker compose up`：SMTP 收件、Web 邮箱、IMAP、REST API**
+**一个容器，常驻内存约 10 MB：SMTP 收件、Web 邮箱、规则、REST API**
 
-[![Python](https://img.shields.io/badge/Python-3.11-3776AB?logo=python&logoColor=white)](https://python.org)
-[![FastAPI](https://img.shields.io/badge/FastAPI-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
-[![Flask](https://img.shields.io/badge/Flask-000000?logo=flask&logoColor=white)](https://flask.palletsprojects.com)
-[![Node.js](https://img.shields.io/badge/Node.js-20-339933?logo=node.js&logoColor=white)](https://nodejs.org)
-[![MongoDB](https://img.shields.io/badge/MongoDB-7-47A248?logo=mongodb&logoColor=white)](https://www.mongodb.com)
+[![Go](https://img.shields.io/badge/Go-1.27-00ADD8?logo=go&logoColor=white)](https://go.dev)
+[![SQLite](https://img.shields.io/badge/SQLite-003B57?logo=sqlite&logoColor=white)](https://sqlite.org)
 [![Docker](https://img.shields.io/badge/Docker-Compose-2496ED?logo=docker&logoColor=white)](https://docs.docker.com/compose/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Stars](https://img.shields.io/github/stars/margbug01/ManyMail?style=flat)](https://github.com/margbug01/ManyMail/stargazers)
 
-**[English](README.md)**
+**[项目主页](https://margbug01.github.io/ManyMail/)** · **[English](README.md)**
 
 ---
 
-<img src="docs/screenshot.jpg" alt="ManyMail Web 邮箱收件箱截图" width="900">
+<img src="docs/screenshot.jpg" alt="ManyMail Web 邮箱收件箱" width="900">
 
-<sub>*截图中所有邮件均为测试邮件，无实际意义。*</sub>
+<sub>*截图中的邮件均为测试数据，没有实际意义。*</sub>
 
 </div>
 
 ## 它适合谁
 
-Mailcow、docker-mailserver 是完整的邮局方案。ManyMail 是一套很小的 Docker 栈，给**自己托管的收件箱**用：验证码、临时邮箱、几个域名，带网页和 API。
+Mailcow、docker-mailserver、Mail-in-a-Box 是完整的邮件平台。ManyMail 只做一件小事：**自己托管的收件箱**，收验证码、临时地址、几个域名，配一个网页和一套 API。
 
-| 你想要 | 用 |
-|:-------|:---|
+| 你想要 | 选 |
+|:------|:---|
 | 自己域名上的 catch-all / 临时地址 | ManyMail |
-| Web 邮箱 + REST API + IMAP，一份 compose | ManyMail |
-| 小 VPS / ARM 小鸡，不想碰 Postfix、Dovecot | ManyMail |
-| 公司邮箱、日历、ActiveSync、专业反垃圾 | Mailcow / docker-mailserver |
+| Web 邮箱 + REST API + 转发规则，一个 compose 文件 | ManyMail |
+| 小 VPS 或 ARM 机器，不想碰 Postfix/Dovecot | ManyMail |
+| 公司邮箱、桌面客户端 IMAP、CalDAV、ActiveSync、Rspamd | Mailcow / docker-mailserver / Mail-in-a-Box |
 
 ## 功能
 
-- **自建 SMTP** — 域名 25 端口收信；自带 DNS 自检，缺哪条 MX、SPF、DMARC 记录直接告诉你
-- **Web 邮箱** — 搜索、阅读、回复、发信；渲染前做 HTML 过滤
-- **IMAP** — Thunderbird、手机邮件 App；也可桥接 Gmail / Outlook / QQ / 163
-- **REST API** — 兼容 DuckMail 的接口，方便脚本和临时邮箱工具
-- **转发与推送规则** — 按收件人、发件人、主题匹配，经 Resend 转发到 Gmail/QQ，推送到 ntfy、Telegram 或 webhook，也能打标签、标已读、丢垃圾箱；网页里有规则页可直接编辑，外部 IMAP 邮箱的新信也能推送（[文档](docs/mail-router.md)）
-- **多域名** — 可挂多个域名，前缀按需创建
-- **一条命令安装** — `install.sh` 加上 GHCR 上的 amd64 / arm64 预构建镜像；FastAPI + Flask + Node.js + MongoDB 跑在 Docker Compose 里。MIT 协议，邮件留在你自己的服务器上
+- **自建 SMTP**：25 端口收你域名的信（可选 STARTTLS），自带 DNS 自检，告诉你缺哪条 MX、SPF、DMARC
+- **Web 邮箱**：搜索、阅读、回复、写信（经 Resend 发出）；来信 HTML 先清洗再显示，外部图片默认不加载
+- **外部邮箱**：可选的桥接服务把 Gmail、Outlook、QQ、163 等 IMAP 邮箱接进同一个网页
+- **REST API**：兼容 DuckMail，方便脚本和临时邮箱工具调用
+- **转发和推送规则**：经 Resend 转发到 Gmail/QQ，推送到 ntfy、Telegram 或 webhook，按收件人、发件人、主题打标签 / 标已读 / 进回收站；来信即触发，在「规则」页面编辑（[文档](docs/mail-router.md)）
+- **多域名**：域名数量不限，邮箱可以用到时再自动创建
+- **小**：一个静态二进制（约 15 MB）、一个 SQLite 文件，常驻内存约 10 MB；GHCR 有 amd64 / arm64 预构建镜像。MIT 许可，数据留在你自己的服务器上
 
 ## 概述
 
-一份 compose 里四个服务：
+一个 compose 文件，三个容器：
 
-| 服务 | 技术栈 | 端口 | 说明 |
-|:-----|:-------|:-----|:-----|
-| **mail-service** | FastAPI + aiosmtpd | `:25` `:8080` | SMTP 收件 + DuckMail 兼容 REST API |
-| **mail-viewer** | Flask + bleach | `:5000` | Web 邮件查看器，支持搜索、回复、发信 |
-| **imap-bridge** | Node.js + imapflow | `:3939` | IMAP 桥接，接入 Gmail / Outlook / QQ 等 |
-| **mail-router** | Python | — | 新邮件的转发与推送规则 |
+| 容器 | 技术 | 端口 | 作用 |
+|:-----|:-----|:-----|:-----|
+| **manymail** | Go + SQLite | `:25` `:8080` `:5000` | SMTP 收信、REST API、Web 邮箱、规则引擎 |
+| **imap-bridge** | Node.js + imapflow | `:3939`（内部） | 可选：在网页里看外部 IMAP 邮箱 |
+| **caddy** | Caddy 2 | `:80` `:443` | HTTPS，证书自动签发 |
 
 <br>
 
 ## 架构
 
 ```
-    互联网                                 你的服务器
-    ──────                                 ──────────
-                      ┌──────────────────────────────────────────────┐
-                      │                                              │
-   外部邮件     ──────┤►  mail-service        ┌───────────────┐     │
-   (SMTP :25)         │   (FastAPI+aiosmtpd)  │   MongoDB 7   │     │
-                      │   ┌──────────────┐    │   ┌─────────┐ │     │
-                      │   │ SMTP 处理器  │────┤►  │ accounts│ │     │
-                      │   │ REST API     │◄───┤   │ messages│ │     │
-                      │   └──────┬───────┘    │   │ domains │ │     │
-                      │          │ :8080      └───┴─────────┘─┘     │
-                      │          │                                    │
-                      │          ▼                                    │
-   浏览器      ───────┤►  mail-viewer          imap-bridge           │
-   (HTTP :5000)       │   (Flask)              (Node.js)             │
-                      │   ┌──────────────┐    ┌──────────────┐      │
-                      │   │ 收件箱视图   │    │ Gmail        │      │
-                      │   │ 搜索         │◄───┤ Outlook      │      │
-                      │   │ 回复 / 发信  │    │ QQ / 163     │      │
-                      │   │ HTML 安全过滤│    │ Yahoo / GMX  │      │
-                      │   └──────────────┘    └──────────────┘      │
-                      │                         :3939                 │
-                      └──────────────────────────────────────────────┘
+    互联网                                你的服务器
+    ──────                                ──────────
+                      ┌────────────────────────────────────────────────┐
+   来信         ──────┤►  manymail（一个 Go 进程）                     │
+   (SMTP :25)         │   ┌──────────────┐   ┌───────────────────────┐ │
+                      │   │ SMTP 收信    │──►│ SQLite                │ │
+                      │   │ 规则引擎     │◄─►│ 邮件、附件、          │ │
+                      │   │ REST API     │   │ 账户、规则            │ │
+                      │   │ Web 邮箱     │   └───────────────────────┘ │
+                      │   └──────▲───────┘                             │
+   浏览器    ──► Caddy (HTTPS) ──┘   ▲ 新邮件通知                      │
+                      │              │                                 │
+                      │   imap-bridge (Node.js) ──► Gmail / Outlook /  │
+                      │                             QQ / 163 ...       │
+                      └────────────────────────────────────────────────┘
 ```
 
 <br>
 
 ## 快速开始
 
-需要一台装了 Docker 的 Linux 服务器（amd64 或 arm64）、一个公网 IPv4（入站 TCP 25、80、443
-放行），以及一个能改 DNS 的域名。
+需要一台装了 Docker 的 Linux 服务器（amd64 或 arm64），公网 IPv4 放行入站 TCP 25、80、443，以及一个能改 DNS 的域名。
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/margbug01/ManyMail/master/install.sh | bash
 ```
 
-安装脚本会问邮件域名、网页用的主机名（默认 `mail.<域名>`）、登录密码（留空自动生成）和邮件保留天数，
-然后用随机密钥写好 `.env`，从 GHCR 拉预构建镜像（`linux/amd64` 和 `linux/arm64`），启动全部服务，
-最后跑一遍 DNS 自检，把还缺的记录打印出来。
+安装脚本会问你邮件域名、网页用的主机名（默认 `mail.<域名>`）、登录密码（不填就自动生成）和邮件保留多久，然后写好带随机密钥的 `.env`，从 GHCR 拉预构建镜像（`linux/amd64` 和 `linux/arm64`），全部启动，最后跑一遍 DNS 检查，列出还缺的记录。
 
-无人值守：`MANYMAIL_DOMAINS=example.com ./install.sh --yes`，全部选项见
-[`install.sh`](install.sh) 开头。
+无人值守：`MANYMAIL_DOMAINS=example.com ./install.sh --yes`。全部选项写在 [`install.sh`](install.sh) 开头。
 
 ### 手动安装
 
 ```bash
 git clone https://github.com/margbug01/ManyMail.git && cd ManyMail
-cp .env.example .env     # 填 DOMAINS、SMTP_HOSTNAME、MAIL_WEB_HOST、各项密钥和 ACCESS_PASSWORD
-docker compose up -d     # 拉镜像；加 --build 则从当前源码构建
+cp .env.example .env     # DOMAINS、SMTP_HOSTNAME、MAIL_WEB_HOST、各种密钥、ACCESS_PASSWORD
+docker compose up -d     # 拉镜像；加 --build 则用当前代码构建
 ```
 
-生产环境请看 `docs/production-hardening.md`，改完 `.env` 后跑一下
-`python tools/check_production_config.py`。
+生产环境先看 [`docs/production-hardening.md`](docs/production-hardening.md)。`ENVIRONMENT=production` 时，如果还有密钥是默认值，程序会拒绝启动。
 
 ### 检查
 
 ```bash
 docker compose ps
-docker compose exec -T mail-service python dnscheck.py   # 网页里也有：https://<网页主机名>/dns-check
+docker compose exec -T manymail manymail dnscheck   # 网页上也有：https://<网页主机名>/dns-check
 curl http://127.0.0.1:8080/health
 ```
 
 ### 升级
 
 ```bash
-git fetch --depth 1 origin tag v1.2.0 && git checkout v1.2.0
-sed -i 's/^MANYMAIL_VERSION=.*/MANYMAIL_VERSION=1.2.0/' .env
+git fetch --depth 1 origin tag vX.Y.Z && git checkout vX.Y.Z
+sed -i 's/^MANYMAIL_VERSION=.*/MANYMAIL_VERSION=X.Y.Z/' .env
 docker compose pull && docker compose up -d
 ```
+
+### 从 1.x（MongoDB 版）升级
+
+2.0 用一个 Go 程序加 SQLite 替换了原来的 Python 服务和 MongoDB，`.env` 不用改。**拉新版本之前**，趁 MongoDB 还在跑，先把数据导出来：
+
+```bash
+mkdir -p export
+for c in domains accounts messages sent_messages sender_keys routing_rules routing_events; do
+  docker compose exec -T mongodb mongoexport --quiet --db mailserver --collection "$c" > "export/$c.json"
+done
+git pull                                   # 或切到 2.x 的 tag
+docker compose run --rm -v "$PWD/export:/export:ro" manymail import /export
+docker compose up -d --remove-orphans      # 顺带删掉旧的 mail-service、mail-viewer、router、imap-server、mongodb
+```
+
+邮件 id、邮箱密码、网页上保存的 Resend key 和规则都会带过来，导入的旧邮件不会被再次转发。2.x 不再提供给桌面客户端用的 IMAP 服务（993 端口）。确认没问题后，用 `docker volume rm` 删掉旧的 MongoDB 数据卷。
 
 <br>
 
 ## DNS 配置
 
-收信只需要前两条，后两条建议加上：
+收信必须两条，另外两条建议加：
 
 ```dns
-; 必需：别的邮件服务器往哪投递，以及它连接的主机
+; 必需：别的服务器往哪投递，以及要连的主机
 yourdomain.com.         IN  MX   10  mail.yourdomain.com.
 mail.yourdomain.com.    IN  A        <服务器 IP>
 
-; 建议：声明没有任何服务器可以用这个域名发信
-; （如果通过 Resend 发信，改用 Resend 后台给出的 SPF 记录）
+; 建议：不允许任何人以这个域名发信
+; （如果经 Resend 发信，改用 Resend 后台给的 SPF 记录）
 yourdomain.com.         IN  TXT      "v=spf1 -all"
 
 ; 建议：DMARC 策略
 _dmarc.yourdomain.com.  IN  TXT      "v=DMARC1; p=quarantine; rua=mailto:dmarc@yourdomain.com"
 ```
 
-ManyMail 自己不给外发邮件签名，所以这里没有 DKIM 密钥要生成。回复和转发经 Resend 发出，
-按 Resend 后台列出的 DKIM、SPF 记录配置即可。
+ManyMail 自己不签名外发邮件，所以这里没有 DKIM 密钥要生成。回复和转发都经 Resend 发出，按 Resend 给你域名列出的 DKIM 和 SPF 记录配置即可。
 
-DNS 自检（网页里的 `/dns-check`，或 `dnscheck.py`）通过公共 DNS 查询 MX、MX 主机地址、网页主机名、
-SPF 和 DMARC，缺什么就给出可以直接照抄的记录。
+DNS 自检（网页上的 `/dns-check`，或 `manymail dnscheck`）通过公共 DNS 查 MX、MX 主机地址、网页主机名、SPF 和 DMARC，缺什么就直接打印要加的那条记录。
 
-> **STARTTLS**：ManyMail 支持 STARTTLS 加密传输。在 `docker-compose.yml` 中挂载 TLS 证书，并在 `.env` 中设置 `SMTP_TLS_CERT` / `SMTP_TLS_KEY`。详见 `.env.example`。
+> **STARTTLS**：把证书和私钥放进 `./certs`（只读挂载），在 `.env` 里设置 `SMTP_TLS_CERT` / `SMTP_TLS_KEY`，见 `.env.example`。
 
 <br>
 
 ## API 参考
 
-> 基础地址：`http://127.0.0.1:8080`
+> 地址：`http://127.0.0.1:8080`
 >
-> 认证方式：`Authorization: Bearer <token>`（`/health`、`/token`、`/accounts` 除外）
+> 认证：邮箱接口用 `Authorization: Bearer <token>`；`/admin/*` 用 `X-API-Key: <API_KEY>`
 
 ### 账户管理
 
 ```http
-POST /accounts              # 创建邮箱账户
-POST /token                 # 登录获取 JWT Token
+POST /accounts                              # 创建邮箱
+POST /token                                 # 登录，返回 JWT（24 小时）
 ```
 
 ### 邮件操作
 
 ```http
-GET  /messages              # 查询收件箱（分页：?offset=0&limit=30）
-GET  /messages/{id}         # 获取邮件详情
-GET  /messages/search?q=    # 全文搜索
-PATCH /messages/{id}        # 标记已读 / 删除
-GET  /sent                  # 已发送邮件列表
+GET    /messages                            # 收件箱（分页：?offset=0&limit=30）
+GET    /messages/{id}                       # 邮件详情，同时标为已读
+GET    /messages/{id}/attachments/{aid}     # 下载附件
+GET    /messages/search?q=                  # 按主题、发件人、正文搜索
+DELETE /messages/{id}                       # 移到回收站
+GET    /messages/trash                      # 回收站
+POST   /messages/{id}/restore               # 从回收站恢复
+DELETE /messages/{id}/permanent             # 彻底删除
+POST   /messages/batch                      # {"action": "delete|mark_read|restore|permanent_delete", "ids": [...]}
+GET    /sent                                # 已发送
 ```
 
 ### 系统接口
 
 ```http
-GET  /health                # 健康检查（无需认证）
-GET  /domains               # 可用域名列表
+GET  /health                                # 健康检查（无需认证）
+GET  /domains                               # 可用域名
+GET  /admin/domains · POST · DELETE /{d}    # 管理域名（API key）
+GET  /admin/dns-check                       # DNS 自检（API key）
 ```
 
+规则接口（列出、编辑、试运行、测试推送）在 `/router/*`，用 API key 认证，见 [docs/mail-router.md](docs/mail-router.md)。
+
 <details>
-<summary><strong>示例：创建账户并读取收件箱</strong></summary>
+<summary><strong>示例：创建邮箱并查看收件箱</strong></summary>
 
 ```bash
 # 创建账户
@@ -221,84 +227,62 @@ curl http://127.0.0.1:8080/messages \
 
 ```
 ManyMail/
-│
-├── mail-service/                # SMTP + REST API 服务
-│   ├── app.py                   #   FastAPI 主程序
-│   ├── dnscheck.py              #   DNS 自检（MX、SPF、DMARC）
-│   ├── Dockerfile               #   Python 3.11-slim
-│   └── requirements.txt         #   fastapi, aiosmtpd, pymongo, jwt, bcrypt
-│
-├── mail-viewer/                 # Web 邮件查看器
-│   ├── app.py                   #   Flask 主程序
-│   ├── Dockerfile               #   Python 3.11-slim + gunicorn
-│   ├── requirements.txt         #   flask, bleach, tinycss2
-│   ├── templates/
-│   │   ├── index.html           #   收件箱界面
-│   │   └── login.html           #   登录页面
-│   └── imap-mail-app/           #   IMAP 桥接服务 (Node.js)
-│       ├── server.js            #     Express REST API
-│       ├── client.js            #     ImapFlow 封装
-│       ├── config.js            #     邮件服务商预设配置
-│       └── package.json         #     imapflow, mailparser
-│
-├── router/                      # 转发 / 推送规则
-│   ├── app.py                   #   新邮件规则循环
-│   ├── rules.py                 #   匹配与校验
-│   ├── actions.py               #   forward、ntfy、telegram、webhook、tag 等动作
-│   └── cli.py                   #   规则的增删、试运行、测试推送
-│
-├── docker-compose.yml           # 编排全部服务（GHCR 镜像或本地构建）
-├── install.sh                   # 交互式安装脚本
-├── .env.example                 # 环境变量模板
-└── tools/                       # 运维与手动测试脚本
-    ├── send_test_smtp.py        #   向本地 SMTP 发测试邮件
-    └── send_test_external_smtp.py # 通过外部 SMTP 发测试邮件
+├── main.go                 # 读取配置（.env）并启动；子命令 manymail import / manymail dnscheck
+├── smtpd.go, parse.go      # SMTP 收信和 MIME 解析
+├── store.go, routestore.go # SQLite 表结构和查询
+├── api.go                  # DuckMail 兼容 REST API
+├── viewer.go, sanitize.go  # Web 邮箱、HTML 清洗、图片代理、经 Resend 发信
+├── rules.go, router.go     # 转发 / 推送规则和规则接口
+├── dnscheck.go             # MX / SPF / DMARC 自检
+├── migrate.go              # 从 1.x 的 MongoDB 导出导入
+├── web/                    # 页面模板和前端文件，编译进二进制
+├── imap-bridge/            # 可选的 Node.js 外部 IMAP 邮箱桥接
+├── i18n/                   # 界面翻译（tools/build-i18n.cjs 打包）
+├── Dockerfile              # 两阶段构建 → alpine，以 uid 10001 运行
+├── docker-compose.yml      # manymail + imap-bridge + caddy
+├── install.sh              # 交互式安装脚本
+└── tools/                  # 界面测试、部署脚本、测试发信
 ```
 
 <br>
 
 ## 安全特性
 
-| 层级 | 特性 |
+| 层面 | 措施 |
 |:-----|:-----|
-| **认证** | JWT Token 鉴权（24h 自动过期）+ API Key 保护管理端点 |
-| **密码** | bcrypt 哈希存储，不可逆 |
-| **速率限制** | API、SMTP、查看器登录、自动创建、域名管理、邮件变更和发信路径限流 |
-| **SMTP 防护** | IP 黑名单 / 灰名单，收件人数量限制，邮件大小限制，可选 STARTTLS |
-| **邮件渲染** | HTML 安全过滤 (bleach + CSSSanitizer)，iframe 沙箱隔离 |
-| **网络安全** | 服务端图片代理，并拒绝代理内网/本机地址 |
-| **数据清理** | MongoDB TTL 索引自动清理过期邮件（默认 3 天；设置 `MESSAGE_TTL_DAYS=0` 可永久保存） |
-| **外部 IMAP** | 账户持久化使用 `IMAP_ACCOUNT_ENCRYPTION_KEY` 加密；拒绝恢复旧版明文账户文件 |
-| **访问控制** | 查看器登录保护，HttpOnly Session Cookie，生产默认关闭自动创建邮箱 |
+| **认证** | JWT（24 小时过期）+ 管理接口用 API key |
+| **密码** | bcrypt 哈希 |
+| **限流** | API、SMTP、网页登录、自动建号、域名管理、改邮件、发信都按 IP 限流 |
+| **SMTP** | IP / 发件人黑名单、灰名单、收件人数和大小限制、可选 STARTTLS、自动回复防回环 |
+| **邮件渲染** | 白名单式 HTML/CSS 清洗、沙箱 iframe、外部图片点了才加载 |
+| **网络** | 图片代理对每次连接和每次跳转都检查，拒绝内网地址 |
+| **存储** | 单个 SQLite 文件；可按 `MESSAGE_TTL_DAYS` 自动清理（默认 3 天，`0` 表示永久保存） |
+| **外部 IMAP** | 保存的账户用 `IMAP_ACCOUNT_ENCRYPTION_KEY` 加密 |
+| **网页** | 需登录、HttpOnly 会话 Cookie、接口只收 JSON、改 `ACCESS_PASSWORD` 会让所有会话失效 |
 
-更多生产硬化建议见 `docs/production-hardening.md`。
+更多加固建议见 [`docs/production-hardening.md`](docs/production-hardening.md)。
 
 <br>
 
 ## 技术栈
 
-<table>
-<tr>
-<td align="center" width="150"><br><strong>Python 3.11</strong><br>FastAPI · Flask<br><br></td>
-<td align="center" width="150"><br><strong>Node.js 20</strong><br>Express · ImapFlow<br><br></td>
-<td align="center" width="150"><br><strong>MongoDB 7</strong><br>pymongo<br><br></td>
-<td align="center" width="150"><br><strong>Docker</strong><br>Compose<br><br></td>
-</tr>
-</table>
-
-| 组件 | 依赖 |
-|:-----|:-----|
-| mail-service | `fastapi` `uvicorn` `aiosmtpd` `pymongo` `PyJWT` `bcrypt` |
-| mail-viewer | `flask` `gunicorn` `requests` `bleach` `tinycss2` |
-| imap-bridge | `express` `imapflow` `mailparser` `dotenv` |
+| 组件 | 用到的东西 |
+|:-----|:-----------|
+| manymail | Go 1.27 · `emersion/go-smtp` · `modernc.org/sqlite`（纯 Go，无 cgo）· `golang.org/x/net/html` · `x/crypto/bcrypt` |
+| imap-bridge | Node.js 20 · `express` · `imapflow` · `mailparser` |
+| HTTPS | Caddy 2 |
 
 <br>
 
 ## 社区
 
-ManyMail 感谢 [linux.do](https://linux.do/) 社区。这里有很多真实、友好的技术分享，也给了这个项目不少自托管和产品体验方面的启发。
+感谢 [linux.do](https://linux.do/)：一个友善的中文技术社区，大家在这里分享想法、项目和自建服务的经验。
 
 <br>
+
+## 更新日志
+
+[CHANGELOG.md](CHANGELOG.md)，另见 [releases](https://github.com/margbug01/ManyMail/releases)。
 
 ## 许可证
 
@@ -307,5 +291,5 @@ ManyMail 感谢 [linux.do](https://linux.do/) 社区。这里有很多真实、�
 ---
 
 <div align="center">
-<sub>为自托管而生，掌控你自己的邮件基础设施。</sub>
+<sub>为自建而生，掌握你自己的邮件基础设施。</sub>
 </div>

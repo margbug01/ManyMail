@@ -6,11 +6,10 @@ const path = require('node:path');
 const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
 
 const ORIGIN = 'http://manymail.test';
-const VIEWER = path.resolve(__dirname, '../mail-viewer');
+const VIEWER = path.resolve(__dirname, '../web');
 const html = fs.readFileSync(path.join(VIEWER, 'templates/rules.html'), 'utf8')
-  .replace(/\{\{ url_for\('static', filename='favicon.svg'\) \}\}/, '/static/favicon.svg')
-  .replace(/\{\{ asset_url\('js\/rules.js'\) \}\}/, '/static/js/rules.js')
-  .replace("{{ shared_url('i18n.js') }}", '/i18n.js');
+  .replace('{{asset "js/rules.js"}}', '/static/js/rules.js')
+  .replace('{{shared "i18n.js"}}', '/i18n.js');
 const BOOTSTRAP_STUB = `window.bootstrap = { Modal: class {
   constructor(el) { this.el = el; }
   show() { this.el.style.display = 'block'; this.el.classList.add('show'); }
@@ -49,7 +48,7 @@ async function run(lang) {
     if (url.origin !== ORIGIN) return route.abort();
     if (url.pathname === '/rules') return route.fulfill({ contentType: 'text/html', body: html });
     if (url.pathname === '/static/js/rules.js') return route.fulfill({ path: path.join(VIEWER, 'static/js/rules.js') });
-    if (url.pathname === '/i18n.js') return route.fulfill({ path: path.join(VIEWER, 'imap-mail-app/public/i18n.js') });
+    if (url.pathname === '/i18n.js') return route.fulfill({ path: path.join(VIEWER, 'shared/i18n.js') });
     if (!url.pathname.startsWith('/api/router/')) return route.fulfill({ status: 404, body: '' });
     const api = url.pathname.slice('/api/router/'.length);
     const body = req.postData() ? JSON.parse(req.postData()) : undefined;

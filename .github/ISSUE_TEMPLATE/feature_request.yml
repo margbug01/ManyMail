@@ -22,10 +22,10 @@ body:
     attributes:
       label: Component
       options:
-        - mail-service (SMTP + REST API)
-        - mail-viewer (webmail UI)
+        - SMTP receiving / REST API
+        - Web UI
+        - Forwarding and push rules
         - imap-bridge (external IMAP accounts)
-        - imap-server (IMAP for mail clients)
         - Docker / deployment
         - Documentation
         - Not sure

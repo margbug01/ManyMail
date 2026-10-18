@@ -3,18 +3,16 @@
 .env.local
 .env.*.local
 
-# Python
+# Go build output and local data
+/manymail
+/manymail.exe
+/data/
+*.db
+*.db-shm
+*.db-wal
+
+# Python (tools/*.py)
 __pycache__/
-*.py[cod]
-*$py.class
-*.egg-info/
-dist/
-build/
-.eggs/
-*.egg
-.venv/
-venv/
-env/
 
 # Node
 node_modules/

@@ -10,7 +10,7 @@ Please do not open a public issue for a security problem.
 
 Include what you can:
 
-- affected component — `mail-service`, `mail-viewer`, `imap-bridge`, or `imap-server`
+- affected component — `manymail` (SMTP, API, web UI, rules) or `imap-bridge`
 - the commit you tested
 - steps to reproduce, with the request or the message that triggers it
 - what an attacker gains
@@ -20,11 +20,11 @@ Expect a first reply within 7 days. ManyMail is maintained in spare time, so a f
 ## In scope
 
 - remote code execution, authentication bypass, privilege escalation
-- XSS in the webmail viewer, including bypasses of the HTML and CSS sanitizer in `mail-viewer/app.py`
+- XSS in the webmail viewer, including bypasses of the HTML and CSS sanitizer in `sanitize.go`
 - SMTP relay abuse — getting the server to deliver mail it should refuse
 - SSRF through the image proxy or the IMAP bridge
 - reading another mailbox's messages or attachments
-- leaking `DUCKMAIL_API_KEY`, `RESEND_API_KEY`, or mailbox credentials
+- leaking `API_KEY`, `RESEND_API_KEY`, Resend keys saved in Settings, or mailbox credentials
 
 ## Out of scope
 

@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 // 界面多语言门禁：
-// 1. mail-viewer/i18n/<lang>.json 必须覆盖各页面英文词典的全部键，占位符一致，不能有多余的旧键；
+// 1. i18n/<lang>.json 必须覆盖各页面英文词典的全部键，占位符一致，不能有多余的旧键；
 // 2. folders 段覆盖 IMAP 页的全部中文文件夹名；
-// 3. imap-mail-app/public/i18n.js 和 JSON 同步（否则跑 node tools/build-i18n.cjs）；
+// 3. imap-bridge/public/i18n.js、web/shared/i18n.js 和 JSON 同步（否则跑 node tools/build-i18n.cjs）；
 // 4. 语言识别：浏览器语言、已保存的选择、未知语言的回退。
 const fs = require('fs');
 const path = require('path');
@@ -23,13 +23,13 @@ function grab(rel, startRe, endMarker) {
 }
 
 const sources = {
-    app: grab('mail-viewer/static/js/app.js', /const LANGS = \{/, '\n};'),
-    imap: grab('mail-viewer/imap-mail-app/public/app.js', /const LANGS = \{/, '\n};'),
-    rules: grab('mail-viewer/static/js/rules.js', /const TEXT = \{/, '\n    };'),
-    login: grab('mail-viewer/templates/login.html', /const LANGS = \{/, '\n        };'),
-    privacy: grab('mail-viewer/imap-mail-app/public/email-privacy.js', /const TEXT = \{/, '\n  };'),
+    app: grab('web/static/js/app.js', /const LANGS = \{/, '\n};'),
+    imap: grab('imap-bridge/public/app.js', /const LANGS = \{/, '\n};'),
+    rules: grab('web/static/js/rules.js', /const TEXT = \{/, '\n    };'),
+    login: grab('web/templates/login.html', /const LANGS = \{/, '\n        };'),
+    privacy: grab('imap-bridge/public/email-privacy.js', /const TEXT = \{/, '\n  };'),
 };
-const folderNames = new Set(Object.values(grab('mail-viewer/imap-mail-app/public/app.js', /var FOLDER_ZH = \{/, '\n};')));
+const folderNames = new Set(Object.values(grab('imap-bridge/public/app.js', /var FOLDER_ZH = \{/, '\n};')));
 
 const placeholders = (s) => (String(s).match(/\{\w+\}/g) || []).sort().join(',');
 
@@ -52,9 +52,9 @@ function compare(en, tr, where) {
     if (placeholders(en) !== placeholders(tr)) errors.push(where + ': placeholders ' + placeholders(en) + ' vs ' + placeholders(tr));
 }
 
-const i18nDir = path.join(ROOT, 'mail-viewer', 'i18n');
+const i18nDir = path.join(ROOT, 'i18n');
 const files = fs.readdirSync(i18nDir).filter((f) => f.endsWith('.json'));
-if (!files.length) errors.push('no translations in mail-viewer/i18n');
+if (!files.length) errors.push('no translations in i18n/');
 for (const file of files) {
     const code = file.replace(/\.json$/, '');
     const data = JSON.parse(fs.readFileSync(path.join(i18nDir, file), 'utf8'));
@@ -81,8 +81,14 @@ function load(saved, navLangs) {
         localStorage: { getItem: (k) => store[k] || null, setItem: (k, v) => { store[k] = v; } },
         navigator: { languages: navLangs, language: navLangs[0] },
     };
-    vm.runInNewContext(read('mail-viewer/imap-mail-app/public/i18n.js'), { window: win });
+    vm.runInNewContext(read('imap-bridge/public/i18n.js'), { window: win });
     return win.ManyMailI18n;
+}
+// The Go binary embeds copies of the bridge's shared scripts; they must not drift apart.
+for (const f of ['i18n.js', 'email-privacy.js']) {
+    if (read('imap-bridge/public/' + f).replace(/\r\n/g, '\n') !== read('web/shared/' + f).replace(/\r\n/g, '\n')) {
+        errors.push(`web/shared/${f} differs from imap-bridge/public/${f}`);
+    }
 }
 const cases = [
     [null, ['zh-CN'], 'zh'],

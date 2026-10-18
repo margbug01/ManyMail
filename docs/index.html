@@ -3,19 +3,19 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>ManyMail — self-hosted email server with Docker: SMTP, IMAP, webmail, REST API</title>
-<meta name="description" content="ManyMail is a lightweight self-hosted mail server you deploy with one docker compose command. SMTP receiver, webmail UI, IMAP, and a REST API for disposable addresses, catch-all inboxes, and multiple domains — no Postfix or Dovecot. MIT licensed.">
+<title>ManyMail — self-hosted email server with Docker: SMTP, webmail, rules, REST API</title>
+<meta name="description" content="ManyMail is a lightweight self-hosted mail server you deploy with one docker compose command. SMTP receiver, webmail, forwarding rules and a REST API for disposable addresses, catch-all inboxes, and multiple domains — no Postfix or Dovecot. MIT licensed.">
 <link rel="canonical" href="https://margbug01.github.io/ManyMail/">
 <link rel="icon" type="image/svg+xml" href="banner.svg">
 
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://margbug01.github.io/ManyMail/">
 <meta property="og:title" content="ManyMail — self-hosted email server with Docker">
-<meta property="og:description" content="SMTP receiver, webmail, IMAP and REST API in one docker compose file. Disposable addresses, catch-all inboxes and multiple domains without Postfix or Dovecot.">
+<meta property="og:description" content="SMTP receiver, webmail, forwarding rules and a REST API in one docker compose file. Disposable addresses, catch-all inboxes and multiple domains without Postfix or Dovecot.">
 <meta property="og:image" content="https://raw.githubusercontent.com/margbug01/ManyMail/master/docs/social-preview.png">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="ManyMail — self-hosted email server with Docker">
-<meta name="twitter:description" content="SMTP receiver, webmail, IMAP and REST API in one docker compose file.">
+<meta name="twitter:description" content="SMTP receiver, webmail, forwarding rules and a REST API in one docker compose file.">
 <meta name="twitter:image" content="https://raw.githubusercontent.com/margbug01/ManyMail/master/docs/social-preview.png">
 
 <script type="application/ld+json">
@@ -25,10 +25,10 @@
   "name": "ManyMail",
   "applicationCategory": "DeveloperApplication",
   "operatingSystem": "Linux, Docker",
-  "description": "Lightweight self-hosted email server with Docker: SMTP receiver, webmail, IMAP and REST API for disposable addresses, catch-all inboxes and multiple domains.",
+  "description": "Lightweight self-hosted email server with Docker: SMTP receiver, webmail, forwarding rules and a REST API for disposable addresses, catch-all inboxes and multiple domains.",
   "url": "https://margbug01.github.io/ManyMail/",
   "codeRepository": "https://github.com/margbug01/ManyMail",
-  "programmingLanguage": ["Python", "JavaScript"],
+  "programmingLanguage": ["Go", "JavaScript"],
   "license": "https://opensource.org/licenses/MIT",
   "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" }
 }
@@ -90,7 +90,7 @@ footer{
 <header>
   <img class="banner" src="banner.svg" alt="ManyMail — lightweight self-hosted email server">
   <p class="tagline">
-    A small Docker stack for inboxes you host yourself: SMTP receiver, webmail, IMAP,
+    A small server for inboxes you host yourself: SMTP receiver, webmail, forwarding rules
     and a REST API — without Postfix, Dovecot, or a full mail platform.
   </p>
   <div class="cta">
@@ -102,8 +102,8 @@ footer{
 
 <h2>What it is</h2>
 <p>
-  ManyMail receives mail for your own domains and gives you three ways to read it: a browser UI,
-  an IMAP endpoint for Thunderbird or a phone, and a REST API for scripts. Everything runs from
+  ManyMail receives mail for your own domains and gives you two ways to read it: a browser UI
+  and a REST API for scripts, plus rules that forward or push new mail to your phone. Everything runs from
   one <code>docker compose up</code> on a small VPS or an ARM box.
 </p>
 <p>
@@ -124,8 +124,8 @@ footer{
     <p>Search, read, reply, compose, attachments. Mail HTML and CSS are sanitized before they render.</p>
   </div>
   <div class="card">
-    <h3>IMAP</h3>
-    <p>Point Thunderbird or a phone client at it. An optional bridge pulls in Gmail, Outlook, QQ and 163 accounts.</p>
+    <h3>External mailboxes</h3>
+    <p>An optional bridge shows Gmail, Outlook, QQ and 163 accounts in the same web UI, with push notifications for new mail.</p>
   </div>
   <div class="card">
     <h3>REST API</h3>
@@ -137,7 +137,7 @@ footer{
   </div>
   <div class="card">
     <h3>One compose file</h3>
-    <p>FastAPI, Flask, Node.js and MongoDB. MIT licensed, and the data stays on your server.</p>
+    <p>One Go binary and one SQLite file, about 10 MB of RAM. MIT licensed, and the data stays on your server.</p>
   </div>
 </div>
 
@@ -146,7 +146,7 @@ footer{
   <thead><tr><th>What you want</th><th>Use</th></tr></thead>
   <tbody>
     <tr><td>Catch-all and disposable addresses on your own domain</td><td>ManyMail</td></tr>
-    <tr><td>Webmail, REST API and IMAP from one compose file</td><td>ManyMail</td></tr>
+    <tr><td>Webmail, REST API and forwarding rules from one compose file</td><td>ManyMail</td></tr>
     <tr><td>A small VPS or ARM box, no Postfix or Dovecot to tune</td><td>ManyMail</td></tr>
     <tr><td>Company mailboxes, CalDAV, ActiveSync, Rspamd, quotas</td><td>Mailcow, docker-mailserver, Mail-in-a-Box</td></tr>
   </tbody>

@@ -1,18 +1,15 @@
 # ManyMail
 
-Lightweight self-hosted email server with Docker: SMTP, IMAP, webmail, and REST API. Disposable / temp mail and multi-domain inboxes without Postfix or Mailcow.
+Lightweight self-hosted email server: SMTP, webmail, forwarding rules and a REST API in one Go binary with SQLite. Disposable / temp mail and multi-domain inboxes without Postfix or Mailcow.
 
 <div align="center">
 
 <img src="docs/banner.svg" alt="ManyMail — lightweight self-hosted email server" width="700">
 
-**One `docker compose up` — SMTP receiver, webmail, IMAP, REST API**
+**One container, about 10 MB of RAM — SMTP receiver, webmail, rules, REST API**
 
-[![Python](https://img.shields.io/badge/Python-3.11-3776AB?logo=python&logoColor=white)](https://python.org)
-[![FastAPI](https://img.shields.io/badge/FastAPI-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
-[![Flask](https://img.shields.io/badge/Flask-000000?logo=flask&logoColor=white)](https://flask.palletsprojects.com)
-[![Node.js](https://img.shields.io/badge/Node.js-20-339933?logo=node.js&logoColor=white)](https://nodejs.org)
-[![MongoDB](https://img.shields.io/badge/MongoDB-7-47A248?logo=mongodb&logoColor=white)](https://www.mongodb.com)
+[![Go](https://img.shields.io/badge/Go-1.27-00ADD8?logo=go&logoColor=white)](https://go.dev)
+[![SQLite](https://img.shields.io/badge/SQLite-003B57?logo=sqlite&logoColor=white)](https://sqlite.org)
 [![Docker](https://img.shields.io/badge/Docker-Compose-2496ED?logo=docker&logoColor=white)](https://docs.docker.com/compose/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Stars](https://img.shields.io/github/stars/margbug01/ManyMail?style=flat)](https://github.com/margbug01/ManyMail/stargazers)
@@ -29,35 +26,34 @@ Lightweight self-hosted email server with Docker: SMTP, IMAP, webmail, and REST 
 
 ## Why ManyMail
 
-Mailcow, docker-mailserver and Mail-in-a-Box are full mail platforms. ManyMail is a small Docker stack for **inboxes you host yourself**: verification-code mail, disposable addresses, and a few domains — with a browser UI and an API.
+Mailcow, docker-mailserver and Mail-in-a-Box are full mail platforms. ManyMail is a small server for **inboxes you host yourself**: verification-code mail, disposable addresses, and a few domains — with a browser UI and an API.
 
 | You want | Use |
 |:---------|:----|
 | Catch-all / temp addresses on your own domain | ManyMail |
-| Webmail + REST API + IMAP, one compose file | ManyMail |
+| Webmail + REST API + forwarding rules, one compose file | ManyMail |
 | Small VPS or ARM box, no Postfix/Dovecot | ManyMail |
-| Company mail, CalDAV, ActiveSync, Rspamd | Mailcow / docker-mailserver / Mail-in-a-Box |
+| Company mail, IMAP for desktop clients, CalDAV, ActiveSync, Rspamd | Mailcow / docker-mailserver / Mail-in-a-Box |
 
 ## Features
 
-- **Self-hosted SMTP** — receive mail for your domain on port 25; a built-in DNS check tells you which MX, SPF and DMARC records are missing
-- **Webmail** — search, read, reply, compose; HTML is sanitized before it renders
-- **IMAP** — Thunderbird and phone apps; optional bridge for Gmail, Outlook, QQ, 163
+- **Self-hosted SMTP** — receive mail for your domains on port 25 (STARTTLS optional); a built-in DNS check tells you which MX, SPF and DMARC records are missing
+- **Webmail** — search, read, reply, compose and send through Resend; incoming HTML is sanitized and remote images stay blocked until you load them
+- **External mailboxes** — an optional bridge shows Gmail, Outlook, QQ, 163 and other IMAP accounts in the same web UI
 - **REST API** — DuckMail-compatible endpoints for scripts and disposable-mail tools
-- **Forwarding and push rules** — forward to Gmail/QQ via Resend, push to ntfy, Telegram or a webhook, tag / mark read / trash by recipient, sender or subject, edited on a Rules page; new mail in external IMAP accounts can be pushed too ([docs](docs/mail-router.md))
-- **Multi-domain** — more than one domain; prefixes can be created when you need them
-- **One-command install** — `install.sh` plus prebuilt amd64 / arm64 images on GHCR; FastAPI + Flask + Node.js + MongoDB in Docker Compose. MIT licensed, data stays on your server
+- **Forwarding and push rules** — forward to Gmail/QQ via Resend, push to ntfy, Telegram or a webhook, tag / mark read / trash by recipient, sender or subject; rules run the moment mail arrives and are edited on a Rules page ([docs](docs/mail-router.md))
+- **Multi-domain** — any number of domains; mailboxes can be created on first use
+- **Small** — one static binary (~15 MB), one SQLite file, ~10 MB of RAM in use; prebuilt amd64 / arm64 images on GHCR. MIT licensed, data stays on your server
 
 ## Overview
 
-Four services in one compose file:
+Three containers in one compose file:
 
-| Service | Stack | Port | Description |
-|:--------|:------|:-----|:------------|
-| **mail-service** | FastAPI + aiosmtpd | `:25` `:8080` | SMTP receiver + DuckMail-compatible REST API |
-| **mail-viewer** | Flask + bleach | `:5000` | Web mail viewer with search, reply & compose |
-| **imap-bridge** | Node.js + imapflow | `:3939` | IMAP bridge for Gmail / Outlook / QQ etc. |
-| **mail-router** | Python | — | Forwarding and push-notification rules for incoming mail |
+| Container | Stack | Port | Description |
+|:----------|:------|:-----|:------------|
+| **manymail** | Go + SQLite | `:25` `:8080` `:5000` | SMTP receiver, REST API, web UI and rules engine |
+| **imap-bridge** | Node.js + imapflow | `:3939` (internal) | Optional: external IMAP accounts in the web UI |
+| **caddy** | Caddy 2 | `:80` `:443` | HTTPS with automatic certificates |
 
 <br>
 
@@ -66,27 +62,19 @@ Four services in one compose file:
 ```
     Internet                              Your Server
     ────────                              ───────────
-                      ┌──────────────────────────────────────────────┐
-                      │                                              │
-   Incoming     ──────┤►  mail-service        ┌───────────────┐     │
-   Email              │   (FastAPI+aiosmtpd)  │   MongoDB 7   │     │
-   (SMTP :25)         │   ┌──────────────┐    │   ┌─────────┐ │     │
-                      │   │ SMTP Handler │────┤►  │ accounts│ │     │
-                      │   │ REST API     │◄───┤   │ messages│ │     │
-                      │   └──────┬───────┘    │   │ domains │ │     │
-                      │          │ :8080      └───┴─────────┘─┘     │
-                      │          │                                    │
-                      │          ▼                                    │
-   Browser    ────────┤►  mail-viewer          imap-bridge           │
-   (HTTP :5000)       │   (Flask)              (Node.js)             │
-                      │   ┌──────────────┐    ┌──────────────┐      │
-                      │   │ Inbox View   │    │ Gmail        │      │
-                      │   │ Search       │◄───┤ Outlook      │      │
-                      │   │ Reply / Send │    │ QQ / 163     │      │
-                      │   │ HTML Sanitize│    │ Yahoo / GMX  │      │
-                      │   └──────────────┘    └──────────────┘      │
-                      │                         :3939                 │
-                      └──────────────────────────────────────────────┘
+                      ┌────────────────────────────────────────────────┐
+   Incoming     ──────┤►  manymail (one Go process)                    │
+   Email              │   ┌──────────────┐   ┌───────────────────────┐ │
+   (SMTP :25)         │   │ SMTP receiver│──►│ SQLite                │ │
+                      │   │ Rules engine │◄─►│ mail, attachments,    │ │
+                      │   │ REST API     │   │ accounts, rules       │ │
+                      │   │ Web UI       │   └───────────────────────┘ │
+                      │   └──────▲───────┘                             │
+   Browser    ──► Caddy (HTTPS) ─┘   ▲ new-mail events                 │
+                      │              │                                 │
+                      │   imap-bridge (Node.js) ──► Gmail / Outlook /  │
+                      │                             QQ / 163 ...       │
+                      └────────────────────────────────────────────────┘
 ```
 
 <br>
@@ -116,24 +104,43 @@ cp .env.example .env     # DOMAINS, SMTP_HOSTNAME, MAIL_WEB_HOST, secrets, ACCES
 docker compose up -d     # pulls images; add --build to build from this checkout
 ```
 
-For production, review `docs/production-hardening.md` and run
-`python tools/check_production_config.py` after editing `.env`.
+For production, review [`docs/production-hardening.md`](docs/production-hardening.md). The
+server refuses to start in `ENVIRONMENT=production` while a secret is left at its default.
 
 ### Check
 
 ```bash
 docker compose ps
-docker compose exec -T mail-service python dnscheck.py   # also at https://<web host>/dns-check
+docker compose exec -T manymail manymail dnscheck   # also at https://<web host>/dns-check
 curl http://127.0.0.1:8080/health
 ```
 
 ### Update
 
 ```bash
-git fetch --depth 1 origin tag v1.2.0 && git checkout v1.2.0
-sed -i 's/^MANYMAIL_VERSION=.*/MANYMAIL_VERSION=1.2.0/' .env
+git fetch --depth 1 origin tag vX.Y.Z && git checkout vX.Y.Z
+sed -i 's/^MANYMAIL_VERSION=.*/MANYMAIL_VERSION=X.Y.Z/' .env
 docker compose pull && docker compose up -d
 ```
+
+### Upgrading from 1.x (MongoDB)
+
+Version 2 replaces the Python services and MongoDB with one Go binary and SQLite. The `.env`
+stays as it is. Export the data **before** pulling the new version, while MongoDB still runs:
+
+```bash
+mkdir -p export
+for c in domains accounts messages sent_messages sender_keys routing_rules routing_events; do
+  docker compose exec -T mongodb mongoexport --quiet --db mailserver --collection "$c" > "export/$c.json"
+done
+git pull                                   # or check out the 2.x tag
+docker compose run --rm -v "$PWD/export:/export:ro" manymail import /export
+docker compose up -d --remove-orphans      # removes the old mail-service, mail-viewer, router, imap-server, mongodb
+```
+
+Message ids, mailbox passwords, Resend keys saved in the web UI and rules carry over; imported
+mail is not forwarded again. The IMAP server for desktop clients (port 993) is gone in 2.x.
+Once everything looks right, remove the old MongoDB volume with `docker volume rm`.
 
 <br>
 
@@ -157,11 +164,11 @@ _dmarc.yourdomain.com.  IN  TXT      "v=DMARC1; p=quarantine; rua=mailto:dmarc@y
 ManyMail does not sign outgoing mail, so there is no DKIM key to generate here. Replies and
 forwards go out through Resend; add the DKIM and SPF records Resend lists for your domain.
 
-The DNS self-check (`/dns-check` in the web UI, or `dnscheck.py`) looks up MX, the MX host's
-address, the web host, SPF and DMARC through public resolvers and prints the exact record
-to add for anything missing.
+The DNS self-check (`/dns-check` in the web UI, or `manymail dnscheck`) looks up MX, the MX
+host's address, the web host, SPF and DMARC through public resolvers and prints the exact
+record to add for anything missing.
 
-> **STARTTLS**: ManyMail supports STARTTLS. Mount your TLS certificate and key via `docker-compose.yml` and set `SMTP_TLS_CERT` / `SMTP_TLS_KEY` in `.env`. See `.env.example` for details.
+> **STARTTLS**: put the certificate and key in `./certs` (mounted read-only) and set `SMTP_TLS_CERT` / `SMTP_TLS_KEY` in `.env`. See `.env.example`.
 
 <br>
 
@@ -169,31 +176,41 @@ to add for anything missing.
 
 > Base URL: `http://127.0.0.1:8080`
 >
-> Auth: `Authorization: Bearer <token>` (except `/health`, `/token`, `/accounts`)
+> Auth: `Authorization: Bearer <token>` for mailbox endpoints; `X-API-Key: <API_KEY>` for `/admin/*`
 
 ### Account
 
 ```http
-POST /accounts              # Create mailbox account
-POST /token                 # Login, returns JWT
+POST /accounts                              # Create mailbox account
+POST /token                                 # Login, returns JWT (24h)
 ```
 
 ### Messages
 
 ```http
-GET  /messages              # List inbox (paginated: ?offset=0&limit=30)
-GET  /messages/{id}         # Message detail
-GET  /messages/search?q=    # Full-text search
-PATCH /messages/{id}        # Mark read / delete
-GET  /sent                  # Sent messages
+GET    /messages                            # Inbox (paginated: ?offset=0&limit=30)
+GET    /messages/{id}                       # Message detail, marks it read
+GET    /messages/{id}/attachments/{aid}     # Download an attachment
+GET    /messages/search?q=                  # Search subject, sender and body
+DELETE /messages/{id}                       # Move to trash
+GET    /messages/trash                      # Trash
+POST   /messages/{id}/restore               # Restore from trash
+DELETE /messages/{id}/permanent             # Delete for good
+POST   /messages/batch                      # {"action": "delete|mark_read|restore|permanent_delete", "ids": [...]}
+GET    /sent                                # Sent messages
 ```
 
 ### System
 
 ```http
-GET  /health                # Health check (no auth required)
-GET  /domains               # Active domain list
+GET  /health                                # Health check (no auth)
+GET  /domains                               # Active domains
+GET  /admin/domains · POST · DELETE /{d}    # Manage domains (API key)
+GET  /admin/dns-check                       # DNS self-check (API key)
 ```
+
+The rules API (list, edit, dry-run, test) lives under `/router/*` with the API key; see
+[docs/mail-router.md](docs/mail-router.md).
 
 <details>
 <summary><strong>Example: Create account & read inbox</strong></summary>
@@ -223,38 +240,21 @@ curl http://127.0.0.1:8080/messages \
 
 ```
 ManyMail/
-│
-├── mail-service/                # SMTP + REST API
-│   ├── app.py                   #   FastAPI main app
-│   ├── dnscheck.py              #   DNS self-check (MX, SPF, DMARC)
-│   ├── Dockerfile               #   Python 3.11-slim
-│   └── requirements.txt         #   fastapi, aiosmtpd, pymongo, jwt, bcrypt
-│
-├── mail-viewer/                 # Web Mail Viewer
-│   ├── app.py                   #   Flask main app
-│   ├── Dockerfile               #   Python 3.11-slim + gunicorn
-│   ├── requirements.txt         #   flask, bleach, tinycss2
-│   ├── templates/
-│   │   ├── index.html           #   Inbox UI
-│   │   └── login.html           #   Login page
-│   └── imap-mail-app/           #   IMAP Bridge (Node.js)
-│       ├── server.js            #     Express REST API
-│       ├── client.js            #     ImapFlow wrapper
-│       ├── config.js            #     Provider presets
-│       └── package.json         #     imapflow, mailparser
-│
-├── router/                      # Forwarding / notification rules
-│   ├── app.py                   #   Rule loop over new mail
-│   ├── rules.py                 #   Matching and validation
-│   ├── actions.py               #   forward, ntfy, telegram, webhook, tag, ...
-│   └── cli.py                   #   list / add / dry-run / test rules
-│
-├── docker-compose.yml           # All services (GHCR images, or build from source)
-├── install.sh                   # Interactive installer
-├── .env.example                 # Environment variable template
-└── tools/                       # Ops and manual test scripts
-    ├── send_test_smtp.py        #   Send a test mail to local SMTP
-    └── send_test_external_smtp.py # Send a test mail via external SMTP
+├── main.go                 # Config (.env) and startup; `manymail import`, `manymail dnscheck`
+├── smtpd.go, parse.go      # SMTP receiver and MIME parsing
+├── store.go, routestore.go # SQLite schema and queries
+├── api.go                  # DuckMail-compatible REST API
+├── viewer.go, sanitize.go  # Web UI, HTML sanitizer, image proxy, sending via Resend
+├── rules.go, router.go     # Forwarding / push rules and the rules API
+├── dnscheck.go             # MX / SPF / DMARC self-check
+├── migrate.go              # Import from a 1.x MongoDB export
+├── web/                    # Templates and front-end files, embedded into the binary
+├── imap-bridge/            # Optional Node.js bridge to external IMAP accounts
+├── i18n/                   # UI translations (tools/build-i18n.cjs bundles them)
+├── Dockerfile              # Two-stage build → alpine, runs as uid 10001
+├── docker-compose.yml      # manymail + imap-bridge + caddy
+├── install.sh              # Interactive installer
+└── tools/                  # UI tests, deploy script, test senders
 ```
 
 <br>
@@ -263,36 +263,27 @@ ManyMail/
 
 | Layer | Feature |
 |:------|:--------|
-| **Auth** | JWT tokens (24h expiry) + API Key for admin endpoints |
+| **Auth** | JWT tokens (24h expiry) + API key for admin endpoints |
 | **Password** | bcrypt hashing |
-| **Rate Limit** | Per-IP throttling on API, SMTP, viewer login, auto-create, domain admin, mail mutation, and send paths |
-| **SMTP** | IP blacklist / greylist, recipient limits, size limits, optional STARTTLS |
-| **Email Render** | HTML sanitization (bleach + CSSSanitizer), iframe sandbox |
-| **Network** | Server-side image proxy with private-address rejection |
-| **Storage** | Auto-cleanup via MongoDB TTL index (default 3 days; set `MESSAGE_TTL_DAYS=0` to keep indefinitely) |
-| **External IMAP** | Account persistence is encrypted with `IMAP_ACCOUNT_ENCRYPTION_KEY`; plaintext legacy account files are refused |
-| **Web** | Login-protected viewer, HttpOnly session cookies, production-safe auto-create default |
+| **Rate Limit** | Per-IP throttling on API, SMTP, web login, auto-create, domain admin, mail changes and sending |
+| **SMTP** | IP / sender blacklist, greylist, recipient and size limits, optional STARTTLS, auto-reply loop guard |
+| **Email Render** | Whitelist HTML/CSS sanitizer, sandboxed iframe, remote images only on request |
+| **Network** | Image proxy checks every connection and redirect against private addresses |
+| **Storage** | One SQLite file; optional cleanup after `MESSAGE_TTL_DAYS` (default 3, `0` keeps mail forever) |
+| **External IMAP** | Saved accounts are encrypted with `IMAP_ACCOUNT_ENCRYPTION_KEY` |
+| **Web** | Login-protected UI, HttpOnly session cookies, JSON-only APIs, changing `ACCESS_PASSWORD` ends all sessions |
 
-Additional hardening guidance: `docs/production-hardening.md`.
+Additional hardening guidance: [`docs/production-hardening.md`](docs/production-hardening.md).
 
 <br>
 
 ## Tech Stack
 
-<table>
-<tr>
-<td align="center" width="150"><br><strong>Python 3.11</strong><br>FastAPI · Flask<br><br></td>
-<td align="center" width="150"><br><strong>Node.js 20</strong><br>Express · ImapFlow<br><br></td>
-<td align="center" width="150"><br><strong>MongoDB 7</strong><br>pymongo<br><br></td>
-<td align="center" width="150"><br><strong>Docker</strong><br>Compose<br><br></td>
-</tr>
-</table>
-
-| Component | Dependencies |
-|:----------|:-------------|
-| mail-service | `fastapi` `uvicorn` `aiosmtpd` `pymongo` `PyJWT` `bcrypt` |
-| mail-viewer | `flask` `gunicorn` `requests` `bleach` `tinycss2` |
-| imap-bridge | `express` `imapflow` `mailparser` `dotenv` |
+| Component | Built with |
+|:----------|:-----------|
+| manymail | Go 1.27 · `emersion/go-smtp` · `modernc.org/sqlite` (pure Go, no cgo) · `golang.org/x/net/html` · `x/crypto/bcrypt` |
+| imap-bridge | Node.js 20 · `express` · `imapflow` · `mailparser` |
+| HTTPS | Caddy 2 |
 
 <br>
 

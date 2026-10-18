@@ -91,7 +91,7 @@ esac
 
 # ---- 2. Source ------------------------------------------------------------------------
 
-if [ -f docker-compose.yml ] && grep -q 'mail-router' docker-compose.yml; then
+if [ -f docker-compose.yml ] && [ -f go.mod ] && grep -q 'manymail' go.mod; then
   say "Using the checkout in $(pwd)"
 else
   DIR="${MANYMAIL_DIR:-ManyMail}"
@@ -123,7 +123,7 @@ fi
 
 # ---- 3. Ports -------------------------------------------------------------------------
 
-RUNNING=$($DOCKER ps --format '{{.Names}}' 2>/dev/null | grep -cx 'mail-service' || true)
+RUNNING=$($DOCKER ps --format '{{.Names}}' 2>/dev/null | grep -cx 'manymail' || true)
 if [ "$RUNNING" = 0 ] && command -v ss >/dev/null 2>&1; then
   say "Checking ports 25, 80, 443"
   BUSY=""
@@ -200,7 +200,6 @@ else
   set_env MESSAGE_TTL_DAYS "$MANYMAIL_TTL_DAYS"
   set_env JWT_SECRET "$(random_hex 32)"
   set_env API_KEY "$API_KEY"
-  set_env DUCKMAIL_API_KEY "$API_KEY"
   set_env ACCESS_PASSWORD "$MANYMAIL_PASSWORD"
   set_env SECRET_KEY "$(random_hex 32)"
   set_env UNIFIED_PASSWORD "$(random_hex 16)"
@@ -227,16 +226,16 @@ else
   $DOCKER compose up -d
 fi
 
-say "Waiting for mail-service"
+say "Waiting for ManyMail"
 STATUS=""
 for _ in $(seq 1 60); do
-  STATUS=$($DOCKER inspect -f '{{.State.Health.Status}}' mail-service 2>/dev/null || true)
+  STATUS=$($DOCKER inspect -f '{{.State.Health.Status}}' manymail 2>/dev/null || true)
   [ "$STATUS" = "healthy" ] && break
   sleep 3
 done
 if [ "$STATUS" != "healthy" ]; then
   $DOCKER compose ps
-  die "mail-service did not become healthy; see: $DOCKER compose logs mail-service"
+  die "ManyMail did not become healthy; see: $DOCKER compose logs manymail"
 fi
 note "healthy"
 
@@ -244,7 +243,7 @@ note "healthy"
 
 say "Checking DNS"
 # </dev/null: under `curl | bash` exec would otherwise eat the rest of this script from stdin.
-$DOCKER compose exec -T mail-service python dnscheck.py ${PUBLIC_IP:+--ip "$PUBLIC_IP"} < /dev/null || true
+$DOCKER compose exec -T manymail manymail dnscheck ${PUBLIC_IP:+"$PUBLIC_IP"} < /dev/null || true
 
 # ---- 8. Summary -----------------------------------------------------------------------
 

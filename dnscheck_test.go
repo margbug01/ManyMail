@@ -133,3 +133,13 @@ func TestDNSWebHost(t *testing.T) {
 		t.Errorf("placeholder checked: %+v", got)
 	}
 }
+
+func TestFormatReport(t *testing.T) {
+	r := runDNSCheck(fake(nil), []string{"example.com"}, ip(testIP), "", "mail.example.com")
+	out := formatReport(r)
+	for _, want := range []string{"Server IP: " + testIP, "[FAIL] example.com", "add: example.com.  MX  10  mail.example.com.", "problem(s)"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("missing %q in: %s", want, out)
+		}
+	}
+}

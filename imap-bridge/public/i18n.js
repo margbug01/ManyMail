@@ -1,4 +1,4 @@
-// 由 tools/build-i18n.cjs 从 mail-viewer/i18n/*.json 生成，别手改。
+// 由 tools/build-i18n.cjs 从 i18n/*.json 生成，别手改。
 (function (root) {
     'use strict';
     var STORAGE_KEY = 'manymail-lang';

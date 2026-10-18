@@ -1,33 +1,33 @@
-# Mail router
+# Forwarding and push rules
 
-`mail-router` runs rules against every message that arrives after it first started. A rule
-says which mail it applies to and what to do with it: forward it through Resend, push a
-notification to ntfy / Telegram / a webhook, or tag, mark read, or trash it.
+The rules engine inside `manymail` runs rules against every message received after it
+first started. A rule says which mail it applies to and what to do with it: forward it
+through Resend, push a notification to ntfy / Telegram / a webhook, or tag, mark read, or
+trash it. Rules run the moment a message is stored.
 
 It also hears about new mail in the external accounts added on the IMAP page (Gmail, QQ,
 Outlook, ...): the IMAP bridge reports each new message's sender and subject, and rules
 with `"source": ["imap"]` can push a notification for it.
 
-It replaces the old `mail-forwarder` and `mail-paypal-forwarder` containers. Their
-`FORWARD_*` and `PAYPAL_FORWARD_*` variables still work and show up as rules named
-`env-forward` and `env-paypal-forward`.
+The `FORWARD_*` and `PAYPAL_FORWARD_*` variables in `.env` still work: they show up as
+read-only rules named `env-forward` and `env-paypal-forward`.
 
 ## Managing rules
 
-Rules are stored in MongoDB (`routing_rules`). The easiest way to manage them is the
-**Rules** page of the webmail (`/rules`, linked from Settings): create and edit rules, switch
-them on and off, dry-run a rule against the last 100 messages, and send a test push.
+Rules are stored in the SQLite database. The easiest way to manage them is the **Rules**
+page of the web UI (`/rules`, linked from Settings): create and edit rules, switch them on
+and off, dry-run a rule against the last 100 messages, and send a test push.
 
-The same operations are available from the CLI inside the container:
+The same operations are available through the API (see below), for example:
 
 ```bash
-docker compose exec -T mail-router python cli.py list
-docker compose exec -T mail-router python cli.py add - < rule.json         # add or replace
-docker compose exec -T mail-router python cli.py dry-run - 100 < rule.json # which of the last 100 mails match
-docker compose exec -T mail-router python cli.py test <rule id>            # send a sample push
-docker compose exec -T mail-router python cli.py disable <rule id>
-docker compose exec -T mail-router python cli.py remove <rule id>
-docker compose exec -T mail-router python cli.py status 20                 # last 20 routed mails
+KEY=$(grep '^API_KEY=' .env | cut -d= -f2-)
+curl -s -H "X-API-Key: $KEY" http://127.0.0.1:8080/router/rules                       # list
+curl -s -H "X-API-Key: $KEY" -H 'Content-Type: application/json' \
+     -d @rule.json http://127.0.0.1:8080/router/rules                                  # add or replace
+curl -s -H "X-API-Key: $KEY" -H 'Content-Type: application/json' \
+     -d "{\"rule\": $(cat rule.json), \"limit\": 100}" http://127.0.0.1:8080/router/dry-run
+curl -s -H "X-API-Key: $KEY" 'http://127.0.0.1:8080/router/status?limit=20'          # last 20 routed mails
 ```
 
 Changes apply to the next message that arrives; no restart needed.
@@ -64,21 +64,21 @@ takes all mail that is not spam.
 | `to` | Recipient globs, e.g. `hello@example.com`, `*@example.com`, `otp-*@example.com` |
 | `from` | Sender globs, e.g. `*@github.com` |
 | `subject` | Substrings of the subject, case-insensitive |
-| `subject_regex` | Python regex searched in the subject, case-insensitive |
+| `subject_regex` | Regex searched in the subject, case-insensitive ([RE2 syntax](https://github.com/google/re2/wiki/Syntax): no lookarounds or backreferences) |
 | `body` | Substrings of the plain-text body |
 | `has_attachments` | `true` or `false` |
 | `include_spam` | Also run on mail the spam filter put in the trash (default `false`) |
 | `source` | `smtp` (mail received here, the default) and/or `imap` (new mail in external IMAP accounts) |
 
 For `imap` mail only the sender, recipient (the account address) and subject are known,
-so `body` never matches it and it counts as having no attachments; only `ntfy`, `telegram` and `webhook`
-actions run; the others are recorded as skipped.
+so `body` never matches it and it counts as having no attachments; only `ntfy`, `telegram`
+and `webhook` actions run; the others are recorded as skipped.
 
 ### Actions
 
 | Type | Fields | Notes |
 |:-----|:-------|:------|
-| `forward` | `to` (list), `from`, `subject_prefix`, `api_key_env` | Sent through Resend; `from` must be on a verified domain. Key from `api_key_env`, else `RESEND_API_KEY`. Reply-To is the original sender. |
+| `forward` | `to` (list), `from`, `subject_prefix`, `api_key_env` | Sent through Resend; `from` must be on a verified domain. Key from `api_key_env`, else `RESEND_API_KEY`. Reply-To is the original sender; attachments are included. |
 | `ntfy` | `topic`, `server` (default `https://ntfy.sh`), `token_env`, `priority` | Title is the subject; body has sender, recipient, the 6-digit code if any, and a preview. Tapping opens `VIEWER_PUBLIC_URL`. |
 | `telegram` | `chat_id`, `bot_token_env` (default `TELEGRAM_BOT_TOKEN`) | Same content as ntfy. |
 | `webhook` | `url`, `secret_env` | POSTs JSON `{event, rule, message}`; with a secret, `X-ManyMail-Signature: sha256=<hmac of the body>`. |
@@ -125,21 +125,23 @@ Push new mail from an external Gmail account, but only from your bank:
 
 ## How delivery works
 
-- On first start the router records the current time; older mail is never replayed.
-  `ROUTER_START_FROM=2026-10-01T00:00:00+00:00` overrides that on a fresh database.
+- On first start (or when a 1.x export is imported) the engine records the current time;
+  older mail is never replayed. On a fresh database `ROUTER_START_FROM` overrides that, as a
+  date (`2026-10-01`) or timestamp (`2026-10-01T08:00:00+08:00`).
 - Each message records which rules matched (fixed at first sight) and the result of each
-  action under `routing` in its MongoDB document.
+  action. The state is saved after every action, so a restart never repeats one that
+  already went out.
 - A failed action is retried alone, with exponential backoff starting at
   `ROUTER_RETRY_SECONDS` (default 60, capped at an hour), up to `ROUTER_MAX_ATTEMPTS`
-  (default 12). Actions that already succeeded are not repeated. Resend calls carry an
-  idempotency key per message and action.
+  (default 12). Resend calls carry an idempotency key per message and action.
 - The SMTP loop guard treats every `forward` target as a forwarding address: auto-replies
   from it are dropped instead of being stored and forwarded again.
 
 ## API
 
-The webmail talks to mail-router over a small JSON API on port 8090, reachable only inside
-the compose network. Every call except `GET /health` needs `X-API-Key: $API_KEY`.
+The rules API is served under `/router/*` on the API port (8080), and also at the root of
+port 8090 (`ROUTER_API_PORT`, set `0` to turn it off), the address the IMAP bridge uses.
+Every call except `GET /health` needs `X-API-Key: $API_KEY`.
 
 | Method | Path | |
 |:-------|:-----|:-|
@@ -156,13 +158,3 @@ The IMAP bridge reports through this API when `ROUTER_URL` and `ROUTER_API_KEY` 
 which `docker-compose.yml` does. It keeps track of the highest UID it has seen in each
 account's INBOX, so it never reports old mail, and after a reconnect it reports what came in
 meanwhile (at most 20 messages). IMAP events are kept for 30 days.
-
-## Upgrading from mail-forwarder
-
-1. Add `FORWARD_SUBJECT_PREFIX` / `PAYPAL_FORWARD_SUBJECT_PREFIX` to `.env` if you relied
-   on the old hard-coded subject prefix (it is now empty by default).
-2. `docker compose up -d --build mail-router`, then
-   `docker compose exec -T mail-router python cli.py list` should show the env rules.
-3. Remove the old containers: `docker rm -f mail-forwarder mail-paypal-forwarder`.
-   Running both for a moment is safe: the router skips mail the old forwarder already sent
-   and waits for mail it is sending.

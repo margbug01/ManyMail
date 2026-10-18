@@ -5,9 +5,9 @@ const path = require('node:path');
 const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
 
 const root = path.resolve(__dirname, '..');
-const shared = fs.readFileSync(path.join(root, 'mail-viewer/imap-mail-app/public/email-privacy.js'), 'utf8');
-const viewer = fs.readFileSync(path.join(root, 'mail-viewer/static/js/app.js'), 'utf8');
-const imap = fs.readFileSync(path.join(root, 'mail-viewer/imap-mail-app/public/app.js'), 'utf8');
+const shared = fs.readFileSync(path.join(root, 'imap-bridge/public/email-privacy.js'), 'utf8');
+const viewer = fs.readFileSync(path.join(root, 'web/static/js/app.js'), 'utf8');
+const imap = fs.readFileSync(path.join(root, 'imap-bridge/public/app.js'), 'utf8');
 const viewerRenderer = viewer.slice(viewer.indexOf('function _computeBodyScale('), viewer.indexOf('function _updateUnreadBadge('));
 const imapRenderer = imap.slice(imap.indexOf('      var renderProtectedBody = function('), imap.indexOf("      iframe.src = 'about:blank';"));
 const pixel = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Wl6i0cAAAAASUVORK5CYII=';

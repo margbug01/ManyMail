@@ -10,11 +10,11 @@
 name: ManyMail
 website_url: https://margbug01.github.io/ManyMail/
 source_code_url: https://github.com/margbug01/ManyMail
-description: Mail server for catch-all and disposable addresses across several domains, with webmail, IMAP and a REST API in one Docker Compose file.
+description: Mail server for catch-all and disposable addresses across several domains, with webmail, forwarding rules and a REST API in one Docker Compose file.
 licenses:
   - MIT
 platforms:
-  - Python
+  - Go
   - Nodejs
   - Docker
 tags:

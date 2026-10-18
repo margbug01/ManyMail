@@ -5,7 +5,7 @@ const assert = require('node:assert/strict');
 const path = require('node:path');
 const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
 
-const PUBLIC = path.resolve(__dirname, '../mail-viewer/imap-mail-app/public');
+const PUBLIC = path.resolve(__dirname, '../imap-bridge/public');
 const ORIGIN = 'http://manymail.test';
 const LIST_DELAY = 400;
 const STATUS_DELAY = 800;

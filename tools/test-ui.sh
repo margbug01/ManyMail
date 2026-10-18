@@ -44,14 +44,9 @@ BROWSER_PATH=$(topath -w "$BROWSER_PATH")
 export PLAYWRIGHT_MODULE BROWSER_PATH
 
 echo "== syntax"
-for f in mail-viewer/static/js/app.js mail-viewer/imap-mail-app/public/app.js mail-viewer/imap-mail-app/*.js tools/*.cjs; do
+for f in web/static/js/*.js web/shared/*.js imap-bridge/public/*.js imap-bridge/*.js tools/*.cjs; do
   node --check "$f"
 done
-PY=$(command -v python3 || command -v python || true)
-if [ -n "$PY" ]; then
-  # 只做语法解析，不生成 __pycache__（会弄脏工作区，部署脚本会拒绝）
-  "$PY" -c "import ast, sys; [ast.parse(open(f, encoding='utf-8').read(), f) for f in sys.argv[1:]]" mail-viewer/app.py
-fi
 echo "ok"
 
 FAILED=""

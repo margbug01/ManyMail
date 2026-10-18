@@ -5,6 +5,31 @@ Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed — 2.0: one Go binary instead of four services
+
+- `mail-service`, `mail-viewer`, `mail-router` and MongoDB are replaced by a single Go
+  program (`manymail`) with SQLite: SMTP on 25, REST API on 8080, web UI on 5000, rules
+  engine inside. Same environment variables, same DuckMail-compatible API, same web UI;
+  existing JWTs, bcrypt password hashes and saved Resend keys keep working. On the
+  maintainer's server memory use dropped from about 575 MB to about 10 MB
+- Rules run the moment a message is stored instead of every 5 seconds, and their state is
+  saved after each action, so a restart never repeats one that already went out
+- `manymail import <dir>` loads a `mongoexport` of a 1.x installation (see the README);
+  `manymail dnscheck` replaces `dnscheck.py`
+- Repository layout: the Go code is at the root, the IMAP bridge moved to `imap-bridge/`,
+  translations to `i18n/`
+
+### Removed
+
+- The IMAP server for desktop and phone clients (`imap-server`, port 993)
+- `router/cli.py` (the Rules page and the rules API cover it) and
+  `tools/check_production_config.py` (the server checks its own configuration)
+
+### Fixed
+
+- Resend keys saved on the Settings page were shown as in use but never used for sending
+- A message nesting attached messages thousands deep took minutes of CPU to parse
+
 ### Added
 
 - Seven more interface languages: Traditional Chinese, Japanese, Korean, Spanish, French,
@@ -12,7 +37,7 @@ Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   Dates follow the language, IMAP folder names are translated, and without a saved choice
   the browser language is used (falling back to English)
 - `tools/test-i18n.cjs` fails when a page gains a string that a translation lacks;
-  translations live in `mail-viewer/i18n/*.json` and `tools/build-i18n.cjs` bundles them
+  translations live in `i18n/*.json` and `tools/build-i18n.cjs` bundles them
   into the shared `i18n.js`
 
 ### Fixed

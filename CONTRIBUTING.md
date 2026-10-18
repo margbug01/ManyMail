@@ -8,11 +8,11 @@ For anything security-related, go through [SECURITY.md](SECURITY.md) instead of 
 
 | Path | What runs there |
 |:-----|:----------------|
-| `mail-service/` | FastAPI + aiosmtpd — SMTP receiver on `:25`, REST API on `:8080` |
-| `mail-viewer/` | Flask webmail UI on `:5000` |
-| `mail-viewer/imap-mail-app/` | Node.js IMAP bridge on `:3939` |
-| `imap-server/` | Node.js IMAP server on `:993` |
-| `tools/` | operational scripts |
+| `*.go` | the `manymail` server: SMTP on `:25`, REST API on `:8080`, web UI on `:5000`, rules engine |
+| `web/` | templates and front-end files, embedded into the binary |
+| `imap-bridge/` | Node.js bridge to external IMAP accounts on `:3939` |
+| `i18n/` | UI translations; `node tools/build-i18n.cjs` bundles them into both copies of `i18n.js` |
+| `tools/` | UI tests, deploy script, test senders |
 | `docs/` | documentation and the GitHub Pages landing page |
 
 ## Running it
@@ -23,43 +23,44 @@ docker compose up -d --build
 docker compose logs -f
 ```
 
-To iterate on the webmail UI alone, skip Docker:
+Without Docker, the server is one Go binary:
 
 ```bash
-cd mail-viewer
-pip install -r requirements.txt
-SECRET_KEY=dev ACCESS_PASSWORD= PORT=5000 python app.py
+go build -o manymail .
+DB_PATH=./dev.db SMTP_PORT=2525 DOMAINS=test.local ACCESS_PASSWORD= ./manymail
 ```
 
-`ACCESS_PASSWORD=` empty disables the login page in development. Production refuses to start without it.
+`ACCESS_PASSWORD=` empty disables the web login in development (UI on `:5000`, API on
+`:8080`). `ENVIRONMENT=production` refuses to start without the secrets.
 
-## Tests and lint
+## Tests
 
-Same commands CI runs, so run them before opening a PR:
+Same checks CI runs, so run them before opening a PR:
 
 ```bash
-# lint
-ruff check mail-service/ mail-viewer/app.py mail-viewer/tests/ tools/
-
-# Python tests
-cd mail-service && pytest tests/ -v && cd ..
-pytest mail-viewer/tests/ -v
-
-# Node tests
-cd mail-viewer/imap-mail-app && npm ci && npm test && cd ../..
-cd imap-server && npm ci && npm test && cd ..
+gofmt -l .                       # must print nothing
+go vet ./... && go test ./...
+(cd imap-bridge && npm ci && node --test)
+node tools/build-i18n.cjs --check && node tools/test-i18n.cjs
+tools/test-ui.sh                 # headless-browser UI tests with stubbed APIs
 ```
 
-Ruff config lives in `ruff.toml`: `py311`, line length 120.
+`go test -race ./...` needs cgo; on Windows set `CC` to a MinGW gcc.
 
 ## Pull requests
 
 - One topic per PR.
 - Say what breaks if the change is wrong, and how you checked that it does not.
-- Add a test when you fix a bug. `mail-viewer/tests/test_app.py` shows the pattern for loading the Flask app under a controlled environment.
-- Keep the existing style of the file you are editing. The frontend lives in one `mail-viewer/templates/index.html`; follow the conventions already there rather than introducing a build step.
-- User-facing strings in the viewer need both `zh` and `en` entries in the `LANGS` object.
-- Touching the mail HTML sanitizer means adding a test that proves the payload no longer gets through.
+- Add a test when you fix a bug. `api_test.go` and `viewer_test.go` show how to run the
+  server against a temporary database.
+- Keep the existing style of the file you are editing. The web UI has no build step: plain
+  JavaScript in `web/static/js`, Go templates in `web/templates`.
+- User-facing strings need `zh` and `en` entries in the page's `LANGS` object, plus the
+  other languages in `i18n/*.json`.
+- `web/shared/*.js` are copies of `imap-bridge/public/*.js`; change both (the i18n test
+  checks that they match).
+- Touching the mail HTML sanitizer (`sanitize.go`) means adding a test that proves the
+  payload no longer gets through.
 
 ## Reporting a bug
 

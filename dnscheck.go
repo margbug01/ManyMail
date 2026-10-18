@@ -11,6 +11,7 @@ import (
 	"net"
 	"net/http"
 	"net/netip"
+	"os"
 	"sort"
 	"strconv"
 	"strings"
@@ -318,4 +319,49 @@ func detectPublicIP() string {
 		}
 	}
 	return ""
+}
+
+// formatReport prints the report like `python dnscheck.py` did, for the install script.
+func formatReport(r dnsReport) string {
+	marks := map[string]string{dnsOK: " OK ", dnsWarn: "WARN", dnsFail: "FAIL", dnsInfo: "INFO"}
+	ip := "unknown (pass --ip)"
+	if r.IP != nil {
+		ip = *r.IP
+	}
+	var b strings.Builder
+	fmt.Fprintf(&b, "Server IP: %s\n", ip)
+	for _, it := range r.Items {
+		fmt.Fprintf(&b, "[%s] %-28s %-8s %s\n", marks[it.Status], it.Domain, it.Check, it.Detail)
+		if it.Fix != "" && (it.Status == dnsWarn || it.Status == dnsFail) {
+			fmt.Fprintf(&b, "       add: %s\n", it.Fix)
+		}
+	}
+	fmt.Fprintf(&b, "%d problem(s), %d warning(s)\n", r.Summary.Fail, r.Summary.Warn)
+	return b.String()
+}
+
+// runDNSCheckCLI: `manymail dnscheck [ip]`, for the active domains in the database and $DOMAINS.
+// Exits 1 when something must be fixed.
+func runDNSCheckCLI(args []string) int {
+	cfg := loadConfig()
+	st, err := openStore(cfg.DBPath)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "open store:", err)
+		return 2
+	}
+	defer st.Close()
+	ip := ""
+	if len(args) > 0 {
+		ip = args[0]
+	}
+	report, problem, err := newAPI(cfg, st).dnsReport(ip)
+	if err != nil || problem != "" {
+		fmt.Fprintln(os.Stderr, "dns check:", err, problem)
+		return 2
+	}
+	fmt.Print(formatReport(report))
+	if report.Summary.Fail > 0 {
+		return 1
+	}
+	return 0
 }

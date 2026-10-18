@@ -1,6 +1,0 @@
-/manymail
-/manymail.exe
-/data/
-*.db
-*.db-shm
-*.db-wal

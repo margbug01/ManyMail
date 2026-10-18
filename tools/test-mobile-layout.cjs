@@ -3,13 +3,13 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
 const root = path.resolve(__dirname, '..');
-const imapPublic = path.join(root, 'mail-viewer/imap-mail-app/public');
+const imapPublic = path.join(root, 'imap-bridge/public');
 const html = fs.readFileSync(path.join(imapPublic, 'index.html'), 'utf8');
 const imapCss = fs.readFileSync(path.join(imapPublic, 'style.css'), 'utf8');
 const imapJs = fs.readFileSync(path.join(imapPublic, 'app.js'), 'utf8');
-const hostTemplate = fs.readFileSync(path.join(root, 'mail-viewer/static/js/app.js'), 'utf8');
+const hostTemplate = fs.readFileSync(path.join(root, 'web/static/js/app.js'), 'utf8');
 const hostSizing = hostTemplate.slice(hostTemplate.indexOf('function fitMobileImapFrame()'), hostTemplate.indexOf('function ensureImapLoaded()'));
-const privacy = fs.readFileSync(path.join(root, 'mail-viewer/imap-mail-app/public/email-privacy.js'), 'utf8');
+const privacy = fs.readFileSync(path.join(root, 'imap-bridge/public/email-privacy.js'), 'utf8');
 
 (async () => {
   const browser = await chromium.launch({ headless: true, ...(process.env.BROWSER_PATH ? { executablePath: process.env.BROWSER_PATH } : {}) });

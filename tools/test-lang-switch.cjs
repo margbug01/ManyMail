@@ -5,13 +5,12 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
 
-const VIEWER = path.resolve(__dirname, '../mail-viewer');
+const VIEWER = path.resolve(__dirname, '../web');
 const ORIGIN = 'http://manymail.test';
 const html = fs.readFileSync(path.join(VIEWER, 'templates/index.html'), 'utf8')
-  .replace("{{ url_for('static', filename='favicon.svg') }}", '/static/favicon.svg')
-  .replace("{{ asset_url('css/app.css') }}", '/static/css/app.css')
-  .replace("{{ shared_url('i18n.js') }}", '/i18n.js')
-  .replace("{{ asset_url('js/app.js') }}", '/static/js/app.js');
+  .replace('{{asset "css/app.css"}}', '/static/css/app.css')
+  .replace('{{shared "i18n.js"}}', '/i18n.js')
+  .replace('{{asset "js/app.js"}}', '/static/js/app.js');
 assert.ok(!html.includes('{{'), 'unhandled template tag in index.html');
 const BOOTSTRAP_STUB = `window.bootstrap = {
   Modal: class { show() {} hide() {} static getInstance() { return null; } static getOrCreateInstance() { return new this(); } },
@@ -49,9 +48,9 @@ async function openPage(browser, locale, storage) {
     if (url.origin !== ORIGIN) return route.abort();
     const json = (o) => route.fulfill({ contentType: 'application/json', body: JSON.stringify(o) });
     if (url.pathname === '/') return route.fulfill({ contentType: 'text/html', body: html });
-    if (url.pathname === '/i18n.js') return route.fulfill({ path: path.join(VIEWER, 'imap-mail-app/public/i18n.js') });
+    if (url.pathname === '/i18n.js') return route.fulfill({ path: path.join(VIEWER, 'shared/i18n.js') });
     if (url.pathname.startsWith('/static/')) return route.fulfill({ path: path.join(VIEWER, url.pathname) });
-    if (url.pathname === '/email-privacy.js') return route.fulfill({ path: path.join(VIEWER, 'imap-mail-app/public/email-privacy.js') });
+    if (url.pathname === '/email-privacy.js') return route.fulfill({ path: path.join(VIEWER, 'shared/email-privacy.js') });
     if (url.pathname === '/api/domains') return json({ success: true, domains: [{ domain: 'example.test', is_active: true }] });
     if (url.pathname === '/api/inbox/detail') {
       const { message_id } = JSON.parse(route.request().postData());

@@ -286,6 +286,9 @@ func newID() string {
 
 func main() {
 	log.SetFlags(log.LstdFlags | log.Lmsgprefix)
+	if len(os.Args) > 1 && os.Args[1] == "dnscheck" { // manymail dnscheck [ip]
+		os.Exit(runDNSCheckCLI(os.Args[2:]))
+	}
 	if len(os.Args) > 1 && os.Args[1] == "import" { // manymail import <mongoexport dir>
 		if len(os.Args) != 3 {
 			log.Fatal("usage: manymail import <directory with <collection>.json files>")

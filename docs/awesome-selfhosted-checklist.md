@@ -37,8 +37,8 @@ you to wait. Nothing more can be done about it from this side.
 
 | Requirement | Status |
 |:---|:---|
-| Self-hostable server software, not a library or SDK | Yes — SMTP, IMAP and HTTP daemons |
-| Not merely a Dockerization of an existing project | Yes — original FastAPI + aiosmtpd implementation |
+| Self-hostable server software, not a library or SDK | Yes — SMTP and HTTP daemons |
+| Not merely a Dockerization of an existing project | Yes — original Go implementation |
 | Not dependent on a specific cloud provider | Yes — outbound Resend is optional |
 | Free and open-source license | MIT, already in `licenses.yml` |
 | Working installation instructions | README quick start plus `docker compose` |
@@ -47,7 +47,7 @@ you to wait. Nothing more can be done about it from this side.
 | Changelog | [CHANGELOG.md](../CHANGELOG.md), Keep a Changelog format |
 | Not already listed, and not on awesome-sysadmin | Checked — no `manymail` entry |
 | Tag exists in `tags/` | `Communication - Email - Complete Solutions` |
-| Platforms exist in `platforms/` | `Python`, `Nodejs`, `Docker` |
+| Platforms exist in `platforms/` | `Go`, `Nodejs`, `Docker` |
 | Description under 250 characters, sentence case | 143 characters |
 | Description avoids "open-source", "free", "self-hosted" | Yes |
 | kebab-case filename | `manymail.yml` |

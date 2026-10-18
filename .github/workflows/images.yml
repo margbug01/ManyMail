@@ -1,6 +1,6 @@
 name: Images
 
-# Multi-arch images for docker-compose.yml, published to ghcr.io/margbug01/manymail-*.
+# Multi-arch images for docker-compose.yml, published to ghcr.io/margbug01/manymail and manymail-imap-bridge.
 # A v* tag publishes <version>, <major>.<minor> and latest; a manual run publishes sha-<commit>.
 on:
   push:
@@ -19,18 +19,12 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - image: manymail-mail-service
-            context: mail-service
-            description: ManyMail SMTP receiver and REST API
-          - image: manymail-mail-viewer
-            context: mail-viewer
-            description: ManyMail webmail
+          - image: manymail
+            context: .
+            description: ManyMail mail server (SMTP, REST API, web UI, rules) in one binary
           - image: manymail-imap-bridge
-            context: mail-viewer/imap-mail-app
+            context: imap-bridge
             description: ManyMail bridge to external IMAP accounts
-          - image: manymail-router
-            context: router
-            description: ManyMail forwarding and push-notification rules
     steps:
       - uses: actions/checkout@v4
 

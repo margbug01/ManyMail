@@ -1,121 +1,41 @@
-# Prebuilt multi-arch images (amd64 / arm64) are pulled from GHCR; if a pull fails, or with
-# `docker compose up -d --build`, the images are built from this checkout instead.
-services:
-  # ---- MongoDB ----
-  mongodb:
-    image: mongo:7
-    container_name: mail-mongodb
-    restart: unless-stopped
-    volumes:
-      - mongo_data:/data/db
-    command: >
-      mongod
-      --wiredTigerCacheSizeGB 0.25
-      --quiet
-    healthcheck:
-      test: ["CMD", "mongosh", "--eval", "db.runCommand('ping').ok"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 20s
-    networks:
-      - mail-net
+# ManyMail: one Go container (SMTP, API, web UI, rules) plus the IMAP bridge for external
+# mailboxes and Caddy for HTTPS. Prebuilt multi-arch images come from GHCR; with
+# `docker compose up -d --build` they are built from this checkout instead.
+name: manymail
 
-  # ---- Mail Service (SMTP + REST API) ----
-  mail-service:
-    image: ghcr.io/margbug01/manymail-mail-service:${MANYMAIL_VERSION:-latest}
-    build: ./mail-service
-    container_name: mail-service
+services:
+  manymail:
+    image: ghcr.io/margbug01/manymail:${MANYMAIL_VERSION:-latest}
+    build: .
+    container_name: manymail
     restart: unless-stopped
+    env_file: .env
+    environment:
+      - DB_PATH=/data/manymail.db
+      - SMTP_PORT=25
+      - API_PORT=8080
+      - VIEWER_PORT=5000
+      - ROUTER_API_PORT=8090
     ports:
       - "25:25"
       - "127.0.0.1:8080:8080"
-    expose:
-      - "8080"
-    env_file:
-      - .env
-    environment:
-      - ENVIRONMENT=production
-      - CORS_ORIGINS=${CORS_ORIGINS:-http://127.0.0.1:5000}
-      - ENABLE_API_DOCS=${ENABLE_API_DOCS:-0}
-      - EXPOSE_HEALTH_DETAILS=${EXPOSE_HEALTH_DETAILS:-0}
-      - RATE_LIMIT_WINDOW=${RATE_LIMIT_WINDOW:-60}
-      - RATE_LIMIT_MAX=${RATE_LIMIT_MAX:-60}
-      - SMTP_RCPT_RATE_WINDOW=${SMTP_RCPT_RATE_WINDOW:-60}
-      - SMTP_RCPT_RATE_MAX=${SMTP_RCPT_RATE_MAX:-100}
-      - SMTP_DATA_RATE_WINDOW=${SMTP_DATA_RATE_WINDOW:-60}
-      - SMTP_DATA_RATE_MAX=${SMTP_DATA_RATE_MAX:-20}
-      - SMTP_MAX_RCPTS_PER_MESSAGE=${SMTP_MAX_RCPTS_PER_MESSAGE:-20}
-      - SMTP_MAX_MESSAGE_BYTES=${SMTP_MAX_MESSAGE_BYTES:-10485760}
-      - SMTP_MAX_ADDRESS_LENGTH=${SMTP_MAX_ADDRESS_LENGTH:-320}
-      - SMTP_BLACKLIST_IPS=${SMTP_BLACKLIST_IPS:-}
-      - SMTP_BLACKLIST_SENDERS=${SMTP_BLACKLIST_SENDERS:-}
-      - SMTP_SPAM_TRASH_ENABLED=${SMTP_SPAM_TRASH_ENABLED:-0}
-      - SMTP_SPAM_TRASH_SENDERS=${SMTP_SPAM_TRASH_SENDERS:-}
-      - SMTP_SPAM_TRASH_SUBJECT_PHRASES=${SMTP_SPAM_TRASH_SUBJECT_PHRASES:-}
-      - SMTP_SPAM_TRASH_BODY_PHRASES=${SMTP_SPAM_TRASH_BODY_PHRASES:-}
-      - SMTP_SPAM_TRASH_LINK_DOMAINS=${SMTP_SPAM_TRASH_LINK_DOMAINS:-}
-      - SMTP_GREYLIST_ENABLED=${SMTP_GREYLIST_ENABLED:-0}
-      - SMTP_GREYLIST_DELAY_SECONDS=${SMTP_GREYLIST_DELAY_SECONDS:-60}
-      - SMTP_GREYLIST_TTL_SECONDS=${SMTP_GREYLIST_TTL_SECONDS:-3600}
-      - SMTP_TLS_CERT=${SMTP_TLS_CERT:-}
-      - SMTP_TLS_KEY=${SMTP_TLS_KEY:-}
-    volumes:
-      - ./certs:/opt/ManyMail/certs:ro
-    depends_on:
-      mongodb:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/health', timeout=5).read()"]
-      interval: 30s
-      timeout: 5s
-      retries: 3
-      start_period: 20s
-    networks:
-      - mail-net
-
-  # ---- Mail Viewer (Web UI) ----
-  mail-viewer:
-    image: ghcr.io/margbug01/manymail-mail-viewer:${MANYMAIL_VERSION:-latest}
-    build: ./mail-viewer
-    container_name: mail-viewer
-    restart: unless-stopped
-    ports:
       - "127.0.0.1:5000:5000"
-    environment:
-      - ENVIRONMENT=${ENVIRONMENT:-production}
-      - DUCKMAIL_BASE_URL=http://mail-service:8080
-      - DUCKMAIL_API_KEY=${DUCKMAIL_API_KEY}
-      - ACCESS_PASSWORD=${ACCESS_PASSWORD}
-      - SECRET_KEY=${SECRET_KEY}
-      - UNIFIED_PASSWORD=${UNIFIED_PASSWORD}
-      - MAX_IMAGE_PROXY_BYTES=${MAX_IMAGE_PROXY_BYTES:-5242880}
-      - AUTO_CREATE_ACCOUNTS=${AUTO_CREATE_ACCOUNTS:-1}
-      - LOGIN_RATE_LIMIT_WINDOW=${LOGIN_RATE_LIMIT_WINDOW:-300}
-      - LOGIN_RATE_LIMIT_MAX=${LOGIN_RATE_LIMIT_MAX:-10}
-      - SENSITIVE_RATE_LIMIT_WINDOW=${SENSITIVE_RATE_LIMIT_WINDOW:-60}
-      - SENSITIVE_RATE_LIMIT_MAX=${SENSITIVE_RATE_LIMIT_MAX:-20}
-      - RESEND_API_KEY=${RESEND_API_KEY:-}
-      - RESEND_API_KEY_CNHEALTHTOURISM=${RESEND_API_KEY_CNHEALTHTOURISM:-}
-      - IMAP_MAIL_BASE_URL=http://imap-mail:3939
-    healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:5000/login', timeout=5).read()"]
-      interval: 30s
-      timeout: 5s
-      retries: 3
-      start_period: 20s
-    depends_on:
-      mail-service:
-        condition: service_healthy
-      imap-mail:
-        condition: service_started
+    volumes:
+      # SQLite database; set MANYMAIL_DATA to a host path to keep it outside Docker (owner uid 10001)
+      - ${MANYMAIL_DATA:-manymail_data}:/data
+      # STARTTLS certificate, see SMTP_TLS_CERT / SMTP_TLS_KEY in .env
+      - ./certs:/opt/ManyMail/certs:ro
     networks:
-      - mail-net
+      mail-net:
+        # The old service names, so Caddyfiles and IMAP bridges from before the Go
+        # version keep working.
+        aliases: [mail-service, mail-viewer, mail-router]
 
-  # ---- IMAP Mail Bridge (Node.js) ----
+  # Reads external mailboxes (Gmail, Outlook, ...) for the web UI's IMAP tab and reports
+  # new mail to the rules engine for push notifications.
   imap-mail:
     image: ghcr.io/margbug01/manymail-imap-bridge:${MANYMAIL_VERSION:-latest}
-    build: ./mail-viewer/imap-mail-app
+    build: ./imap-bridge
     container_name: mail-imap-bridge
     restart: unless-stopped
     environment:
@@ -123,8 +43,7 @@ services:
       - ACCOUNTS_FILE=/data/accounts.json
       - IMAP_ACCOUNT_PERSISTENCE=${IMAP_ACCOUNT_PERSISTENCE:-encrypted}
       - IMAP_ACCOUNT_ENCRYPTION_KEY=${IMAP_ACCOUNT_ENCRYPTION_KEY:-}
-      # New mail in external accounts is reported to mail-router for push rules
-      - ROUTER_URL=http://mail-router:8090
+      - ROUTER_URL=http://manymail:8090
       - ROUTER_API_KEY=${API_KEY:-}
     volumes:
       - imap_mail_data:/data
@@ -139,34 +58,6 @@ services:
     networks:
       - mail-net
 
-  # ---- Mail router: forwarding and push-notification rules ----
-  # Rules live in MongoDB, edited on the webmail's /rules page or with router/cli.py;
-  # FORWARD_* / PAYPAL_FORWARD_* in .env become rules. Its API (:8090) is only on mail-net.
-  mail-router:
-    image: ghcr.io/margbug01/manymail-router:${MANYMAIL_VERSION:-latest}
-    build: ./router
-    container_name: mail-router
-    restart: unless-stopped
-    env_file:
-      - .env
-    environment:
-      - MONGO_URL=mongodb://mongodb:27017
-      - DB_NAME=${DB_NAME:-mailserver}
-    expose:
-      - "8090"
-    healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8090/health', timeout=5).read()"]
-      interval: 30s
-      timeout: 5s
-      retries: 3
-      start_period: 15s
-    depends_on:
-      mongodb:
-        condition: service_healthy
-    networks:
-      - mail-net
-
-  # ---- Caddy (Reverse Proxy + Auto HTTPS) ----
   caddy:
     image: caddy:2-alpine
     container_name: mail-caddy
@@ -181,13 +72,12 @@ services:
       - caddy_data:/data
       - caddy_config:/config
     depends_on:
-      mail-viewer:
-        condition: service_started
+      - manymail
     networks:
       - mail-net
 
 volumes:
-  mongo_data:
+  manymail_data:
   imap_mail_data:
   caddy_data:
   caddy_config:

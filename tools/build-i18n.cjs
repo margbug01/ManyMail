@@ -1,5 +1,6 @@
 #!/usr/bin/env node
-// 把 mail-viewer/i18n/*.json（中英以外的界面语言）打包成 imap-mail-app/public/i18n.js。
+// 把 i18n/*.json（中英以外的界面语言）打包成 i18n.js，写两份：imap-bridge/public（桥接自己用）
+// 和 web/shared（编进 Go 程序），内容相同。
 // 主界面、IMAP 子页面、规则页、登录页都加载这一个文件；中文和英文词典仍写在各自的脚本里。
 //   node tools/build-i18n.cjs          重新生成
 //   node tools/build-i18n.cjs --check  只比对，生成结果和仓库里的不一致就退出 1
@@ -7,8 +8,8 @@ const fs = require('fs');
 const path = require('path');
 
 const ROOT = path.resolve(__dirname, '..');
-const SRC_DIR = path.join(ROOT, 'mail-viewer', 'i18n');
-const OUT = path.join(ROOT, 'mail-viewer', 'imap-mail-app', 'public', 'i18n.js');
+const SRC_DIR = path.join(ROOT, 'i18n');
+const OUTS = [path.join(ROOT, 'imap-bridge', 'public', 'i18n.js'), path.join(ROOT, 'web', 'shared', 'i18n.js')];
 
 // 顺序就是菜单里的顺序；fallback = 词典缺键时退回哪种语言
 const LANGUAGES = [
@@ -30,7 +31,7 @@ function build() {
         const file = path.join(SRC_DIR, lang.code + '.json');
         dicts[lang.code] = JSON.parse(fs.readFileSync(file, 'utf8'));
     }
-    return `// 由 tools/build-i18n.cjs 从 mail-viewer/i18n/*.json 生成，别手改。
+    return `// 由 tools/build-i18n.cjs 从 i18n/*.json 生成，别手改。
 (function (root) {
     'use strict';
     var STORAGE_KEY = 'manymail-lang';
@@ -99,13 +100,17 @@ function build() {
 const out = build();
 if (process.argv.includes('--check')) {
     // Windows 上 autocrlf 签出来是 CRLF，换行不算差异
-    const cur = fs.existsSync(OUT) ? fs.readFileSync(OUT, 'utf8').replace(/\r\n/g, '\n') : '';
-    if (cur !== out) {
-        console.error('i18n.js is stale: run node tools/build-i18n.cjs');
-        process.exit(1);
+    for (const OUT of OUTS) {
+        const cur = fs.existsSync(OUT) ? fs.readFileSync(OUT, 'utf8').replace(/\r\n/g, '\n') : '';
+        if (cur !== out) {
+            console.error(path.relative(ROOT, OUT) + ' is stale: run node tools/build-i18n.cjs');
+            process.exit(1);
+        }
     }
     console.log('i18n.js up to date');
 } else {
-    fs.writeFileSync(OUT, out);
-    console.log('wrote ' + path.relative(ROOT, OUT));
+    for (const OUT of OUTS) {
+        fs.writeFileSync(OUT, out);
+        console.log('wrote ' + path.relative(ROOT, OUT));
+    }
 }
