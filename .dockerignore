@@ -4,4 +4,7 @@ docs
 tools
 i18n
 data
+backups
+certs
+.env
 *.md
