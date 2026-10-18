@@ -5,6 +5,8 @@ Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [2.0.0] - 2026-10-18
+
 ### Changed — 2.0: one Go binary instead of four services
 
 - `mail-service`, `mail-viewer`, `mail-router` and MongoDB are replaced by a single Go
@@ -210,6 +212,7 @@ point where the feature set and the deployment story are stable enough to pin a 
 - Production hardening guide in `docs/production-hardening.md`
 - CI runs Ruff, Python tests, Node tests, and a Docker build on every push
 
+[2.0.0]: https://github.com/margbug01/ManyMail/releases/tag/v2.0.0
 [1.3.0]: https://github.com/margbug01/ManyMail/releases/tag/v1.3.0
 [1.2.0]: https://github.com/margbug01/ManyMail/releases/tag/v1.2.0
 [1.1.0]: https://github.com/margbug01/ManyMail/releases/tag/v1.1.0
