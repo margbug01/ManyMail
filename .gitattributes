@@ -1,2 +1,6 @@
 # Shell scripts must keep LF endings, even in Windows checkouts.
 *.sh text eol=lf
+# Bundled from i18n/*.json by tools/build-i18n.cjs
+imap-bridge/public/i18n.js linguist-generated=true
+# Copies of imap-bridge/public/*.js embedded into the Go binary
+web/shared/** linguist-generated=true
