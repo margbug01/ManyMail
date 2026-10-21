@@ -2,13 +2,12 @@ const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
 const { chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright');
+const { openApp } = require('./ui-app.cjs');
 const root = path.resolve(__dirname, '..');
 const imapPublic = path.join(root, 'imap-bridge/public');
 const html = fs.readFileSync(path.join(imapPublic, 'index.html'), 'utf8');
 const imapCss = fs.readFileSync(path.join(imapPublic, 'style.css'), 'utf8');
 const imapJs = fs.readFileSync(path.join(imapPublic, 'app.js'), 'utf8');
-const hostTemplate = fs.readFileSync(path.join(root, 'web/static/js/app.js'), 'utf8');
-const hostSizing = hostTemplate.slice(hostTemplate.indexOf('function fitMobileImapFrame()'), hostTemplate.indexOf('function ensureImapLoaded()'));
 const privacy = fs.readFileSync(path.join(root, 'imap-bridge/public/email-privacy.js'), 'utf8');
 
 (async () => {
@@ -19,7 +18,6 @@ const privacy = fs.readFileSync(path.join(root, 'imap-bridge/public/email-privac
       await page.route('**/*', route => {
         const url = new URL(route.request().url());
         if (url.hostname !== 'manymail.test') return route.abort();
-        if (url.pathname === '/host') return route.fulfill({ contentType: 'text/html', body: '<!doctype html><style>body{margin:0}iframe{display:block;width:100%;border:0;min-height:80vh}</style><nav style="height:96px">Host navigation</nav><iframe id="imap-frame" src="/?embedded=1"></iframe><script>' + hostSizing + '; fitMobileImapFrame();</script>' });
         if (url.pathname.endsWith('email-privacy.js')) return route.fulfill({ contentType: 'text/javascript', body: privacy });
         if (url.pathname.endsWith('/i18n.js')) return route.fulfill({ path: path.join(imapPublic, 'i18n.js') });
         if (url.pathname.endsWith('/app.js')) return route.fulfill({ contentType: 'text/javascript', body: imapJs });
@@ -73,13 +71,34 @@ const privacy = fs.readFileSync(path.join(root, 'imap-bridge/public/email-privac
       }
       console.log(viewport.width + 'x' + viewport.height + ': list height=' + Math.round(geometry.height) + ', list top=' + Math.round(geometry.y) + '; navigation and detail passed');
       if (viewport.width < 992) {
-        await page.goto('http://manymail.test/host');
-        await page.waitForLoadState('networkidle');
-        const frame = await page.locator('#imap-frame').boundingBox();
-        assert.ok(frame.y + frame.height <= viewport.height);
-        const list = await page.frameLocator('#imap-frame').locator('#mail-list').boundingBox();
+        // The real main page hosting the IMAP sub-app on its IMAP tab
+        const host = await openApp(browser, {
+          viewport,
+          extra: (url, route) => {
+            if (!url.pathname.startsWith('/imap/')) return undefined;
+            const file = url.pathname.slice('/imap/'.length);
+            if (file === '') return route.fulfill({ contentType: 'text/html', body: html });
+            if (file.startsWith('api/')) return route.fulfill({ contentType: 'application/json', body: '[]' });
+            return route.fulfill({ path: path.join(imapPublic, file) });
+          },
+        });
+        await host.page.locator('#tab-imap').click();
+        await host.page.frameLocator('#imap-frame').locator('#mail-list').waitFor();
+        await host.page.waitForTimeout(100);
+        const frame = await host.page.locator('#imap-frame').boundingBox();
+        assert.ok(frame.y + frame.height <= viewport.height, JSON.stringify(frame));
+        const list = await host.page.frameLocator('#imap-frame').locator('#mail-list').boundingBox();
         assert.ok(list.height > frame.height * 0.5);
+        assert.equal(await host.page.locator('#btn-left-drawer').isVisible(), false, 'drawer button hidden on the IMAP tab');
+        assert.deepEqual(host.errors, []);
         console.log('Nested host: list height=' + Math.round(list.height) + ', no outer overflow');
+
+        // Main mail view on a phone: list first, detail replaces it, back returns
+        await host.page.locator('#tab-mail').click();
+        assert.equal(await host.page.locator('#btn-left-drawer').isVisible(), true);
+        assert.equal(await host.page.locator('#mail-detail-column').isVisible(), false);
+        assert.equal(await host.page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true, 'main page scrolls sideways');
+        await host.context.close();
       }
       await page.close();
     }

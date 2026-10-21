@@ -8,3 +8,5 @@ backups
 certs
 .env
 *.md
+frontend/node_modules
+web/static/app

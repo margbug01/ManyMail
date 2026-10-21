@@ -39,10 +39,10 @@ if [ "$LOCAL" != "$REMOTE" ]; then
 fi
 echo "local = github = ${LOCAL:0:7}"
 
-# 1b. Local tests (Go tests, then the UI with stubbed APIs, ~40s). Tested code == pushed code, since the tree is clean.
+# 1b. Local tests (UI build + UI with stubbed APIs, then Go tests, which need that build). Tested code == pushed code, since the tree is clean.
 if [ "$DRY" = "1" ] || [ "$SKIP_TESTS" = "1" ]; then
   echo "local tests skipped"
-elif ! go test ./... || ! tools/test-ui.sh; then
+elif ! tools/test-ui.sh || ! go test ./...; then
   echo "ABORT: local tests failed. Fix them, or deploy anyway with --skip-tests." >&2
   exit 1
 fi
@@ -88,7 +88,7 @@ while IFS= read -r f; do
   [ -z "$f" ] && continue
   case "$f" in
     */test/*|*_test.go|*.md|docs/*|tools/*|i18n/*|.github/*|.env.example|.gitignore) ;;
-    *.go|go.mod|go.sum|web/*|Dockerfile|.dockerignore) add manymail ;;
+    *.go|go.mod|go.sum|web/*|frontend/*|Dockerfile|.dockerignore) add manymail ;;
     imap-bridge/*) add imap-mail ;;
     docker-compose.yml|Caddyfile|.env.example)
       WARN="$WARN $f" ;;

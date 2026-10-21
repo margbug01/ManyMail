@@ -249,9 +249,10 @@ ManyMail/
 ├── dnscheck.go             # MX / SPF / DMARC self-check
 ├── migrate.go              # Import from a 1.x MongoDB export
 ├── web/                    # Templates and front-end files, embedded into the binary
+├── frontend/               # Main mail UI (SolidJS + TypeScript, Vite) → web/static/app
 ├── imap-bridge/            # Optional Node.js bridge to external IMAP accounts
 ├── i18n/                   # UI translations (tools/build-i18n.cjs bundles them)
-├── Dockerfile              # Two-stage build → alpine, runs as uid 10001
+├── Dockerfile              # Node builds the UI, Go builds the binary → alpine, runs as uid 10001
 ├── docker-compose.yml      # manymail + imap-bridge + caddy
 ├── install.sh              # Interactive installer
 └── tools/                  # UI tests, deploy script, test senders
@@ -282,6 +283,7 @@ Additional hardening guidance: [`docs/production-hardening.md`](docs/production-
 | Component | Built with |
 |:----------|:-----------|
 | manymail | Go 1.27 · `emersion/go-smtp` · `modernc.org/sqlite` (pure Go, no cgo) · `golang.org/x/net/html` · `x/crypto/bcrypt` |
+| web UI | SolidJS 2 (RC) · TypeScript · Vite (build time only) · Bootstrap 5 · Quill |
 | imap-bridge | Node.js 20 · `express` · `imapflow` · `mailparser` |
 | HTTPS | Caddy 2 |
 

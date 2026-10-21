@@ -236,9 +236,10 @@ ManyMail/
 ├── dnscheck.go             # MX / SPF / DMARC 自检
 ├── migrate.go              # 从 1.x 的 MongoDB 导出导入
 ├── web/                    # 页面模板和前端文件，编译进二进制
+├── frontend/               # 主邮件界面（SolidJS + TypeScript，Vite 构建）→ web/static/app
 ├── imap-bridge/            # 可选的 Node.js 外部 IMAP 邮箱桥接
 ├── i18n/                   # 界面翻译（tools/build-i18n.cjs 打包）
-├── Dockerfile              # 两阶段构建 → alpine，以 uid 10001 运行
+├── Dockerfile              # Node 构建界面、Go 构建程序 → alpine，以 uid 10001 运行
 ├── docker-compose.yml      # manymail + imap-bridge + caddy
 ├── install.sh              # 交互式安装脚本
 └── tools/                  # 界面测试、部署脚本、测试发信
@@ -269,6 +270,7 @@ ManyMail/
 | 组件 | 用到的东西 |
 |:-----|:-----------|
 | manymail | Go 1.27 · `emersion/go-smtp` · `modernc.org/sqlite`（纯 Go，无 cgo）· `golang.org/x/net/html` · `x/crypto/bcrypt` |
+| 网页界面 | SolidJS 2（RC）· TypeScript · Vite（只在构建时）· Bootstrap 5 · Quill |
 | imap-bridge | Node.js 20 · `express` · `imapflow` · `mailparser` |
 | HTTPS | Caddy 2 |
 

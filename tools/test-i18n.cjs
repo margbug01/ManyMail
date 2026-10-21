@@ -23,7 +23,7 @@ function grab(rel, startRe, endMarker) {
 }
 
 const sources = {
-    app: grab('web/static/js/app.js', /const LANGS = \{/, '\n};'),
+    app: grab('frontend/src/langs.ts', /const LANGS = \{/, '\n};'),
     imap: grab('imap-bridge/public/app.js', /const LANGS = \{/, '\n};'),
     rules: grab('web/static/js/rules.js', /const TEXT = \{/, '\n    };'),
     login: grab('web/templates/login.html', /const LANGS = \{/, '\n        };'),

@@ -126,7 +126,7 @@ func TestViewerLoginAndPages(t *testing.T) {
 	e.login()
 
 	_, index := e.req("GET", "/", nil)
-	for _, asset := range []string{"css/app.css", "js/app.js"} {
+	for _, asset := range []string{"css/app.css", "app/main.js"} {
 		m := regexp.MustCompile(`/static/` + regexp.QuoteMeta(asset) + `\?v=[0-9a-f]{12}`).FindString(index)
 		if m == "" {
 			t.Errorf("%s not versioned in index", asset)

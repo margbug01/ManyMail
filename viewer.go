@@ -1,8 +1,8 @@
 package main
 
-// The web UI that used to be mail-viewer (Flask). Same pages, same /api/* JSON for
-// static/js/app.js. It reads the store directly instead of logging in to the REST API
-// for every call; mailbox passwords are still checked.
+// The web UI that used to be mail-viewer (Flask). Same pages, same /api/* JSON for the
+// main UI (frontend/, built into web/static/app). It reads the store directly instead of
+// logging in to the REST API for every call; mailbox passwords are still checked.
 
 import (
 	"bytes"
@@ -73,6 +73,9 @@ func newViewer(cfg *Config, st *Store, a *api) *viewer {
 		}
 		return nil
 	})
+	if v.versions["web/static/app/main.js"] == "" {
+		log.Print("web/static/app/main.js is missing, the main page will be blank: run npm ci && npm run build in frontend/ before go build")
+	}
 	v.tmpl = template.Must(template.New("").Funcs(template.FuncMap{
 		"asset":  func(name string) string { return "/static/" + name + "?v=" + v.versions["web/static/"+name] },
 		"shared": func(name string) string { return "/" + name + "?v=" + v.versions["web/shared/"+name] },

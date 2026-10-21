@@ -66,7 +66,7 @@ body {
 /* 中栏窄的时候（桌面小窗口三栏各分三分之一）一行放不下，「自动」和刷新会被挤到第二行。
    按卡片头内容宽度分档收（实测文字版要 382px、图标版 262px，按三位未读数和中英文较宽者算）：先把文件夹按钮收成图标（未读数保留，文字进 title），再收「自动」两个字 */
 @container (max-width: 389px) {
-    .mail-list-header .nav-tabs-group .btn > span[data-i18n] { display: none; }
+    .mail-list-header .nav-tabs-group .btn > .folder-label { display: none; }
     .mail-list-header .nav-tabs-group .btn > i { margin-right: 0 !important; }
     .mail-list-header .nav-tabs-group .btn { padding-left: 10px; padding-right: 10px; }
 }
@@ -74,7 +74,7 @@ body {
     .mail-list-header .form-switch .form-check-label { display: none; }
 }
 /* 上面的阈值按中英文量的；法语、俄语等文字更长，由 fitListHeader() 实测折行后加这两个类，效果同上 */
-.mail-list-header.compact-tabs .nav-tabs-group .btn > span[data-i18n] { display: none; }
+.mail-list-header.compact-tabs .nav-tabs-group .btn > .folder-label { display: none; }
 .mail-list-header.compact-tabs .nav-tabs-group .btn > i { margin-right: 0 !important; }
 .mail-list-header.compact-tabs .nav-tabs-group .btn { padding-left: 10px; padding-right: 10px; }
 .mail-list-header.compact-auto .form-switch .form-check-label { display: none; }
@@ -93,7 +93,12 @@ body {
         padding: 4px 8px;
         font-size: 0.78rem;
     }
-    /* 窄屏只有顶部模式切换收成图标，文件夹按钮保留文字 */
+    /* 顶部模式切换是手机上最常点的：按钮做到和右边几个一样高，图标放大；放得下才带文字 */
+    .mode-group .btn { min-width: 52px; height: 38px; padding: 0 14px; font-size: 0.875rem; display: inline-flex; align-items: center; justify-content: center; }
+    .mode-group .btn i { font-size: 1.15rem; }
+    .navbar > .container-fluid > .d-flex .btn-sm { min-width: 38px; height: 38px; display: inline-flex; align-items: center; justify-content: center; }
+}
+@media (max-width: 429.98px) {
     .mode-group .btn .nav-tab-label { display: none; }
     .mode-group .btn i { margin-right: 0 !important; }
 }
@@ -201,6 +206,11 @@ body {
 .error-state i {
     font-size: 2.5rem;
     margin-bottom: 12px;
+}
+
+/* Solid 的挂载点不占布局：导航、提示和三栏仍是 body 的直接弹性子项 */
+#app {
+    display: contents;
 }
 
 /* 三栏邮件布局 */
@@ -749,10 +759,12 @@ body {
     #mail-detail-column > .card > .card-body { padding: 10px 12px; }
     .mail-list-scroll .mail-item.card > .card-body { padding: 10px 4px; }
 
-    /* 详情：操作按钮只留图标排一行，信息行收紧 */
-    .detail-actions { gap: 4px; flex-wrap: nowrap; overflow-x: auto; }
-    .detail-actions .btn { width: 40px; height: 36px; padding: 0; display: inline-flex; align-items: center; justify-content: center; flex: 0 0 auto; }
+    /* 详情：操作按钮和列表头一样是 btn-sm 图标钮，一行排开；删除推到最右，右边不留空 */
+    .detail-actions { gap: 6px; flex-wrap: nowrap; }
+    .detail-actions .btn { width: 40px; height: 32px; padding: 0; display: inline-flex; align-items: center; justify-content: center; flex: 0 0 auto; }
+    .detail-actions .btn i { font-size: 1rem; line-height: 1; }
     .detail-actions .btn-label { display: none; }
+    .detail-actions .btn:last-child { margin-left: auto; }
     .detail-meta-row { margin-bottom: 4px; font-size: 0.85rem; gap: 4px; }
     #mail-detail-content hr { margin: 10px 0; }
 

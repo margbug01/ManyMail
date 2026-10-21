@@ -5,6 +5,32 @@ Versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Changed
+
+- The main mail page (mailbox query, lists, search and paging, detail, compose, settings) is
+  now a SolidJS 2 + TypeScript app in `frontend/`, built with Vite into `web/static/app` and
+  still embedded in the Go binary; no Node process runs in production. Same look, same
+  `/api/*` calls. The rules, login and DNS pages and the IMAP bridge are unchanged
+- Docker builds the UI in a Node stage first; building from source without Docker now needs
+  `npm ci && npm run build` in `frontend/` before `go build`
+- The refresh button, the "Refresh" button of an empty inbox and "Load more" act on the
+  mailbox being shown, no longer on whatever is typed in the prefix box. A failed "Load more"
+  shows a message and keeps the list instead of replacing it with an error
+
+### Fixed
+
+- Replies that arrive late no longer overwrite newer ones: querying another mailbox, opening
+  another mail, auto-refresh and "load more" each drop stale responses
+- Auto-refresh keeps the pages loaded with "load more", leaves search results alone and
+  refreshes the mailbox being shown instead of whatever is typed in the prefix box
+- Restoring a mail from Trash shows it in the inbox when you switch back
+- The "unsent draft found" bar in the compose window only shows when there is a draft
+  (Bootstrap's `d-flex` used to override its `display:none`, so it was always visible)
+- An auto-refresh that was already on its way no longer brings back a mail you just deleted
+  or marks a mail you just read as unread again
+- Disabling a domain whose name contains `#` or `?` no longer disables a different domain
+  (the name is now encoded in the request path)
+
 ## [2.0.0] - 2026-10-18
 
 ### Changed — 2.0: one Go binary instead of four services

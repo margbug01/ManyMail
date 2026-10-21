@@ -16,6 +16,8 @@ __pycache__/
 
 # Node
 node_modules/
+# frontend/ build output, embedded into the Go binary (built by Docker, CI and tools/test-ui.sh)
+/web/static/app/
 npm-debug.log*
 
 # IDE

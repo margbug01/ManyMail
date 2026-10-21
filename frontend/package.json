@@ -1,0 +1,22 @@
+{
+  "name": "manymail-frontend",
+  "private": true,
+  "type": "module",
+  "description": "Main mail UI (SolidJS). Built into web/static/app and embedded into the Go binary.",
+  "scripts": {
+    "build": "vite build",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@solidjs/web": "2.0.0-rc.16",
+    "solid-js": "2.0.0-rc.16"
+  },
+  "devDependencies": {
+    "@solidjs/vite-plugin": "3.0.0-next.50",
+    "typescript": "7.0.2",
+    "vite": "8.3.5"
+  },
+  "engines": {
+    "node": ">=22.12"
+  }
+}
