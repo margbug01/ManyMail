@@ -149,21 +149,30 @@ function readFileAsBase64(file: File): Promise<string> {
 async function onAttachmentsPicked(input: HTMLInputElement) {
   const files = Array.from(input.files || []);
   input.value = '';
-  let total = totalBytes();
+  const seq = openSeq;
   for (const file of files) {
+    if (seq !== openSeq || !visible) return;
+    flush();
     if (file.size > MAX_ATTACHMENT_MB * 1024 * 1024) {
       toastError(t('attachmentTooLarge', { name: file.name, max: MAX_ATTACHMENT_MB }));
       continue;
     }
-    if (total + file.size > MAX_ATTACHMENT_TOTAL_MB * 1024 * 1024) {
+    if (totalBytes() + file.size > MAX_ATTACHMENT_TOTAL_MB * 1024 * 1024) {
       toastError(t('attachmentTotalTooLarge', { max: MAX_ATTACHMENT_TOTAL_MB }));
       break;
     }
     try {
       const content = await readFileAsBase64(file);
-      total += file.size;
+      if (seq !== openSeq || !visible) return;
+      flush();
+      if (totalBytes() + file.size > MAX_ATTACHMENT_TOTAL_MB * 1024 * 1024) {
+        toastError(t('attachmentTotalTooLarge', { max: MAX_ATTACHMENT_TOTAL_MB }));
+        continue;
+      }
       setC(s => { s.attachments.push({ filename: file.name, size: file.size, contentType: file.type || '', content }); });
+      flush();
     } catch {
+      if (seq !== openSeq || !visible) return;
       toastError(t('attachmentReadFailed', { name: file.name }));
     }
   }
@@ -190,6 +199,7 @@ function show() {
 }
 
 function close(clearDraft: boolean) {
+  openSeq++;
   clearTimeout(draftTimer);
   visible = false;
   if (clearDraft) discardDraft();
@@ -210,6 +220,15 @@ export function openCompose() {
   show();
 }
 
+function quotedBody(msg: MessageDetail): string {
+  if (msg.text?.trim()) return msg.text;
+  const doc = new DOMParser().parseFromString(msg.html || '', 'text/html');
+  doc.querySelectorAll('script, style, template, iframe, object, embed').forEach(el => el.remove());
+  doc.querySelectorAll('br').forEach(el => el.replaceWith('\n'));
+  doc.querySelectorAll('p, div, li, tr, blockquote, h1, h2, h3, h4, h5, h6').forEach(el => el.append('\n'));
+  return (doc.body.textContent || '').trim();
+}
+
 function quoteOriginal(msg: MessageDetail, origSubject: string) {
   const origDate = msg.createdAt ? new Date(msg.createdAt).toLocaleString(locale()) : '';
   const origFrom = msg.from?.address || '';
@@ -217,7 +236,7 @@ function quoteOriginal(msg: MessageDetail, origSubject: string) {
   ed.setContents([]);
   ed.insertText(0, '\n\n');
   const quoteStart = ed.getLength();
-  const quoteText = `--- Original Message ---\nFrom: ${origFrom}\nDate: ${origDate}\nSubject: ${origSubject}\n\n${msg.text || ''}`;
+  const quoteText = `--- Original Message ---\nFrom: ${origFrom}\nDate: ${origDate}\nSubject: ${origSubject}\n\n${quotedBody(msg)}`;
   ed.insertText(quoteStart, quoteText);
   ed.formatText(quoteStart, quoteText.length, 'color', '#6c757d');
   ed.setSelection(0, 0);

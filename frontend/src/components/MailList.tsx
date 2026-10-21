@@ -83,7 +83,7 @@ export function MailList(props: { reloadImap: () => void }) {
                      }} />
               <label class="form-check-label small" for="auto-refresh-toggle">{t('auto')}</label>
             </div>
-            <button class="btn btn-sm btn-outline-secondary" onClick={() => refreshCurrentTab(props.reloadImap)} id="btn-refresh-mail" disabled={!state.email}>
+            <button class="btn btn-sm btn-outline-secondary" onClick={() => refreshCurrentTab(props.reloadImap)} id="btn-refresh-mail" disabled={!state.email || state.querying}>
               <i class="bi bi-arrow-clockwise"></i>
             </button>
           </div>

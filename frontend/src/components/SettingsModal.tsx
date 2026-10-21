@@ -162,9 +162,13 @@ function SenderKeyRow(props: { item: SenderKey; open: boolean; onToggle: () => v
   const origin = () => ({ settings: t('keyOriginSettings'), 'env-domain': t('keyFromEnvDomain'), 'env-default': t('keyFromEnvDefault') } as Record<string, string>)[props.item.source || ''] || '';
   const url = () => '/api/settings/sender-keys/' + encodeURIComponent(props.item.domain);
 
+  let saveInFlight = false;
+
   async function save() {
+    if (saveInFlight) return;
     const key = input.value.trim();
     if (!key) { input.focus(); return; }
+    saveInFlight = true;
     setSaving(true);
     setNote({ kind: 'muted', text: t('keySaving') });
     try {
@@ -174,6 +178,8 @@ function SenderKeyRow(props: { item: SenderKey; open: boolean; onToggle: () => v
       await loadSenderKeys();
     } catch (e) {
       setNote({ kind: 'danger', text: errorText(e) });
+    } finally {
+      saveInFlight = false;
       setSaving(false);
     }
   }

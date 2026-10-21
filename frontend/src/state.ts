@@ -91,6 +91,7 @@ export const [state, setState] = createStore<AppState>({
 // Plain mirrors for code that runs right after a write: store reads only see a write after
 // the microtask flush.
 let currentEmail = '';
+let querying = false;
 const tickets = { inbox: 0, sent: 0, trash: 0, detail: 0, search: 0 };
 // Bumped by every local change to the inbox list; a silent refresh that started before one drops its reply.
 let inboxEdits = 0;
@@ -264,7 +265,10 @@ export async function queryInbox() {
 }
 
 async function loadInbox(email: string, silent = false) {
-  if (!silent) resetMailDetail();
+  if (!silent) {
+    querying = true;
+    resetMailDetail();
+  }
   const ticket = ++tickets.inbox;
   setState(s => {
     s.queryError = '';
@@ -287,6 +291,7 @@ async function loadInbox(email: string, silent = false) {
       return;
     }
     const changed = email !== currentEmail;
+    if (changed) resetMailDetail();
     currentEmail = email;
     tickets.search++;
     saveViewState({ email });
@@ -314,7 +319,10 @@ async function loadInbox(email: string, silent = false) {
       s.inbox.error = t('networkError') + ': ' + errorText(e);
     });
   } finally {
-    if (ticket === tickets.inbox && !silent) setState(s => { s.querying = false; });
+    if (ticket === tickets.inbox && !silent) {
+      querying = false;
+      setState(s => { s.querying = false; });
+    }
   }
 }
 
@@ -322,7 +330,7 @@ async function loadInbox(email: string, silent = false) {
 // so neither "load more" pages, checkboxes nor the open mail get lost.
 export async function refreshInboxSilently() {
   const email = currentEmail;
-  if (!email || state.search.active || state.inbox.status === 'loading' || state.inbox.loadingMore) return;
+  if (!email || querying || state.search.active || state.inbox.status === 'loading' || state.inbox.loadingMore) return;
   const ticket = ++tickets.inbox;
   const edits = inboxEdits;
   const limit = Math.min(Math.max(state.inbox.items.length, PAGE_SIZE), MAX_PAGE);
@@ -378,7 +386,7 @@ export async function loadMoreInbox() {
   }
 }
 
-export const reloadInbox = () => (currentEmail ? loadInbox(currentEmail) : undefined);
+export const reloadInbox = () => (currentEmail && !querying ? loadInbox(currentEmail) : undefined);
 
 // ---- 搜索 ----
 export async function searchMail() {
@@ -532,6 +540,8 @@ export async function batchAction(action: 'delete' | 'mark_read') {
   const email = currentEmail;
   const ids = [...state.selected];
   if (!email || ids.length === 0) return;
+  const pool = state.search.active ? state.search.items : state.inbox.items;
+  const removed = pool.filter(m => ids.includes(m.id)).map(m => ({ ...m }));
   try {
     const data = await batchRequest(email, action, ids);
     if (!data.success) {
@@ -541,8 +551,6 @@ export async function batchAction(action: 'delete' | 'mark_read') {
     if (email !== currentEmail) return;
     if (action === 'delete') {
       // 直接删（软删除），用 Toast 给撤销入口，省掉每次确认弹窗
-      const pool = state.search.active ? state.search.items : state.inbox.items;
-      const removed = pool.filter(m => ids.includes(m.id)).map(m => ({ ...m }));
       removeFromInbox(ids);
       resetMailDetail();
       showToast(t('mailsDeleted', { n: ids.length }), {
@@ -550,7 +558,7 @@ export async function batchAction(action: 'delete' | 'mark_read') {
         onAction: async () => {
           // 撤销批量删除走一次 batch restore；失败就引导去回收站
           try {
-            const r = await batchRequest(email, 'restore', removed.map(m => m.id));
+            const r = await batchRequest(email, 'restore', ids);
             if (r.success) putBackIntoInbox(email, removed);
             else toastError(t('undoFailed'));
           } catch {

@@ -274,12 +274,15 @@ body {
         flex-direction: column;
         gap: 1rem;
         padding: 0;
-        overflow: visible;
+        overflow-y: auto;
+        overflow-x: hidden;
+        overscroll-behavior: contain;
     }
     .mail-left .mail-query-card { flex: 0 0 auto; }
     /* 最近邮箱按内容高度收，不撑满剩余空间；条目多了由内部滚动接住 */
     .mail-left .mail-recent-card {
-        flex: 0 1 auto;
+        flex: 0 0 auto;
+        max-height: max(180px, 40vh);
         min-height: 0;
         display: flex;
         flex-direction: column;
