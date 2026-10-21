@@ -9,6 +9,9 @@ export default defineConfig({
     outDir: '../web/static/app',
     emptyOutDir: true,
     modulePreload: false,
+    // main.js.map sits next to main.js so production stack traces point at frontend/src.
+    // The source is public on GitHub anyway; the map is only fetched when devtools are open.
+    sourcemap: true,
     rolldownOptions: {
       input: 'src/main.tsx',
       output: { entryFileNames: 'main.js' },
